@@ -1,3 +1,24 @@
+/*
+ * -----------------------------------------------------------------------------
+ * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
+ * CARRERA: Ingeniería en Informática
+ * ASIGNATURA: Programación III / Proyecto de Software
+ *
+ * PROYECTO: GESTIÓN DE INVENTARIO DE UNA TIENDA (SICONI)
+ * ARCHIVO: AddEditProductDialog.java
+ *
+ * AUTORA: Johanna Guedez - V14089807
+ * PROFESORA: Ing. Dubraska Roca
+ * FECHA: Enero 2026
+ * VERSIÓN: 1.3.0 (Rectangular Button Standard & Screen Fit)
+ *
+ * DESCRIPCIÓN TÉCNICA:
+ * Diálogo modal para la creación y edición de productos.
+ * Implementa botones rectangulares estandarizados y optimización de
+ * altura para visualización completa en resoluciones estándar.
+ * -----------------------------------------------------------------------------
+ */
+
 package com.swimcore.view.dialogs;
 
 import com.swimcore.dao.ProductDAO;
@@ -7,6 +28,7 @@ import com.swimcore.view.InventoryView;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.awt.event.ActionListener;
 import java.util.HashMap;
@@ -22,101 +44,154 @@ public class AddEditProductDialog extends JDialog {
     private JTextArea txtDesc;
     private JComboBox<Category> cmbCategory;
 
-    // Colores
+    // --- PALETA CORPORATIVA SICONI 8K ---
     private final Color COLOR_BG = new Color(20, 20, 20);
-    private final Color COLOR_INPUT = new Color(40, 40, 40);
+    private final Color COLOR_INPUT_BG = new Color(45, 45, 45);
     private final Color COLOR_TEXTO = new Color(240, 240, 240);
-    private final Color COLOR_VERDE = new Color(0, 255, 128);
+    private final Color COLOR_VERDE_NEON = new Color(0, 255, 128);
+    private final Color COLOR_FUCSIA = new Color(220, 0, 115);
+
+    private final Font FONT_INPUT = new Font("Tahoma", Font.PLAIN, 16);
+    private final Font FONT_LABEL = new Font("Tahoma", Font.BOLD, 13);
 
     public AddEditProductDialog(InventoryView parent, Product product) {
         super(parent, product == null ? "Registrar Nuevo Ítem" : "Editar Ítem", true);
         this.productToEdit = product;
 
-        // Prefijos Inteligentes
-        categoryPrefixes.put("Modelos Referencia", "MOD");
-        categoryPrefixes.put("Textiles", "MAT");
-        categoryPrefixes.put("Mercería", "MER");
-        categoryPrefixes.put("Branding", "BRA");
-        categoryPrefixes.put("Equipos Taller", "ACT");
-        categoryPrefixes.put("Accesorios", "REV");
+        setupPrefixes();
 
-        setSize(950, 680);
+        // AJUSTE: Altura reducida a 650 para garantizar visibilidad de la botonera
+        setSize(1000, 650);
         setLocationRelativeTo(parent);
         getContentPane().setBackground(COLOR_BG);
         setLayout(new BorderLayout());
 
-        // Header
+        // --- HEADER ---
         String titulo = (product == null) ? "REGISTRAR NUEVO ÍTEM" : "EDITAR: " + product.getCode();
         JLabel lblTitle = new JLabel(titulo, SwingConstants.CENTER);
-        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 28));
         lblTitle.setForeground(new Color(255, 140, 0));
-        lblTitle.setBorder(new EmptyBorder(25, 0, 25, 0));
+        lblTitle.setBorder(new EmptyBorder(15, 0, 10, 0));
         add(lblTitle, BorderLayout.NORTH);
 
-        // Formulario
+        // --- FORMULARIO ---
         JPanel formPanel = new JPanel(new GridBagLayout());
         formPanel.setOpaque(false);
-        formPanel.setBorder(new EmptyBorder(0, 50, 0, 50));
+        formPanel.setBorder(new EmptyBorder(5, 60, 5, 60));
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(10, 15, 10, 15);
+        gbc.insets = new Insets(6, 15, 6, 15);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 0.5;
 
-        // Fila 1
+        // Fila 1: Categoría y Código
         gbc.gridy = 0; gbc.gridx = 0; formPanel.add(crearLabel("CATEGORÍA (Define Código)"), gbc);
         gbc.gridx = 1; formPanel.add(crearLabel("CÓDIGO (Automático)"), gbc);
 
         gbc.gridy = 1; gbc.gridx = 0;
         cmbCategory = new JComboBox<>();
+        cmbCategory.setFont(FONT_INPUT);
+        cmbCategory.setPreferredSize(new Dimension(250, 38));
         cargarCategorias();
         cmbCategory.addActionListener(e -> generarCodigo());
-        cmbCategory.setPreferredSize(new Dimension(200, 40));
         formPanel.add(cmbCategory, gbc);
 
         gbc.gridx = 1;
         txtCode = crearInput(false);
-        txtCode.setForeground(COLOR_VERDE);
-        txtCode.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        txtCode.setForeground(COLOR_VERDE_NEON);
+        txtCode.setFont(new Font("Tahoma", Font.BOLD, 16));
         formPanel.add(txtCode, gbc);
 
-        // Fila 2
-        gbc.gridy = 2; gbc.gridx = 0; formPanel.add(crearLabel("NOMBRE"), gbc);
-        gbc.gridx = 1; formPanel.add(crearLabel("DESCRIPCIÓN"), gbc);
+        // Fila 2: Nombre y Detalles
+        gbc.gridy = 2; gbc.gridx = 0; formPanel.add(crearLabel("NOMBRE DEL PRODUCTO"), gbc);
+        gbc.gridx = 1; formPanel.add(crearLabel("DESCRIPCIÓN / DETALLES"), gbc);
 
         gbc.gridy = 3; gbc.gridx = 0; formPanel.add(txtName = crearInput(true), gbc);
 
         gbc.gridx = 1;
         txtDesc = new JTextArea(2, 20);
-        txtDesc.setBackground(COLOR_INPUT); txtDesc.setForeground(COLOR_TEXTO);
-        txtDesc.setBorder(BorderFactory.createEmptyBorder(5,5,5,5));
-        formPanel.add(new JScrollPane(txtDesc), gbc);
+        txtDesc.setFont(FONT_INPUT);
+        txtDesc.setBackground(COLOR_INPUT_BG);
+        txtDesc.setForeground(COLOR_TEXTO);
+        txtDesc.setCaretColor(Color.WHITE);
+        txtDesc.setBorder(new LineBorder(new Color(80, 80, 80)));
+        JScrollPane scrollDesc = new JScrollPane(txtDesc);
+        scrollDesc.setPreferredSize(new Dimension(250, 42));
+        formPanel.add(scrollDesc, gbc);
 
-        // Fila 3
-        gbc.gridy = 4; gbc.gridx = 0; formPanel.add(crearLabel("COSTO (Ref. Divisa)"), gbc);
-        gbc.gridx = 1; formPanel.add(crearLabel("VENTA (Ref. Divisa)"), gbc);
+        // Fila 3: Precios
+        gbc.gridy = 4; gbc.gridx = 0; formPanel.add(crearLabel("COSTO (Ref. Divisa €/$)"), gbc);
+        gbc.gridx = 1; formPanel.add(crearLabel("VENTA (Ref. Divisa €/$)"), gbc);
 
         gbc.gridy = 5; gbc.gridx = 0; formPanel.add(txtCostPrice = crearInput(true), gbc);
         gbc.gridx = 1; formPanel.add(txtSalePrice = crearInput(true), gbc);
 
-        // Fila 4
-        gbc.gridy = 6; gbc.gridx = 0; formPanel.add(crearLabel("STOCK"), gbc);
-        gbc.gridx = 1; formPanel.add(crearLabel("ALERTA MÍNIMA"), gbc);
+        // Fila 4: Stocks
+        gbc.gridy = 6; gbc.gridx = 0; formPanel.add(crearLabel("EXISTENCIA ACTUAL"), gbc);
+        gbc.gridx = 1; formPanel.add(crearLabel("ALERTA STOCK MÍNIMO"), gbc);
 
         gbc.gridy = 7; gbc.gridx = 0; formPanel.add(txtStock = crearInput(true), gbc);
         gbc.gridx = 1; formPanel.add(txtMinStock = crearInput(true), gbc);
 
         add(formPanel, BorderLayout.CENTER);
 
-        // Botones
-        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 30, 30));
+        // --- BOTONERA (Standard Rectangular Style) ---
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 15));
         btnPanel.setOpaque(false);
-        btnPanel.add(crearBotonPastilla("LIMPIAR", Color.GRAY, e -> limpiar()));
-        btnPanel.add(crearBotonPastilla("CANCELAR", new Color(255, 60, 60), e -> dispose()));
-        btnPanel.add(crearBotonPastilla("GUARDAR", new Color(220, 0, 115), e -> guardar()));
+        btnPanel.setBorder(new EmptyBorder(0, 0, 15, 0));
+
+        btnPanel.add(crearBotonRectangular("LIMPIAR", new Color(70, 70, 70), e -> limpiar()));
+        btnPanel.add(crearBotonRectangular("CANCELAR", new Color(190, 45, 45), e -> dispose()));
+        btnPanel.add(crearBotonRectangular("GUARDAR", COLOR_FUCSIA, e -> guardar()));
+        btnPanel.add(crearBotonRectangular("SALIR", new Color(55, 55, 55), e -> dispose()));
+
         add(btnPanel, BorderLayout.SOUTH);
 
         if (productToEdit != null) llenarCampos();
-        else { txtStock.setText("0"); txtMinStock.setText("2"); generarCodigo(); }
+        else { txtStock.setText("0"); txtMinStock.setText("5"); generarCodigo(); }
+    }
+
+    private void setupPrefixes() {
+        categoryPrefixes.put("Modelos Referencia", "MOD");
+        categoryPrefixes.put("Textiles", "MAT");
+        categoryPrefixes.put("Mercería", "MER");
+        categoryPrefixes.put("Branding", "BRA");
+        categoryPrefixes.put("Equipos Taller", "ACT");
+        categoryPrefixes.put("Accesorios", "REV");
+    }
+
+    private JLabel crearLabel(String t) {
+        JLabel l = new JLabel(t);
+        l.setForeground(Color.LIGHT_GRAY);
+        l.setFont(FONT_LABEL);
+        return l;
+    }
+
+    private JTextField crearInput(boolean ed) {
+        JTextField t = new JTextField();
+        t.setPreferredSize(new Dimension(250, 38));
+        t.setBackground(COLOR_INPUT_BG);
+        t.setForeground(COLOR_TEXTO);
+        t.setFont(FONT_INPUT);
+        t.setEditable(ed);
+        t.setBorder(new LineBorder(new Color(80, 80, 80)));
+        return t;
+    }
+
+    /**
+     * Factory Method: Crea botones rectangulares unificados con el módulo
+     * de proveedores para optimizar espacio en pantalla.
+     */
+    private JButton crearBotonRectangular(String t, Color c, ActionListener a) {
+        JButton b = new JButton(t);
+        b.setPreferredSize(new Dimension(130, 42));
+        b.setBackground(c);
+        b.setForeground(Color.WHITE);
+        b.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        b.setFocusPainted(false);
+        b.setBorder(BorderFactory.createLineBorder(c.brighter(), 1));
+        b.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        b.addActionListener(a);
+        return b;
     }
 
     private void generarCodigo() {
@@ -134,17 +209,19 @@ public class AddEditProductDialog extends JDialog {
             p.setCode(txtCode.getText());
             p.setName(txtName.getText());
             p.setDescription(txtDesc.getText());
-            p.setCostPrice(Double.parseDouble(txtCostPrice.getText()));
-            p.setSalePrice(Double.parseDouble(txtSalePrice.getText()));
+            p.setCostPrice(Double.parseDouble(txtCostPrice.getText().replace(",", ".")));
+            p.setSalePrice(Double.parseDouble(txtSalePrice.getText().replace(",", ".")));
             p.setCurrentStock(Integer.parseInt(txtStock.getText()));
             p.setMinStock(Integer.parseInt(txtMinStock.getText()));
-            p.setCategoryId(cmbCategory.getItemAt(cmbCategory.getSelectedIndex()).getId());
+            p.setCategoryId(((Category)cmbCategory.getSelectedItem()).getId());
 
             if (productDAO.save(p)) {
-                JOptionPane.showMessageDialog(this, "Guardado con éxito");
+                JOptionPane.showMessageDialog(this, "Datos sincronizados correctamente.");
                 dispose();
             }
-        } catch (Exception ex) { JOptionPane.showMessageDialog(this, "Error en datos"); }
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Verifique los datos numéricos.");
+        }
     }
 
     private void llenarCampos() {
@@ -162,35 +239,10 @@ public class AddEditProductDialog extends JDialog {
 
     private void limpiar() {
         txtName.setText(""); txtDesc.setText(""); txtCostPrice.setText(""); txtSalePrice.setText("");
-        txtStock.setText("0"); txtMinStock.setText("2"); generarCodigo();
+        txtStock.setText("0"); txtMinStock.setText("5"); generarCodigo();
     }
 
     private void cargarCategorias() {
         for(Category c : productDAO.getAllCategories()) cmbCategory.addItem(c);
-    }
-
-    private JLabel crearLabel(String t) {
-        JLabel l = new JLabel(t); l.setForeground(Color.GRAY); return l;
-    }
-
-    private JTextField crearInput(boolean ed) {
-        JTextField t = new JTextField(); t.setPreferredSize(new Dimension(200, 40));
-        t.setBackground(COLOR_INPUT); t.setForeground(COLOR_TEXTO); t.setEditable(ed);
-        return t;
-    }
-
-    private JButton crearBotonPastilla(String t, Color c, ActionListener a) {
-        JButton b = new JButton(t) {
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D)g;
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(getBackground()); g2.fillRoundRect(0,0,getWidth(),getHeight(),40,40);
-                super.paintComponent(g);
-            }
-        };
-        b.setPreferredSize(new Dimension(140, 45)); b.setBackground(c); b.setForeground(Color.WHITE);
-        b.setContentAreaFilled(false); b.setFocusPainted(false); b.setBorderPainted(false);
-        b.addActionListener(a);
-        return b;
     }
 }

@@ -1,10 +1,27 @@
+/*
+ * -----------------------------------------------------------------------------
+ * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
+ * CARRERA: Ingeniería en Informática
+ * ASIGNATURA: Programación III / Proyecto de Software
+ *
+ * PROYECTO: GESTIÓN DE INVENTARIO DE UNA TIENDA (SICONI)
+ * ARCHIVO: SupplierManagementDialog.java
+ *
+ * AUTORA: Johanna Guedez - V14089807
+ * PROFESORA: Ing. Dubraska Roca
+ * FECHA: Enero 2026
+ * VERSIÓN: 1.4.5 (Rectangular Button Standard & Compact UI)
+ * -----------------------------------------------------------------------------
+ */
+
 package com.swimcore.view.dialogs;
 
 import com.swimcore.dao.SupplierDAO;
 import com.swimcore.model.Supplier;
-
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.LineBorder;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.net.URI;
@@ -16,182 +33,225 @@ public class SupplierManagementDialog extends JDialog {
     private DefaultTableModel model;
     private JTable table;
 
-    private JTextField txtCompany, txtContact, txtPhone, txtEmail, txtAddress;
-    // NUEVOS CAMPOS SOCIALES
-    private JTextField txtInstagram, txtWhatsapp;
-
+    private JTextField txtCompany, txtContact, txtPhone, txtEmail, txtAddress, txtInstagram, txtWhatsapp;
     private int selectedId = 0;
+
+    // --- CONFIGURACIÓN VISUAL CORPORATIVA ---
+    private static final Font FONT_INPUT = new Font("Segoe UI", Font.PLAIN, 15);
+    private static final Font FONT_LABEL = new Font("Segoe UI", Font.BOLD, 13);
+    private static final Color COLOR_BG_APP = new Color(18, 18, 18);
+    private static final Color COLOR_BG_CARD = new Color(28, 28, 28);
+    private static final Color COLOR_ACCENT = new Color(255, 140, 0);
+    private static final Color COLOR_FUCSIA = new Color(220, 0, 115);
 
     public SupplierManagementDialog(Window parent) {
         super(parent, "Gestión de Proveedores", ModalityType.APPLICATION_MODAL);
-        setSize(1000, 650);
+        setSize(1150, 700);
         setLocationRelativeTo(parent);
-        getContentPane().setBackground(new Color(20, 20, 20)); // Fondo oscuro
         setLayout(new BorderLayout());
+        getContentPane().setBackground(COLOR_BG_APP);
 
-        // --- TÍTULO ---
-        JLabel lblTitle = new JLabel("DIRECTORIO DE PROVEEDORES & CONEXIÓN", SwingConstants.CENTER);
-        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 22));
-        lblTitle.setForeground(new Color(255, 140, 0)); // Naranja
-        lblTitle.setBorder(new EmptyBorder(20, 0, 20, 0));
-        add(lblTitle, BorderLayout.NORTH);
+        add(buildHeader(), BorderLayout.NORTH);
+        add(buildCenterPanel(), BorderLayout.CENTER);
+        add(buildBottomToolbar(), BorderLayout.SOUTH);
 
-        JPanel centerPanel = new JPanel(new GridLayout(1, 2, 20, 0));
-        centerPanel.setBackground(new Color(20, 20, 20));
-        centerPanel.setBorder(new EmptyBorder(0, 20, 20, 20));
+        table.getSelectionModel().addListSelectionListener(e -> updateFieldsFromSelection());
+        loadSuppliersData();
+    }
 
-        // --- IZQUIERDA: TABLA ---
-        String[] cols = {"ID", "EMPRESA", "INSTAGRAM"};
-        model = new DefaultTableModel(cols, 0) { public boolean isCellEditable(int row, int col) { return false; } };
+    private JComponent buildHeader() {
+        JLabel title = new JLabel("DIRECTORIO DE PROVEEDORES & CONEXIÓN", SwingConstants.CENTER);
+        title.setFont(new Font("Segoe UI", Font.BOLD, 26));
+        title.setForeground(COLOR_ACCENT);
+        title.setBorder(new EmptyBorder(20, 0, 10, 0));
+        return title;
+    }
+
+    private JComponent buildCenterPanel() {
+        JPanel panel = new JPanel(new BorderLayout(25, 0));
+        panel.setOpaque(false);
+        panel.setBorder(new EmptyBorder(5, 30, 5, 30));
+
+        panel.add(buildTablePanel(), BorderLayout.CENTER);
+        panel.add(buildFormPanel(), BorderLayout.EAST);
+
+        return panel;
+    }
+
+    private JComponent buildTablePanel() {
+        model = new DefaultTableModel(new String[]{"ID", "EMPRESA", "INSTAGRAM"}, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
         table = new JTable(model);
-        table.setRowHeight(30);
-        table.getSelectionModel().addListSelectionListener(e -> cargarDatosDeFila());
-        centerPanel.add(new JScrollPane(table));
+        styleTable();
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.setBorder(new LineBorder(new Color(60, 60, 60)));
+        return scroll;
+    }
 
-        // --- DERECHA: FORMULARIO ---
-        JPanel formPanel = new JPanel(new GridBagLayout());
-        formPanel.setBackground(new Color(35, 35, 35));
-        formPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
+    private JComponent buildFormPanel() {
+        JPanel container = new JPanel(new BorderLayout());
+        container.setOpaque(false);
+        container.setPreferredSize(new Dimension(380, 0));
+
+        JPanel form = new JPanel(new GridBagLayout());
+        form.setBackground(COLOR_BG_CARD);
+        form.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(new Color(60, 60, 60)),
+                new EmptyBorder(15, 20, 15, 20)
+        ));
+
         GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = 0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.insets = new Insets(5, 5, 5, 5);
-        gbc.gridx = 0; gbc.gridy = 0;
+        gbc.weightx = 1;
+        gbc.insets = new Insets(5, 0, 5, 0);
+        gbc.gridy = 0;
 
-        txtCompany = addSimpleField(formPanel, "Empresa:", gbc);
-        txtContact = addSimpleField(formPanel, "Contacto:", gbc);
-        txtPhone = addSimpleField(formPanel, "Teléfono (Local):", gbc);
+        txtCompany   = buildSimpleField(form, "Empresa", gbc);
+        txtContact   = buildSimpleField(form, "Contacto", gbc);
+        txtPhone     = buildSimpleField(form, "Teléfono", gbc);
+        txtEmail     = buildSimpleField(form, "Email", gbc);
+        txtWhatsapp  = buildSocialField(form, "WhatsApp", "https://wa.me/", gbc, new Color(37, 211, 102));
+        txtInstagram = buildSocialField(form, "Instagram", "https://instagram.com/", gbc, COLOR_FUCSIA);
+        txtAddress   = buildSimpleField(form, "Dirección", gbc);
 
-        // --- WHATSAPP CON BOTÓN ---
-        txtWhatsapp = addSocialField(formPanel, "WhatsApp (Ej: 58414...):", "https://wa.me/", gbc, new Color(37, 211, 102));
+        JScrollPane scroll = new JScrollPane(form);
+        scroll.setBorder(null);
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
-        // --- INSTAGRAM CON BOTÓN ---
-        txtInstagram = addSocialField(formPanel, "Instagram (Usuario):", "https://instagram.com/", gbc, new Color(225, 48, 108));
-
-        txtAddress = addSimpleField(formPanel, "Dirección:", gbc);
-
-        // BOTONES DE ACCIÓN
-        JPanel btnPanel = new JPanel(new FlowLayout());
-        btnPanel.setOpaque(false);
-
-        JButton btnSave = new JButton("GUARDAR");
-        btnSave.setBackground(new Color(255, 140, 0));
-        btnSave.setForeground(Color.WHITE);
-        btnSave.addActionListener(e -> guardar());
-
-        JButton btnNew = new JButton("NUEVO");
-        btnNew.addActionListener(e -> limpiarFormulario());
-
-        JButton btnDel = new JButton("ELIMINAR");
-        btnDel.setBackground(Color.RED);
-        btnDel.setForeground(Color.WHITE);
-        btnDel.addActionListener(e -> eliminar());
-
-        btnPanel.add(btnNew); btnPanel.add(btnDel); btnPanel.add(btnSave);
-        gbc.gridy++; formPanel.add(btnPanel, gbc);
-
-        centerPanel.add(formPanel);
-        add(centerPanel, BorderLayout.CENTER);
-
-        cargarTabla();
+        container.add(scroll, BorderLayout.CENTER);
+        return container;
     }
 
-    // Auxiliar para campos normales
-    private JTextField addSimpleField(JPanel p, String label, GridBagConstraints gbc) {
-        JLabel lbl = new JLabel(label); lbl.setForeground(Color.GRAY);
-        p.add(lbl, gbc);
-        gbc.gridy++;
-        JTextField txt = new JTextField(); txt.setPreferredSize(new Dimension(200, 30));
-        p.add(txt, gbc);
-        gbc.gridy++;
+    /**
+     * Barra inferior con botones rectangulares estandarizados.
+     */
+    private JComponent buildBottomToolbar() {
+        JPanel bar = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 15));
+        bar.setOpaque(false);
+
+        bar.add(createStandardButton("NUEVO", new Color(70, 70, 70), e -> resetForm()));
+        bar.add(createStandardButton("ELIMINAR", new Color(190, 45, 45), e -> performDelete()));
+        bar.add(createStandardButton("GUARDAR", COLOR_ACCENT, e -> performSave()));
+        bar.add(createStandardButton("SALIR", new Color(55, 55, 55), e -> dispose()));
+
+        return bar;
+    }
+
+    /**
+     * Crea botones con estilo rectangular uniforme para todo el sistema.
+     */
+    private JButton createStandardButton(String text, Color bg, java.awt.event.ActionListener al) {
+        JButton btn = new JButton(text);
+        btn.setPreferredSize(new Dimension(130, 42));
+        btn.setBackground(bg);
+        btn.setForeground(Color.WHITE);
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        btn.setFocusPainted(false);
+        btn.setBorder(BorderFactory.createLineBorder(bg.brighter(), 1));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.addActionListener(al);
+        return btn;
+    }
+
+    private JTextField buildSimpleField(JPanel p, String label, GridBagConstraints gbc) {
+        JLabel lbl = new JLabel(label);
+        lbl.setFont(FONT_LABEL);
+        lbl.setForeground(Color.LIGHT_GRAY);
+        p.add(lbl, gbc); gbc.gridy++;
+        JTextField txt = createTextField();
+        p.add(txt, gbc); gbc.gridy++;
         return txt;
     }
 
-    // Auxiliar para campos con botón de enlace (WAOOO)
-    private JTextField addSocialField(JPanel p, String label, String urlPrefix, GridBagConstraints gbc, Color btnColor) {
-        JLabel lbl = new JLabel(label); lbl.setForeground(Color.GRAY);
-        p.add(lbl, gbc);
-        gbc.gridy++;
-
-        JPanel row = new JPanel(new BorderLayout(5, 0));
+    private JTextField buildSocialField(JPanel p, String label, String prefix, GridBagConstraints gbc, Color c) {
+        JLabel lbl = new JLabel(label);
+        lbl.setFont(FONT_LABEL);
+        lbl.setForeground(Color.LIGHT_GRAY);
+        p.add(lbl, gbc); gbc.gridy++;
+        JPanel row = new JPanel(new BorderLayout(8, 0));
         row.setOpaque(false);
-
-        JTextField txt = new JTextField();
-        txt.setPreferredSize(new Dimension(150, 30));
-
-        JButton btnLink = new JButton("🔗 IR");
-        btnLink.setBackground(btnColor);
-        btnLink.setForeground(Color.WHITE);
-        btnLink.setPreferredSize(new Dimension(60, 30));
-        btnLink.setCursor(new Cursor(Cursor.HAND_CURSOR));
-
-        // ACCIÓN: ABRIR NAVEGADOR
-        btnLink.addActionListener(e -> {
-            String val = txt.getText().trim();
-            if(!val.isEmpty()) {
-                try {
-                    Desktop.getDesktop().browse(new URI(urlPrefix + val));
-                } catch (Exception ex) { JOptionPane.showMessageDialog(this, "No se pudo abrir el enlace."); }
-            }
-        });
-
+        JTextField txt = createTextField();
+        JButton go = new JButton("↗");
+        go.setPreferredSize(new Dimension(40, 34));
+        go.setBackground(c);
+        go.setForeground(Color.WHITE);
+        go.setBorderPainted(false);
+        go.addActionListener(e -> openLink(prefix, txt.getText()));
         row.add(txt, BorderLayout.CENTER);
-        row.add(btnLink, BorderLayout.EAST);
-        p.add(row, gbc);
-        gbc.gridy++;
+        row.add(go, BorderLayout.EAST);
+        p.add(row, gbc); gbc.gridy++;
         return txt;
     }
 
-    private void cargarTabla() {
-        model.setRowCount(0);
-        List<Supplier> list = supplierDAO.getAll();
-        for (Supplier s : list) model.addRow(new Object[]{s.getId(), s.getCompany(), s.getInstagram()});
+    private JTextField createTextField() {
+        JTextField txt = new JTextField();
+        txt.setFont(FONT_INPUT);
+        txt.setPreferredSize(new Dimension(260, 34));
+        txt.setBackground(new Color(45, 45, 45));
+        txt.setForeground(Color.WHITE);
+        txt.setCaretColor(Color.WHITE);
+        txt.setBorder(new LineBorder(new Color(85, 85, 85)));
+        return txt;
     }
 
-    private void cargarDatosDeFila() {
+    private void styleTable() {
+        table.setRowHeight(38);
+        table.setBackground(new Color(32, 32, 32));
+        table.setForeground(Color.WHITE);
+        table.setSelectionBackground(COLOR_FUCSIA);
+        DefaultTableCellRenderer center = new DefaultTableCellRenderer();
+        center.setHorizontalAlignment(JLabel.CENTER);
+        for (int i = 0; i < table.getColumnCount(); i++)
+            table.getColumnModel().getColumn(i).setCellRenderer(center);
+    }
+
+    private void loadSuppliersData() {
+        model.setRowCount(0);
+        List<Supplier> suppliers = supplierDAO.getAll();
+        suppliers.forEach(s -> model.addRow(new Object[]{s.getId(), s.getCompany(), s.getInstagram()}));
+    }
+
+    private void updateFieldsFromSelection() {
         int row = table.getSelectedRow();
         if (row >= 0) {
             int id = (int) model.getValueAt(row, 0);
             selectedId = id;
-            List<Supplier> list = supplierDAO.getAll();
-            for(Supplier s : list) {
-                if(s.getId() == id) {
-                    txtCompany.setText(s.getCompany());
-                    txtContact.setText(s.getContact());
-                    txtPhone.setText(s.getPhone());
-                    txtEmail.setText(s.getEmail());
-                    txtAddress.setText(s.getAddress());
-                    // CARGAMOS LOS DATOS SOCIALES
-                    txtInstagram.setText(s.getInstagram());
-                    txtWhatsapp.setText(s.getWhatsapp());
-                    break;
-                }
-            }
+            supplierDAO.getAll().stream().filter(s -> s.getId() == selectedId).findFirst()
+                    .ifPresent(s -> {
+                        txtCompany.setText(s.getCompany()); txtContact.setText(s.getContact());
+                        txtPhone.setText(s.getPhone()); txtEmail.setText(s.getEmail());
+                        txtAddress.setText(s.getAddress()); txtInstagram.setText(s.getInstagram());
+                        txtWhatsapp.setText(s.getWhatsapp());
+                    });
         }
     }
 
-    private void limpiarFormulario() {
+    private void resetForm() {
         selectedId = 0;
-        txtCompany.setText(""); txtContact.setText(""); txtPhone.setText(""); txtEmail.setText(""); txtAddress.setText("");
-        txtInstagram.setText(""); txtWhatsapp.setText("");
+        txtCompany.setText(""); txtContact.setText(""); txtPhone.setText("");
+        txtEmail.setText(""); txtAddress.setText(""); txtInstagram.setText(""); txtWhatsapp.setText("");
         table.clearSelection();
     }
 
-    private void guardar() {
-        // AQUÍ SE SOLUCIONA EL ERROR: PASAMOS LOS 8 DATOS AL CONSTRUCTOR
-        Supplier s = new Supplier(selectedId, txtCompany.getText(), txtContact.getText(), txtPhone.getText(), txtEmail.getText(), txtAddress.getText(), txtInstagram.getText(), txtWhatsapp.getText());
-
-        if(supplierDAO.save(s)) {
-            JOptionPane.showMessageDialog(this, "Guardado!");
-            cargarTabla();
-            limpiarFormulario();
-        }
+    private void performSave() {
+        if(txtCompany.getText().trim().isEmpty()) return;
+        Supplier s = new Supplier(selectedId, txtCompany.getText(), txtContact.getText(),
+                txtPhone.getText(), txtEmail.getText(), txtAddress.getText(),
+                txtInstagram.getText(), txtWhatsapp.getText());
+        if(supplierDAO.save(s)) { loadSuppliersData(); resetForm(); }
     }
 
-    private void eliminar() {
-        if(selectedId != 0 && JOptionPane.showConfirmDialog(this, "¿Eliminar?") == JOptionPane.YES_OPTION) {
-            supplierDAO.delete(selectedId);
-            cargarTabla();
-            limpiarFormulario();
-        }
+    private void performDelete() {
+        if(selectedId != 0 && supplierDAO.delete(selectedId)) { loadSuppliersData(); resetForm(); }
+    }
+
+    private void openLink(String prefix, String value) {
+        try { if(!value.trim().isEmpty()) Desktop.getDesktop().browse(new URI(prefix + value.trim())); }
+        catch (Exception ignored) {}
     }
 }

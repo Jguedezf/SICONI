@@ -111,7 +111,7 @@ public class Supplier {
     public void setWhatsapp(String whatsapp) { this.whatsapp = whatsapp; }
 
     /**
-     * Sobreescritura del método toString.
+     * Sobreescritura del metodo toString.
      * Esencial para que los componentes JComboBox muestren el nombre de la empresa
      * en lugar del espacio de memoria del objeto.
      * * @return El nombre de la compañía.

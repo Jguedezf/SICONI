@@ -10,25 +10,16 @@
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: Enero 2026
- * VERSIÓN: 1.0.0 (Stable Release)
+ * VERSIÓN: 1.2.0 (Stable Persistence Release)
  *
  * DESCRIPCIÓN TÉCNICA:
- * Clase Principal (Entry Point) de la aplicación SICONI.
- * Actúa como orquestador inicial del ciclo de vida del software. Sus responsabilidades incluyen:
- * 1. Inicialización del motor de interfaz gráfica (FlatLaf) para la gestión del Look & Feel.
- * 2. Verificación de conectividad con la capa de persistencia (SQLite) mediante patrón Singleton.
- * 3. Ejecución de rutinas DDL (Data Definition Language) para la construcción del esquema relacional.
- * 4. Ejecución de rutinas DML (Data Manipulation Language) para la inyección de datos semilla (Data Seeding).
- * 5. Despacho del hilo de eventos (EDT) para garantizar la seguridad de hilos (Thread-Safety) en Swing.
+ * Clase Principal (Entry Point) encargada de la inicialización del sistema.
+ * Implementa lógica de persistencia protegida para asegurar que los cambios
+ * realizados por el usuario no se pierdan entre sesiones de ejecución.
  *
- * PRINCIPIOS DE PROGRAMACIÓN ORIENTADA A OBJETOS (POO):
- * 1. COMPOSICIÓN: Compone el flujo inicial instanciando objetos de acceso a datos (UserDAO) y Vistas (LoginView).
- * 2. ENCAPSULAMIENTO: Los métodos de configuración de base de datos son `private static`,
- * ocultando la complejidad de la implementación SQL al contexto global.
- * 3. ABSTRACCIÓN: Delega la lógica de conexión a la clase utilitaria `Conexion` y la autenticación a `UserDAO`.
- *
- * PATRONES DE DISEÑO IMPLEMENTADOS:
- * - Facade (Implícito): Simplifica el subsistema de arranque (UI + DB + Auth) en una única llamada.
+ * PRINCIPIOS POO:
+ * - ABSTRACCIÓN: Delega la complejidad de persistencia a métodos auxiliares.
+ * - ENCAPSULAMIENTO: Métodos de configuración privados para proteger la lógica de arranque.
  * -----------------------------------------------------------------------------
  */
 
@@ -40,127 +31,121 @@ import com.swimcore.dao.UserDAO;
 import com.swimcore.model.User;
 import com.swimcore.view.LoginView;
 import javax.swing.*;
-import java.awt.*;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 
 /**
- * Clase ejecutora del sistema.
- * Contiene el método main() y las rutinas de inicialización de infraestructura.
+ * Clase ejecutora del sistema SICONI.
  */
 public class Main {
 
     /**
-     * Punto de entrada de la JVM (Java Virtual Machine).
-     * @param args Argumentos de línea de comandos (sin uso en esta versión).
+     * Punto de entrada de la JVM.
      */
     public static void main(String[] args) {
-        // ---------------------------------------------------------------------
-        // 1. CAPA DE PRESENTACIÓN: CONFIGURACIÓN VISUAL (LOOK AND FEEL)
-        // ---------------------------------------------------------------------
+        // 1. CONFIGURACIÓN VISUAL (LOOK AND FEEL)
         try {
-            // Inyección del Look and Feel FlatDark para modernizar los componentes Swing.
             UIManager.setLookAndFeel(new FlatDarkLaf());
-
-            // Personalización de propiedades globales del UIManager (Arcos y Scrollbars)
             UIManager.put("Button.arc", 999);
             UIManager.put("Component.arc", 10);
             UIManager.put("ScrollBar.thumbArc", 999);
-            UIManager.put("ScrollBar.width", 12);
-        } catch (Exception e) {
-            // Manejo silencioso de excepciones de UI
-        }
+            UIManager.put("ScrollBar.width", 14);
+        } catch (Exception e) { e.printStackTrace(); }
 
-        // ---------------------------------------------------------------------
         // 2. CAPA DE PERSISTENCIA: VERIFICACIÓN E INICIALIZACIÓN
-        // ---------------------------------------------------------------------
         Connection conn = Conexion.conectar();
 
         if (conn != null) {
-            // Inicialización de esquema de base de datos (DDL) y datos maestros
+            // Ejecuta la rutina de verificación y carga de productos
             createInventoryTables(conn);
 
-            // Instancia del DAO para verificación de existencia de usuarios
+            // Verificación del usuario administrador
             UserDAO userDAO = new UserDAO();
-
-            // Lógica de Negocio: Creación del Superusuario (Admin) por defecto si no existe (Data Seeding)
             if (userDAO.findByUsername("admin") == null) {
                 userDAO.saveUser(new User("admin", "1234", "Johanna Guedez", "ADMIN"));
             }
         }
 
-        // ---------------------------------------------------------------------
-        // 3. INICIO DEL CICLO DE VIDA DE LA UI (THREAD SAFETY)
-        // ---------------------------------------------------------------------
-        // Swing no es Thread-Safe. Todas las manipulaciones de UI deben hacerse en el
-        // Event Dispatch Thread (EDT). 'invokeLater' encola esta tarea en el EDT.
+        // 3. INICIO DEL HILO DE EVENTOS DE UI
         SwingUtilities.invokeLater(() -> new LoginView().setVisible(true));
     }
 
     /**
-     * Método auxiliar privado para la definición del esquema de base de datos (DDL).
-     * Verifica la existencia de tablas y las crea si es necesario.
-     * También inyecta datos maestros iniciales (Categorías, Proveedores).
-     *
+     * Define el esquema DDL y realiza una carga de datos condicionada (DML).
      * @param conn Objeto Connection activo.
      */
     private static void createInventoryTables(Connection conn) {
-        // Uso de try-with-resources para asegurar el cierre del Statement
         try (Statement stmt = conn.createStatement()) {
 
             // --- BLOQUE DDL (Data Definition Language) ---
-
-            // Tabla Categorías
             stmt.execute("CREATE TABLE IF NOT EXISTS categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, description TEXT)");
-
-            // Tabla Proveedores
             stmt.execute("CREATE TABLE IF NOT EXISTS suppliers (id INTEGER PRIMARY KEY AUTOINCREMENT, company TEXT NOT NULL, contact TEXT, phone TEXT, email TEXT, address TEXT, instagram TEXT, whatsapp TEXT)");
-
-            // Tabla Productos (Relacional con FKs)
             stmt.execute("CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT UNIQUE, name TEXT NOT NULL, description TEXT, cost_price REAL, sale_price REAL, current_stock INTEGER DEFAULT 0, min_stock INTEGER DEFAULT 5, category_id INTEGER, supplier_id INTEGER, image_path TEXT, FOREIGN KEY (category_id) REFERENCES categories(id), FOREIGN KEY (supplier_id) REFERENCES suppliers(id))");
 
-            // --- BLOQUE DML (Data Manipulation Language) - DATA SEEDING ---
-
-            // Verificación: Solo insertar si la tabla está vacía para evitar duplicados
+            // --- BLOQUE DML PROTEGIDO (DATA SEEDING) ---
+            // CORRECCIÓN: Eliminamos el DELETE para activar la persistencia.
+            // Solo insertamos si la tabla de productos está totalmente vacía.
             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM products");
             if (rs.next() && rs.getInt(1) == 0) {
-                System.out.println("⚡ Creando datos maestros...");
+                System.out.println("🚀 SICONI: Base de datos vacía. Inyectando inventario inicial...");
 
-                // Inserción de Categorías Base
-                stmt.execute("INSERT INTO categories (name) VALUES ('Modelos Referencia'), ('Textiles'), ('Mercería'), ('Branding'), ('Equipos Taller'), ('Accesorios')");
+                // Inserción de Categorías
+                stmt.execute("INSERT OR IGNORE INTO categories (name) VALUES ('Modelos'), ('Textiles'), ('Insumos'), ('Activos'), ('Mercería')");
 
-                // Inserción de Proveedores Base
-                stmt.execute("INSERT INTO suppliers (company) VALUES ('SICONI Producción'), ('Telas El Castillo'), ('Tramas'), ('Taguapire'), ('Titanes Gráficos'), ('Singer Servicio'), ('Importadora Sport')");
+                // Inserción de Proveedores
+                stmt.execute("INSERT OR IGNORE INTO suppliers (company) VALUES ('SICONI Producción'), ('Telas El Castillo'), ('Insumos Guayana'), ('Singer Service')");
 
-                // Inserción de Productos Base usando método auxiliar seguro
-                insertar(conn, "MOD-001", "Traje de Baño Dama", "Clásico", 15, 35, 3, 1, 1);
-                insertar(conn, "MAT-001", "Tela Lycra (Metro)", "Alta densidad", 4, 0, 50, 2, 2);
-                insertar(conn, "MER-001", "Hilos (Cono)", "Poliéster", 2.5, 0, 20, 3, 4);
+                // --- PRODUCTOS: MODELOS DAYANA GUÉDEZ ---
+                insertProduct(conn, "MOD-001", "Traje de Baño Dama", "Clásico", 15, 35, 10, 1, 1);
+                insertProduct(conn, "MOD-002", "Enterizo Manga Corta", "Colección Invierno", 20, 45, 8, 1, 1);
+                insertProduct(conn, "MOD-003", "Bikini Triángulo Neón", "Verano 2026", 12, 28, 15, 1, 1);
+                insertProduct(conn, "MOD-004", "Boxer Caballero", "Lycra Deportiva", 10, 22, 12, 1, 1);
+                insertProduct(conn, "MOD-005", "Faski Dama", "Ajuste Pro", 18, 38, 5, 1, 1);
+                insertProduct(conn, "MOD-006", "Faski Caballero", "Compresión Alta", 18, 38, 7, 1, 1);
+                insertProduct(conn, "MOD-007", "Traje de Baño Monokini", "Corte Asimétrico", 22, 50, 4, 1, 1);
+
+                // --- PRODUCTOS: INSUMOS Y HERRAMIENTAS ---
+                insertProduct(conn, "INS-001", "Tiza de Sastre", "Marcaje textil", 0.5, 1, 50, 3, 3);
+                insertProduct(conn, "INS-002", "Tijera Profesional", "Acero Inoxidable", 15, 0, 6, 3, 3);
+                insertProduct(conn, "INS-003", "Cortador de Tela", "Circular 45mm", 25, 0, 3, 3, 3);
+                insertProduct(conn, "INS-004", "Agujas Stretch #9", "Paquete x10", 5, 0, 20, 3, 3);
+                insertProduct(conn, "INS-005", "Agujas Universal #11", "Paquete x10", 4, 0, 15, 3, 3);
+
+                // --- PRODUCTOS: MERCERÍA Y TEXTILES ---
+                insertProduct(conn, "MER-001", "Hilos Negro", "Cono 4000yd", 3, 0, 25, 5, 2);
+                insertProduct(conn, "MER-002", "Hilos Blanco", "Cono 4000yd", 3, 0, 25, 5, 2);
+                insertProduct(conn, "MAT-001", "Tela Lycra (Metro)", "Fucsia Neón", 6, 12, 40, 2, 2);
+                insertProduct(conn, "MAT-002", "Tela Forro (Metro)", "Microfibra", 3.5, 7, 60, 2, 2);
+
+                // --- PRODUCTOS: ACTIVOS (MÁQUINAS) ---
+                insertProduct(conn, "ACT-001", "Máquina Singer Ind.", "Recta", 450, 0, 1, 4, 4);
+                insertProduct(conn, "ACT-002", "Overlock Industrial", "4 Hilos", 600, 0, 1, 4, 4);
+                insertProduct(conn, "ACT-003", "Máquina Collaretera", "Recubridora", 750, 0, 1, 4, 4);
+
+                System.out.println("✅ SICONI: Inventario inicial cargado exitosamente.");
+            } else {
+                System.out.println("💾 SICONI: Cargando base de datos persistente.");
             }
+
         } catch (Exception e) { e.printStackTrace(); }
     }
 
     /**
-     * Método utilitario para inserción segura de registros.
-     * Utiliza PreparedStatement para prevenir inyección SQL.
+     * Metodo utilitario para inserción segura de productos.
      */
-    private static void insertar(Connection conn, String c, String n, String d, double cost, double sale, int st, int cat, int sup) throws Exception {
+    private static void insertProduct(Connection conn, String code, String name, String desc, double cost, double sale, int stock, int catId, int supId) throws Exception {
         String sql = "INSERT INTO products (code, name, description, cost_price, sale_price, current_stock, min_stock, category_id, supplier_id, image_path) VALUES (?, ?, ?, ?, ?, ?, 5, ?, ?, '')";
-
-        try (java.sql.PreparedStatement p = conn.prepareStatement(sql)) {
-            // Mapeo de parámetros
-            p.setString(1, c);
-            p.setString(2, n);
-            p.setString(3, d);
-            p.setDouble(4, cost);
-            p.setDouble(5, sale);
-            p.setInt(6, st);
-            p.setInt(7, cat);
-            p.setInt(8, sup);
-
-            // Ejecución
-            p.executeUpdate();
+        try (java.sql.PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, code);
+            pstmt.setString(2, name);
+            pstmt.setString(3, desc);
+            pstmt.setDouble(4, cost);
+            pstmt.setDouble(5, sale);
+            pstmt.setInt(6, stock);
+            pstmt.setInt(7, catId);
+            pstmt.setInt(8, supId);
+            pstmt.executeUpdate();
         }
     }
 }
