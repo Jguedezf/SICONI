@@ -10,28 +10,17 @@
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: Enero 2026
- * VERSIÓN: 1.0.0 (Stable Release)
+ * VERSIÓN: 1.1.0 (Persistent Social Data & POO Build)
  *
  * DESCRIPCIÓN TÉCNICA:
- * Clase perteneciente a la Capa de Acceso a Datos (Data Access Object) para la entidad 'Proveedor'.
- * Centraliza la lógica de persistencia utilizando la API JDBC para interactuar con SQLite.
- *
- * Responsabilidades de Ingeniería:
- * 1. Operaciones CRUD (Create, Read, Update, Delete): Implementa la lógica completa para el
- * ciclo de vida de los datos de proveedores en la base de datos.
- * 2. Sentencias Parametrizadas: Utiliza `PreparedStatement` para garantizar la seguridad
- * contra ataques de Inyección SQL y optimizar la ejecución de consultas.
- * 3. Mapeo de Datos (Hydration): Transforma registros relacionales (ResultSet) en objetos
- * de dominio (Supplier), incluyendo campos modernos de contacto digital.
- *
- * PRINCIPIOS POO:
- * - ABSTRACCIÓN: Aísla la complejidad de las sentencias SQL (INSERT, UPDATE, DELETE)
- * de la interfaz de usuario.
- * - ENCAPSULAMIENTO: Gestiona de forma interna la apertura y cierre de recursos JDBC
- * mediante el patrón "Try-with-resources".
- *
- * PATRONES DE DISEÑO IMPLEMENTADOS:
- * - DAO (Data Access Object): Provee una interfaz abstracta para la capa de persistencia.
+ * Clase de la Capa de Acceso a Datos (DAO). Gestiona el ciclo de vida (CRUD)
+ * de la entidad Proveedor en SQLite. Implementa lógica de mapeo relacional
+ * para capturar datos de contacto digital y geográfico.
+ * * PRINCIPIOS POO APLICADOS:
+ * - ABSTRACCIÓN: El sistema consume métodos como 'save' o 'getAll' sin conocer
+ * las consultas SQL subyacentes.
+ * - ENCAPSULAMIENTO: Centraliza el manejo de conexiones JDBC protegiendo la
+ * integridad de la base de datos mediante PreparedStatement.
  * -----------------------------------------------------------------------------
  */
 
@@ -43,33 +32,30 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Proveedor de servicios de datos para la entidad Proveedor.
- * Gestiona el almacenamiento y recuperación de información corporativa y social.
+ * Gestor de Persistencia para Proveedores.
+ * Proporciona una interfaz abstracta para la administración de la base de datos.
  */
 public class SupplierDAO {
 
     /**
-     * Operación de Persistencia Dual (Create / Update).
-     * Determina automáticamente si debe realizar una inserción o una actualización
-     * basándose en el identificador del objeto.
-     * * @param s Instancia del proveedor a procesar.
-     * @return true si la operación en la base de datos fue exitosa.
+     * Persistencia Persistente (Create / Update).
+     * Sincroniza el objeto Supplier con la tabla física mediante lógica dual.
+     * @param s Instancia del proveedor a procesar.
+     * @return true si la operación SQL se completó sin errores.
      */
     public boolean save(Supplier s) {
         String sql;
-        // Lógica de decisión: ID 0 indica un registro nuevo (Auto-increment)
+        // Lógica de decisión: Si ID es 0, es un registro nuevo.
         if (s.getId() == 0) {
-            // DML: Inserción de 7 campos transaccionales
             sql = "INSERT INTO suppliers (company, contact, phone, email, address, instagram, whatsapp) VALUES (?, ?, ?, ?, ?, ?, ?)";
         } else {
-            // DML: Actualización basada en Clave Primaria (PK)
             sql = "UPDATE suppliers SET company=?, contact=?, phone=?, email=?, address=?, instagram=?, whatsapp=? WHERE id=?";
         }
 
         try (Connection conn = Conexion.conectar();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-            // Mapeo de parámetros comunes (1 al 7)
+            // Mapeo de parámetros transaccionales
             pstmt.setString(1, s.getCompany());
             pstmt.setString(2, s.getContact());
             pstmt.setString(3, s.getPhone());
@@ -78,7 +64,7 @@ public class SupplierDAO {
             pstmt.setString(6, s.getInstagram());
             pstmt.setString(7, s.getWhatsapp());
 
-            // En caso de UPDATE, se añade el parámetro de filtrado (ID) en la posición 8
+            // Inyección de clave primaria para operaciones de actualización
             if (s.getId() != 0) {
                 pstmt.setInt(8, s.getId());
             }
@@ -86,45 +72,42 @@ public class SupplierDAO {
             pstmt.executeUpdate();
             return true;
         } catch (SQLException e) {
-            e.printStackTrace(); // Log de trazabilidad para depuración
+            System.err.println("Error en persistencia SupplierDAO: " + e.getMessage());
             return false;
         }
     }
 
     /**
-     * Operación de Eliminación (Delete).
-     * Remueve físicamente un registro de la tabla basándose en su ID.
-     * * @param id Identificador único del proveedor.
-     * @return true si el registro fue eliminado correctamente.
+     * Eliminación de Registro (Delete).
+     * @param id Clave primaria del proveedor a remover.
+     * @return true si la fila fue eliminada exitosamente.
      */
     public boolean delete(int id) {
         String sql = "DELETE FROM suppliers WHERE id = ?";
         try (Connection conn = Conexion.conectar();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, id);
-            pstmt.executeUpdate();
-            return true;
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             return false;
         }
     }
 
     /**
-     * Operación de Recuperación Masiva (Read All).
-     * Consulta todos los proveedores registrados, ordenándolos alfabéticamente.
-     * * @return Lista de objetos Supplier poblada con datos de la BD.
+     * Recuperación Maestra de Proveedores (Read All).
+     * Implementa el patrón Data Hydration para reconstruir objetos desde ResultSet.
+     * @return Lista de entidades Supplier ordenadas alfabéticamente.
      */
     public List<Supplier> getAll() {
         List<Supplier> list = new ArrayList<>();
-        String sql = "SELECT * FROM suppliers ORDER BY company";
+        String sql = "SELECT * FROM suppliers ORDER BY company ASC";
 
         try (Connection conn = Conexion.conectar();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
-                // Reconstrucción de objetos (Data Hydration)
-                // Se incluyen los campos de redes sociales para asegurar la integridad del modelo
+                // Reconstrucción del objeto de dominio (Mapeo Objeto-Relacional manual)
                 list.add(new Supplier(
                         rs.getInt("id"),
                         rs.getString("company"),

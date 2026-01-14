@@ -64,7 +64,7 @@ public class CurrencyManager {
     }
 
     /**
-     * Método de utilidad para el formateo visual de precios en la interfaz.
+     * Metodo de utilidad para el formateo visual de precios en la interfaz.
      * Realiza la conversión aritmética y retorna una cadena formateada con 2 decimales.
      * * @param precioEnDivisa El monto base en moneda extranjera.
      * @return String con el formato: "€ X.XX (Bs. X.XX)"

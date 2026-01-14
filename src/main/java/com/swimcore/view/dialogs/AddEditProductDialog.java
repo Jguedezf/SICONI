@@ -10,12 +10,11 @@
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: Enero 2026
- * VERSIÓN: 1.3.0 (Rectangular Button Standard & Screen Fit)
- *
- * DESCRIPCIÓN TÉCNICA:
- * Diálogo modal para la creación y edición de productos.
- * Implementa botones rectangulares estandarizados y optimización de
- * altura para visualización completa en resoluciones estándar.
+ * VERSIÓN: 1.3.1 (Persistent SmartCode & POO Standard)
+ * * DESCRIPCIÓN TÉCNICA:
+ * Diálogo modal (JDialog) para la persistencia transaccional de productos.
+ * Implementa un algoritmo de generación de códigos basado en taxonomía de
+ * categorías y validación de tipos de datos en tiempo de ejecución.
  * -----------------------------------------------------------------------------
  */
 
@@ -34,17 +33,24 @@ import java.awt.event.ActionListener;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Clase encargada de la lógica de creación y edición de entidades Producto.
+ * Aplica principios de Encapsulamiento y Abstracción de datos SQL.
+ */
 public class AddEditProductDialog extends JDialog {
 
     private final ProductDAO productDAO = new ProductDAO();
     private Product productToEdit = null;
+
+    // PATRÓN: Diccionario de mapeo para prefijos de códigos inteligentes
     private final Map<String, String> categoryPrefixes = new HashMap<>();
 
+    // Componentes de entrada de datos
     private JTextField txtCode, txtName, txtCostPrice, txtSalePrice, txtStock, txtMinStock;
     private JTextArea txtDesc;
     private JComboBox<Category> cmbCategory;
 
-    // --- PALETA CORPORATIVA SICONI 8K ---
+    // --- PALETA CORPORATIVA SICONI (ESTÁNDAR DARK MODE) ---
     private final Color COLOR_BG = new Color(20, 20, 20);
     private final Color COLOR_INPUT_BG = new Color(45, 45, 45);
     private final Color COLOR_TEXTO = new Color(240, 240, 240);
@@ -54,27 +60,59 @@ public class AddEditProductDialog extends JDialog {
     private final Font FONT_INPUT = new Font("Tahoma", Font.PLAIN, 16);
     private final Font FONT_LABEL = new Font("Tahoma", Font.BOLD, 13);
 
+    /**
+     * Constructor: Configura el comportamiento modal y el chasis visual.
+     * @param parent Vista de inventario para bloqueo de foco modal.
+     * @param product Instancia de producto a editar (null si es registro nuevo).
+     */
     public AddEditProductDialog(InventoryView parent, Product product) {
         super(parent, product == null ? "Registrar Nuevo Ítem" : "Editar Ítem", true);
         this.productToEdit = product;
 
-        setupPrefixes();
+        setupPrefixes(); // Inicializa lógica de SmartCodes
 
-        // AJUSTE: Altura reducida a 650 para garantizar visibilidad de la botonera
+        // Configuración de resolución y centrado
         setSize(1000, 650);
         setLocationRelativeTo(parent);
         getContentPane().setBackground(COLOR_BG);
         setLayout(new BorderLayout());
 
-        // --- HEADER ---
-        String titulo = (product == null) ? "REGISTRAR NUEVO ÍTEM" : "EDITAR: " + product.getCode();
+        initHeader();
+        initFormFields();
+        initControlButtons();
+
+        // Lógica condicional POO para inicialización de estado
+        if (productToEdit != null) {
+            llenarCampos();
+        } else {
+            txtStock.setText("0");
+            txtMinStock.setText("5");
+            generarCodigo();
+        }
+    }
+
+    /**
+     * Define el catálogo de siglas según la arquitectura de inventario.
+     */
+    private void setupPrefixes() {
+        categoryPrefixes.put("Modelos Referencia", "MOD");
+        categoryPrefixes.put("Textiles", "MAT");
+        categoryPrefixes.put("Mercería", "MER");
+        categoryPrefixes.put("Branding", "BRA");
+        categoryPrefixes.put("Equipos Taller", "ACT");
+        categoryPrefixes.put("Accesorios", "REV");
+    }
+
+    private void initHeader() {
+        String titulo = (productToEdit == null) ? "REGISTRAR NUEVO ÍTEM" : "EDITAR PRODUCTO: " + productToEdit.getCode();
         JLabel lblTitle = new JLabel(titulo, SwingConstants.CENTER);
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 28));
         lblTitle.setForeground(new Color(255, 140, 0));
         lblTitle.setBorder(new EmptyBorder(15, 0, 10, 0));
         add(lblTitle, BorderLayout.NORTH);
+    }
 
-        // --- FORMULARIO ---
+    private void initFormFields() {
         JPanel formPanel = new JPanel(new GridBagLayout());
         formPanel.setOpaque(false);
         formPanel.setBorder(new EmptyBorder(5, 60, 5, 60));
@@ -83,27 +121,26 @@ public class AddEditProductDialog extends JDialog {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 0.5;
 
-        // Fila 1: Categoría y Código
-        gbc.gridy = 0; gbc.gridx = 0; formPanel.add(crearLabel("CATEGORÍA (Define Código)"), gbc);
-        gbc.gridx = 1; formPanel.add(crearLabel("CÓDIGO (Automático)"), gbc);
+        // Fila 1: Categoría y Código Automático
+        gbc.gridy = 0; gbc.gridx = 0; formPanel.add(crearLabel("CATEGORÍA (Define Prefijo)"), gbc);
+        gbc.gridx = 1; formPanel.add(crearLabel("CÓDIGO INTELIGENTE (Auto)"), gbc);
 
         gbc.gridy = 1; gbc.gridx = 0;
         cmbCategory = new JComboBox<>();
         cmbCategory.setFont(FONT_INPUT);
-        cmbCategory.setPreferredSize(new Dimension(250, 38));
         cargarCategorias();
         cmbCategory.addActionListener(e -> generarCodigo());
         formPanel.add(cmbCategory, gbc);
 
         gbc.gridx = 1;
-        txtCode = crearInput(false);
+        txtCode = crearInput(false); // Inmutable para garantizar correlativo
         txtCode.setForeground(COLOR_VERDE_NEON);
         txtCode.setFont(new Font("Tahoma", Font.BOLD, 16));
         formPanel.add(txtCode, gbc);
 
-        // Fila 2: Nombre y Detalles
+        // Fila 2: Nombre y Descripción
         gbc.gridy = 2; gbc.gridx = 0; formPanel.add(crearLabel("NOMBRE DEL PRODUCTO"), gbc);
-        gbc.gridx = 1; formPanel.add(crearLabel("DESCRIPCIÓN / DETALLES"), gbc);
+        gbc.gridx = 1; formPanel.add(crearLabel("DESCRIPCIÓN TÉCNICA"), gbc);
 
         gbc.gridy = 3; gbc.gridx = 0; formPanel.add(txtName = crearInput(true), gbc);
 
@@ -112,29 +149,30 @@ public class AddEditProductDialog extends JDialog {
         txtDesc.setFont(FONT_INPUT);
         txtDesc.setBackground(COLOR_INPUT_BG);
         txtDesc.setForeground(COLOR_TEXTO);
-        txtDesc.setCaretColor(Color.WHITE);
+        txtDesc.setLineWrap(true);
         txtDesc.setBorder(new LineBorder(new Color(80, 80, 80)));
         JScrollPane scrollDesc = new JScrollPane(txtDesc);
         scrollDesc.setPreferredSize(new Dimension(250, 42));
         formPanel.add(scrollDesc, gbc);
 
-        // Fila 3: Precios
-        gbc.gridy = 4; gbc.gridx = 0; formPanel.add(crearLabel("COSTO (Ref. Divisa €/$)"), gbc);
-        gbc.gridx = 1; formPanel.add(crearLabel("VENTA (Ref. Divisa €/$)"), gbc);
+        // Fila 3: Finanzas (Formatos Decimales)
+        gbc.gridy = 4; gbc.gridx = 0; formPanel.add(crearLabel("COSTO UNITARIO (€/$)"), gbc);
+        gbc.gridx = 1; formPanel.add(crearLabel("PRECIO VENTA (€/$)"), gbc);
 
         gbc.gridy = 5; gbc.gridx = 0; formPanel.add(txtCostPrice = crearInput(true), gbc);
         gbc.gridx = 1; formPanel.add(txtSalePrice = crearInput(true), gbc);
 
-        // Fila 4: Stocks
-        gbc.gridy = 6; gbc.gridx = 0; formPanel.add(crearLabel("EXISTENCIA ACTUAL"), gbc);
-        gbc.gridx = 1; formPanel.add(crearLabel("ALERTA STOCK MÍNIMO"), gbc);
+        // Fila 4: Control de Existencias
+        gbc.gridy = 6; gbc.gridx = 0; formPanel.add(crearLabel("STOCK INICIAL"), gbc);
+        gbc.gridx = 1; formPanel.add(crearLabel("STOCK MÍNIMO (Alerta)"), gbc);
 
         gbc.gridy = 7; gbc.gridx = 0; formPanel.add(txtStock = crearInput(true), gbc);
         gbc.gridx = 1; formPanel.add(txtMinStock = crearInput(true), gbc);
 
         add(formPanel, BorderLayout.CENTER);
+    }
 
-        // --- BOTONERA (Standard Rectangular Style) ---
+    private void initControlButtons() {
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 15));
         btnPanel.setOpaque(false);
         btnPanel.setBorder(new EmptyBorder(0, 0, 15, 0));
@@ -142,21 +180,8 @@ public class AddEditProductDialog extends JDialog {
         btnPanel.add(crearBotonRectangular("LIMPIAR", new Color(70, 70, 70), e -> limpiar()));
         btnPanel.add(crearBotonRectangular("CANCELAR", new Color(190, 45, 45), e -> dispose()));
         btnPanel.add(crearBotonRectangular("GUARDAR", COLOR_FUCSIA, e -> guardar()));
-        btnPanel.add(crearBotonRectangular("SALIR", new Color(55, 55, 55), e -> dispose()));
 
         add(btnPanel, BorderLayout.SOUTH);
-
-        if (productToEdit != null) llenarCampos();
-        else { txtStock.setText("0"); txtMinStock.setText("5"); generarCodigo(); }
-    }
-
-    private void setupPrefixes() {
-        categoryPrefixes.put("Modelos Referencia", "MOD");
-        categoryPrefixes.put("Textiles", "MAT");
-        categoryPrefixes.put("Mercería", "MER");
-        categoryPrefixes.put("Branding", "BRA");
-        categoryPrefixes.put("Equipos Taller", "ACT");
-        categoryPrefixes.put("Accesorios", "REV");
     }
 
     private JLabel crearLabel(String t) {
@@ -177,23 +202,21 @@ public class AddEditProductDialog extends JDialog {
         return t;
     }
 
-    /**
-     * Factory Method: Crea botones rectangulares unificados con el módulo
-     * de proveedores para optimizar espacio en pantalla.
-     */
     private JButton crearBotonRectangular(String t, Color c, ActionListener a) {
         JButton b = new JButton(t);
-        b.setPreferredSize(new Dimension(130, 42));
+        b.setPreferredSize(new Dimension(150, 45));
         b.setBackground(c);
         b.setForeground(Color.WHITE);
         b.setFont(new Font("Segoe UI", Font.BOLD, 13));
         b.setFocusPainted(false);
         b.setBorder(BorderFactory.createLineBorder(c.brighter(), 1));
-        b.setCursor(new Cursor(Cursor.HAND_CURSOR));
         b.addActionListener(a);
         return b;
     }
 
+    /**
+     * Lógica de Negocio: Algoritmo de generación de códigos basado en persistencia DAO.
+     */
     private void generarCodigo() {
         if (productToEdit != null) return;
         Category sel = (Category) cmbCategory.getSelectedItem();
@@ -203,6 +226,9 @@ public class AddEditProductDialog extends JDialog {
         }
     }
 
+    /**
+     * Persistencia: Valida y transfiere los datos de la UI al motor SQLite.
+     */
     private void guardar() {
         try {
             Product p = (productToEdit == null) ? new Product() : productToEdit;
@@ -216,11 +242,17 @@ public class AddEditProductDialog extends JDialog {
             p.setCategoryId(((Category)cmbCategory.getSelectedItem()).getId());
 
             if (productDAO.save(p)) {
-                JOptionPane.showMessageDialog(this, "Datos sincronizados correctamente.");
+                JOptionPane.showMessageDialog(this, "Registro sincronizado exitosamente.");
                 dispose();
             }
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Verifique los datos numéricos.");
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "Error: Verifique que los campos numéricos sean válidos.");
+        }
+    }
+
+    private void cargarCategorias() {
+        for(Category c : productDAO.getAllCategories()) {
+            cmbCategory.addItem(c);
         }
     }
 
@@ -233,16 +265,16 @@ public class AddEditProductDialog extends JDialog {
         txtStock.setText(String.valueOf(productToEdit.getCurrentStock()));
         txtMinStock.setText(String.valueOf(productToEdit.getMinStock()));
         for(int i=0; i<cmbCategory.getItemCount(); i++) {
-            if(cmbCategory.getItemAt(i).getId() == productToEdit.getCategoryId()) cmbCategory.setSelectedIndex(i);
+            if(cmbCategory.getItemAt(i).getId() == productToEdit.getCategoryId()) {
+                cmbCategory.setSelectedIndex(i);
+            }
         }
     }
 
     private void limpiar() {
-        txtName.setText(""); txtDesc.setText(""); txtCostPrice.setText(""); txtSalePrice.setText("");
-        txtStock.setText("0"); txtMinStock.setText("5"); generarCodigo();
-    }
-
-    private void cargarCategorias() {
-        for(Category c : productDAO.getAllCategories()) cmbCategory.addItem(c);
+        txtName.setText(""); txtDesc.setText("");
+        txtCostPrice.setText(""); txtSalePrice.setText("");
+        txtStock.setText("0"); txtMinStock.setText("5");
+        generarCodigo();
     }
 }

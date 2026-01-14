@@ -10,28 +10,21 @@
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: Enero 2026
- * VERSIÓN: 1.1.0 (Refactored Release)
+ * VERSIÓN: 1.1.2 (Persistent Delta Integration)
  *
  * DESCRIPCIÓN TÉCNICA:
  * Clase perteneciente a la Capa de Acceso a Datos (DAO) para la entidad 'Producto'.
- * Actúa como el puente de persistencia principal del sistema, orquestando la
- * comunicación entre el Modelo de Objetos y la base de datos relacional SQLite.
+ * Implementa la persistencia integral mediante SQLite, soportando operaciones
+ * CRUD, ajustes incrementales de stock (Delta Logic) y automatización de catálogos.
  *
- * Características de Ingeniería:
- * 1. Implementación de Lógica Dual (Save/Update): Centraliza la persistencia
- * mediante una estructura condicional que decide entre instrucciones DML INSERT o UPDATE.
- * 2. Algoritmo de Generación de Identificadores: Incluye un generador de códigos
- * incrementales inteligentes (SmartCodes) para optimizar el registro de catálogo.
- * 3. Gestión de Integridad Referencial: Maneja nulidad y vinculación de Claves
- * Foráneas (FK) hacia Categorías y Proveedores.
- *
- * PRINCIPIOS POO:
- * - ABSTRACCIÓN: Aísla la complejidad de las consultas SQL de las vistas de inventario.
+ * PRINCIPIOS POO APLICADOS:
+ * - ABSTRACCIÓN: Aísla la complejidad de las consultas SQL del resto del sistema.
  * - ENCAPSULAMIENTO: Gestiona de forma privada el ciclo de vida de los objetos
- * `Connection`, `PreparedStatement` y `ResultSet`.
+ * Connection y PreparedStatement mediante try-with-resources.
+ * - RESPONSABILIDAD ÚNICA: La clase se dedica exclusivamente a la persistencia de productos.
  *
- * PATRONES DE DISEÑO IMPLEMENTADOS:
- * - DAO (Data Access Object): Proporciona una interfaz limpia para la persistencia.
+ * PATRONES DE DISEÑO:
+ * - Data Access Object (DAO): Proporciona una interfaz limpia para el acceso a datos.
  * -----------------------------------------------------------------------------
  */
 
@@ -45,31 +38,24 @@ import java.util.List;
 
 /**
  * Gestor de Persistencia para Productos.
- * Proporciona servicios avanzados para la administración del catálogo de SICONI.
+ * Proporciona servicios avanzados para la administración del inventario de SICONI.
  */
 public class ProductDAO {
 
     /**
-     * Persistencia Persistente (Create / Update).
-     * Sincroniza el estado de un objeto Product con su registro correspondiente en la BD.
-     * @param p Instancia del producto a guardar o actualizar.
+     * Persistencia Dual (Create / Update).
+     * Decide automáticamente entre INSERT o UPDATE basándose en la existencia del ID.
+     * @param p Instancia del producto a persistir.
      * @return true si la transacción SQL fue exitosa.
      */
     public boolean save(Product p) {
-        String sql;
-        // Lógica de decisión basada en la existencia del ID (Clave Primaria)
-        if (p.getId() == 0) {
-            // Operación DDL: Inserción de nuevo registro
-            sql = "INSERT INTO products (code, name, description, cost_price, sale_price, current_stock, min_stock, category_id, supplier_id, image_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        } else {
-            // Operación DDL: Actualización de registro existente
-            sql = "UPDATE products SET code=?, name=?, description=?, cost_price=?, sale_price=?, current_stock=?, min_stock=?, category_id=?, supplier_id=?, image_path=? WHERE id=?";
-        }
+        String sql = (p.getId() == 0)
+                ? "INSERT INTO products (code, name, description, cost_price, sale_price, current_stock, min_stock, category_id, supplier_id, image_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                : "UPDATE products SET code=?, name=?, description=?, cost_price=?, sale_price=?, current_stock=?, min_stock=?, category_id=?, supplier_id=?, image_path=? WHERE id=?";
 
         try (Connection conn = Conexion.conectar();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-            // Mapeo de parámetros transaccionales (Protección contra Inyección SQL)
             pstmt.setString(1, p.getCode());
             pstmt.setString(2, p.getName());
             pstmt.setString(3, p.getDescription());
@@ -78,13 +64,12 @@ public class ProductDAO {
             pstmt.setInt(6, p.getCurrentStock());
             pstmt.setInt(7, p.getMinStock());
 
-            // Gestión de Relaciones Opcionales (Manejo de Nulos en FK)
+            // Manejo de Claves Foráneas opcionales (Integridad Referencial)
             if (p.getCategoryId() > 0) pstmt.setInt(8, p.getCategoryId()); else pstmt.setObject(8, null);
             if (p.getSupplierId() > 0) pstmt.setInt(9, p.getSupplierId()); else pstmt.setObject(9, null);
 
             pstmt.setString(10, p.getImagePath());
 
-            // En caso de UPDATE, se inyecta el ID como parámetro de filtrado (posición 11)
             if (p.getId() != 0) {
                 pstmt.setInt(11, p.getId());
             }
@@ -92,32 +77,33 @@ public class ProductDAO {
             pstmt.executeUpdate();
             return true;
         } catch (SQLException e) {
-            System.err.println("Error en persistencia de producto: " + e.getMessage());
+            System.err.println("Error en save ProductDAO: " + e.getMessage());
             return false;
         }
     }
 
     /**
-     * Eliminación de Registro (Delete).
-     * @param id Identificador único del producto a remover.
-     * @return true si el registro fue eliminado correctamente.
+     * Ajuste incremental de existencias (Delta Logic).
+     * Permite sumar o restar unidades directamente en la BD para mayor concurrencia.
+     * @param id Identificador del producto.
+     * @param delta Valor entero (positivo para sumar, negativo para restar).
+     * @return true si la operación respeta la restricción de stock no negativo (>=0).
      */
-    public boolean delete(int id) {
-        String sql = "DELETE FROM products WHERE id = ?";
+    public boolean updateStockDelta(int id, int delta) {
+        String sql = "UPDATE products SET current_stock = current_stock + ? WHERE id = ? AND (current_stock + ?) >= 0";
         try (Connection conn = Conexion.conectar();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, id);
-            pstmt.executeUpdate();
-            return true;
-        } catch (SQLException e) {
-            return false;
-        }
+            pstmt.setInt(1, delta);
+            pstmt.setInt(2, id);
+            pstmt.setInt(3, delta);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) { return false; }
     }
 
     /**
-     * Recuperación por Identificador (Read by ID).
+     * Recuperación por Identificador.
      * @param id Clave primaria a consultar.
-     * @return Objeto Product poblado o null si no se encuentra.
+     * @return Objeto Product mapeado o null si no existe.
      */
     public Product getProductById(int id) {
         String sql = "SELECT * FROM products WHERE id = ?";
@@ -126,7 +112,6 @@ public class ProductDAO {
             pstmt.setInt(1, id);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
-                // Mapeo Objeto-Relacional (Hydration)
                 return new Product(
                         rs.getInt("id"), rs.getString("code"), rs.getString("name"),
                         rs.getString("description"), rs.getDouble("cost_price"), rs.getDouble("sale_price"),
@@ -134,16 +119,27 @@ public class ProductDAO {
                         rs.getInt("category_id"), rs.getInt("supplier_id"), rs.getString("image_path")
                 );
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        } catch (Exception e) { e.printStackTrace(); }
         return null;
     }
 
     /**
-     * Recuperación Maestra de Categorías.
-     * Utilizado para poblar componentes de selección (ComboBoxes) en la UI.
-     * @return Lista de entidades Category registradas.
+     * Eliminación Física de Registro.
+     * @param id Identificador del producto a remover.
+     * @return true si el registro fue eliminado correctamente.
+     */
+    public boolean delete(int id) {
+        String sql = "DELETE FROM products WHERE id = ?";
+        try (Connection conn = Conexion.conectar();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, id);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) { return false; }
+    }
+
+    /**
+     * Consulta Maestra de Categorías.
+     * @return Lista de objetos Category registrados.
      */
     public List<Category> getAllCategories() {
         List<Category> list = new ArrayList<>();
@@ -160,13 +156,11 @@ public class ProductDAO {
 
     /**
      * Algoritmo de Generación de SmartCodes.
-     * Analiza el último código registrado con un prefijo dado y genera el correlativo siguiente.
-     * Ejemplo: Si recibe "BIK" y existe "BIK-005", retorna "BIK-006".
-     * @param prefix Siglas identificadoras (Ej: BIK, TEXT).
-     * @return Nuevo código formateado.
+     * Genera automáticamente el siguiente código correlativo basado en un prefijo.
+     * @param prefix Siglas de la categoría (Ej: MOD, INS).
+     * @return Nuevo código formateado (Ej: MOD-005).
      */
     public String generateSmartCode(String prefix) {
-        // Consulta del último registro con patrón LIKE
         String sql = "SELECT code FROM products WHERE code LIKE ? ORDER BY id DESC LIMIT 1";
         try (Connection conn = Conexion.conectar();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -174,15 +168,12 @@ public class ProductDAO {
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
                 String lastCode = rs.getString("code");
-                // Lógica de parsing y parsing incremental
                 if (lastCode.contains("-")) {
-                    String numberPart = lastCode.split("-")[1];
-                    int nextNum = Integer.parseInt(numberPart) + 1;
-                    return String.format("%s-%03d", prefix, nextNum); // Formato con ceros a la izquierda
+                    int nextNum = Integer.parseInt(lastCode.split("-")[1]) + 1;
+                    return String.format("%s-%03d", prefix, nextNum);
                 }
             }
         } catch (Exception e) { }
-        // Fallback: Generación del primer correlativo del prefijo
         return prefix + "-001";
     }
 }
