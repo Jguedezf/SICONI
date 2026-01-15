@@ -231,22 +231,34 @@ public class AddEditProductDialog extends JDialog {
      */
     private void guardar() {
         try {
+            // Sanitización básica de entradas obligatorias
+            if (txtName.getText().trim().isEmpty()) {
+                JOptionPane.showMessageDialog(this, "El nombre del producto es obligatorio.");
+                return;
+            }
+
             Product p = (productToEdit == null) ? new Product() : productToEdit;
             p.setCode(txtCode.getText());
-            p.setName(txtName.getText());
-            p.setDescription(txtDesc.getText());
+            p.setName(txtName.getText().trim());
+            p.setDescription(txtDesc.getText().trim());
+
+            // Reemplazo de coma por punto para asegurar compatibilidad con Double.parseDouble
             p.setCostPrice(Double.parseDouble(txtCostPrice.getText().replace(",", ".")));
             p.setSalePrice(Double.parseDouble(txtSalePrice.getText().replace(",", ".")));
-            p.setCurrentStock(Integer.parseInt(txtStock.getText()));
-            p.setMinStock(Integer.parseInt(txtMinStock.getText()));
+
+            p.setCurrentStock(Integer.parseInt(txtStock.getText().trim()));
+            p.setMinStock(Integer.parseInt(txtMinStock.getText().trim()));
             p.setCategoryId(((Category)cmbCategory.getSelectedItem()).getId());
 
+            // Delegación a la Capa de Datos
             if (productDAO.save(p)) {
                 JOptionPane.showMessageDialog(this, "Registro sincronizado exitosamente.");
                 dispose();
             }
         } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "Error: Verifique que los campos numéricos sean válidos.");
+            JOptionPane.showMessageDialog(this, "Error: Verifique que los campos numéricos (Precios y Stock) sean válidos.");
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Error inesperado al guardar: " + ex.getMessage());
         }
     }
 

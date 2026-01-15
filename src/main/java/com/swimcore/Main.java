@@ -10,16 +10,7 @@
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: Enero 2026
- * VERSIÓN: 1.2.0 (Stable Persistence Release)
- *
- * DESCRIPCIÓN TÉCNICA:
- * Clase Principal (Entry Point) encargada de la inicialización del sistema.
- * Implementa lógica de persistencia protegida para asegurar que los cambios
- * realizados por el usuario no se pierdan entre sesiones de ejecución.
- *
- * PRINCIPIOS POO:
- * - ABSTRACCIÓN: Delega la complejidad de persistencia a métodos auxiliares.
- * - ENCAPSULAMIENTO: Métodos de configuración privados para proteger la lógica de arranque.
+ * VERSIÓN: 1.2.1 (Stable Persistence & Connection Feedback)
  * -----------------------------------------------------------------------------
  */
 
@@ -57,6 +48,8 @@ public class Main {
         Connection conn = Conexion.conectar();
 
         if (conn != null) {
+            // --- CAMBIO: SE ELIMINÓ EL JOPTIONPANE DE AQUÍ ---
+
             // Ejecuta la rutina de verificación y carga de productos
             createInventoryTables(conn);
 
@@ -66,6 +59,9 @@ public class Main {
                 userDAO.saveUser(new User("admin", "1234", "Johanna Guedez", "ADMIN"));
             }
         }
+
+        // --- CAMBIO: CIERRE AUTOMÁTICO DE SEGURIDAD ---
+        Runtime.getRuntime().addShutdownHook(new Thread(Conexion::cerrar));
 
         // 3. INICIO DEL HILO DE EVENTOS DE UI
         SwingUtilities.invokeLater(() -> new LoginView().setVisible(true));

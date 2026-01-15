@@ -10,71 +10,59 @@
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: Enero 2026
- * VERSIÓN: 1.0.0 (Stable Release)
+ * VERSIÓN: 2.0.0 (Persistent Exchange Rate System)
  *
  * DESCRIPCIÓN TÉCNICA:
- * Clase utilitaria encargada de la lógica de conversión monetaria y gestión de tasas de cambio.
- * Centraliza el factor de conversión (Tasa BCV) para garantizar que todos los módulos
- * (Inventario, Ventas, Reportes) utilicen un valor unificado.
- *
- * Características de Ingeniería:
- * 1. Gestión de Estado Global: Utiliza una variable estática para almacenar la tasa,
- * permitiendo actualizaciones en tiempo real que se reflejan instantáneamente en toda la UI.
- * 2. Formateo de Datos: Implementa algoritmos de representación visual para mostrar
- * precios duales (Divisa/Bolívares) con precisión decimal.
- * 3. Abstracción Financiera: Aisla la lógica de cálculo matemático de los componentes
- * de la interfaz, siguiendo el principio de responsabilidad única.
- *
- * PRINCIPIOS POO:
- * - ENCAPSULAMIENTO: Protege la variable `tasaBCV` mediante métodos accesores (Getter/Setter).
- * - ABSTRACCIÓN: El sistema consume `formatPrice` sin necesidad de conocer la fórmula interna.
- *
- * PATRONES DE DISEÑO:
- * - Singleton (Variación Estática): Proporciona un único punto de control para la
- * configuración financiera del sistema.
+ * Clase utilitaria encargada de la lógica de conversión monetaria y gestión de tasas.
+ * Se ha implementado PERSISTENCIA mediante Java Preferences API para asegurar
+ * que la Tasa BCV sobreviva al cierre del sistema.
  * -----------------------------------------------------------------------------
  */
 
 package com.swimcore.util;
 
+import java.util.prefs.Preferences;
+
 /**
- * Gestor de Divisas y Conversión Monetaria.
- * Proporciona las herramientas necesarias para manejar la dualidad de precios en el sistema.
+ * Gestor de Divisas con Persistencia de Datos.
+ * Garantiza que la tasa de cambio se mantenga sincronizada entre sesiones.
  */
 public class CurrencyManager {
 
-    // Tasa de cambio base (referencia BCV).
-    // Se define como estática para que persista durante la sesión de la aplicación.
-    private static double tasaBCV = 60.00;
+    // Nodo de preferencias para guardar datos en el almacenamiento del sistema
+    private static final Preferences prefs = Preferences.userNodeForPackage(CurrencyManager.class);
+    private static final String TASA_KEY = "tasa_bcv_siconi";
+
+    // Valor por defecto en caso de que no exista registro previo
+    private static final double TASA_DEFAULT = 60.00;
 
     /**
-     * Recupera la tasa de cambio actual.
-     * @return Valor actual de la tasa (double).
+     * Recupera la tasa de cambio actual desde el almacenamiento persistente.
+     * Si no hay una tasa guardada, retorna el valor por defecto (60.00).
+     * @return Valor guardado de la tasa (double).
      */
     public static double getTasa() {
-        return tasaBCV;
+        return prefs.getDouble(TASA_KEY, TASA_DEFAULT);
     }
 
     /**
-     * Actualiza la tasa de cambio en tiempo de ejecución.
-     * @param nuevaTasa El nuevo valor de conversión.
+     * Actualiza la tasa de cambio y la guarda físicamente en el sistema.
+     * @param nuevaTasa El nuevo valor de conversión ingresado por el usuario.
      */
     public static void setTasa(double nuevaTasa) {
-        tasaBCV = nuevaTasa;
+        prefs.putDouble(TASA_KEY, nuevaTasa);
     }
 
     /**
      * Metodo de utilidad para el formateo visual de precios en la interfaz.
-     * Realiza la conversión aritmética y retorna una cadena formateada con 2 decimales.
-     * * @param precioEnDivisa El monto base en moneda extranjera.
+     * @param precioEnDivisa El monto base en moneda extranjera.
      * @return String con el formato: "€ X.XX (Bs. X.XX)"
      */
     public static String formatPrice(double precioEnDivisa) {
-        // Cálculo del valor equivalente en moneda local
-        double enBolivares = precioEnDivisa * tasaBCV;
+        double tasaActual = getTasa();
+        double enBolivares = precioEnDivisa * tasaActual;
 
-        // Uso de especificadores de formato (%.2f) para asegurar la precisión monetaria.
-        // Se utiliza el símbolo de Euro (€) como moneda base según los requerimientos del sistema.
+        // Formateo profesional con 2 decimales
         return String.format("€ %.2f  (Bs. %.2f)", precioEnDivisa, enBolivares);
     }
 }

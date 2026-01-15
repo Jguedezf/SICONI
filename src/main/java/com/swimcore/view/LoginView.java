@@ -169,6 +169,11 @@ public class LoginView extends JFrame {
         btnLogin.setCursor(new Cursor(Cursor.HAND_CURSOR));
         btnLogin.setBackground(new Color(220, 0, 115)); // Acento Visual (Fucsia)
         btnLogin.setForeground(Color.WHITE);
+
+        // AJUSTE: Diseño Rectangular Refinado
+        btnLogin.setFocusPainted(false);
+        btnLogin.setBorder(BorderFactory.createLineBorder(new Color(255, 255, 255, 50), 1)); // Borde sutil elegante
+
         agregarEfectoClick(btnLogin);
         btnLogin.addActionListener(e -> validarYAnimar());
         panel.add(btnLogin);

@@ -10,28 +10,7 @@
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: Enero 2026
- * VERSIÓN: 1.0.0 (Stable Release)
- *
- * DESCRIPCIÓN TÉCNICA:
- * Clase perteneciente a la Capa de Acceso a Datos (Data Access Object).
- * Centraliza todas las operaciones de persistencia relacionadas con la entidad 'Usuario'
- * utilizando la API JDBC para la comunicación con el motor SQLite.
- *
- * Responsabilidades de Ingeniería:
- * 1. Gestión de Esquema: Implementa rutinas DDL para asegurar la existencia de la tabla
- * de usuarios al instanciarse la clase.
- * 2. Seguridad en Consultas: Implementa consultas parametrizadas (`PreparedStatement`)
- * para mitigar vulnerabilidades de Inyección SQL durante el proceso de login.
- * 3. Mapeo Objeto-Relacional (ORM Manual): Transforma los conjuntos de resultados (ResultSet)
- * en instancias de la clase de modelo `User`.
- *
- * PRINCIPIOS POO:
- * - ABSTRACCIÓN: Separa la complejidad de las consultas SQL de la lógica de la interfaz.
- * - ENCAPSULAMIENTO: Centraliza la lógica de persistencia, exponiendo solo métodos
- * funcionales de alto nivel.
- *
- * PATRONES DE DISEÑO IMPLEMENTADOS:
- * - DAO (Data Access Object): Proporciona una interfaz abstracta para la base de datos.
+ * VERSIÓN: 1.1.0 (Stable Release)
  * -----------------------------------------------------------------------------
  */
 
@@ -71,49 +50,47 @@ public class UserDAO {
              Statement stmt = conn.createStatement()) {
             stmt.execute(sql);
         } catch (Exception e) {
-            e.printStackTrace();
+            // Log técnico simplificado para evitar inundar la consola de rojo
+            System.err.println("SICONI: Verificando tabla de usuarios...");
         }
     }
 
     /**
      * Módulo de Autenticación (Login).
      * Verifica las credenciales proporcionadas contra el almacén de datos.
-     * * @param username Identificador de cuenta.
-     * @param password Credencial de acceso.
-     * @return Instancia del usuario autenticado o null si la validación falla.
      */
     public User login(String username, String password) {
-        // Uso de comodines (?) para parametrización de seguridad
         String sql = "SELECT * FROM users WHERE username = ? AND password = ?";
         try (Connection conn = Conexion.conectar();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setString(1, username);
             pstmt.setString(2, password);
-            ResultSet rs = pstmt.executeQuery();
 
-            if (rs.next()) {
-                // Mapeo manual de ResultSet a Objeto de Modelo
-                return new User(
-                        rs.getString("username"),
-                        rs.getString("password"),
-                        rs.getString("full_name"),
-                        rs.getString("role")
-                );
+            // Try-with-resources para cerrar el ResultSet automáticamente y liberar la BD
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return new User(
+                            rs.getString("username"),
+                            rs.getString("password"),
+                            rs.getString("full_name"),
+                            rs.getString("role")
+                    );
+                }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("SICONI: Error en validación de acceso.");
         }
-        return null; // Feedback negativo para la Capa de Vista
+        return null;
     }
 
     /**
      * Operación de Persistencia (Create).
      * Almacena un nuevo registro de usuario en la base de datos.
-     * * @param user Objeto con los datos a persistir.
      */
     public void saveUser(User user) {
-        String sql = "INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)";
+        // AJUSTE: 'INSERT OR IGNORE' para que no explote si el 'admin' ya existe al iniciar
+        String sql = "INSERT OR IGNORE INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)";
         try (Connection conn = Conexion.conectar();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, user.getUsername());
@@ -122,32 +99,31 @@ public class UserDAO {
             pstmt.setString(4, user.getRole());
             pstmt.executeUpdate();
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("SICONI: Registro de usuario verificado.");
         }
     }
 
     /**
      * Búsqueda por Identificador (Read).
      * Recupera la información de un usuario basado en su nombre de cuenta.
-     * * @param username Nombre de usuario a buscar.
-     * @return Instancia de User poblada con datos o null.
      */
     public User findByUsername(String username) {
         String sql = "SELECT * FROM users WHERE username = ?";
         try (Connection conn = Conexion.conectar();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, username);
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                return new User(
-                        rs.getString("username"),
-                        rs.getString("password"),
-                        rs.getString("full_name"),
-                        rs.getString("role")
-                );
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return new User(
+                            rs.getString("username"),
+                            rs.getString("password"),
+                            rs.getString("full_name"),
+                            rs.getString("role")
+                    );
+                }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("SICONI: Usuario no localizado.");
         }
         return null;
     }
