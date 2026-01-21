@@ -10,7 +10,7 @@
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: Enero 2026
- * VERSIÓN: 1.7.0 (Initial Connection Guardian & Silent Repair)
+ * VERSIÓN: 1.8.0 (Audit Reading Added)
  * -----------------------------------------------------------------------------
  */
 
@@ -21,6 +21,7 @@ import com.swimcore.model.Product;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Vector; // Import necesario para el retorno del historial
 
 /**
  * Gestor de Persistencia Avanzado para Productos SICONI.
@@ -129,6 +130,61 @@ public class ProductDAO {
             }
         } catch (SQLException e) { return false; }
     }
+
+    // --- NUEVO MÉTODO AÑADIDO PARA CONSULTA DE HISTORIAL (AUDITORÍA FASE 1) ---
+    /**
+     * Recupera el historial de movimientos filtrado por fechas.
+     * Utiliza un JOIN para traer el nombre del producto en lugar de solo su ID.
+     * @param from Fecha inicio (java.util.Date)
+     * @param to Fecha fin (java.util.Date)
+     * @return Lista de vectores para llenado directo de JTable.
+     */
+    public List<Vector<Object>> getHistoryByDateRange(java.util.Date from, java.util.Date to) {
+        List<Vector<Object>> data = new ArrayList<>();
+        String sql = "SELECT m.id, m.date, p.code, p.name, m.type, m.quantity, m.observation " +
+                "FROM inventory_movements m " +
+                "LEFT JOIN products p ON m.product_id = p.id " +
+                "WHERE m.date BETWEEN ? AND ? " +
+                "ORDER BY m.date DESC";
+
+        try (Connection conn = Conexion.conectar();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            // Formateador simple compatible con SQLite (ISO8601)
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+            // Ajuste de rangos horarios para cubrir el día completo (00:00 a 23:59)
+            java.util.Calendar cal = java.util.Calendar.getInstance();
+            cal.setTime(from);
+            cal.set(java.util.Calendar.HOUR_OF_DAY, 0); cal.set(java.util.Calendar.MINUTE, 0);
+            String strFrom = sdf.format(cal.getTime());
+
+            cal.setTime(to);
+            cal.set(java.util.Calendar.HOUR_OF_DAY, 23); cal.set(java.util.Calendar.MINUTE, 59);
+            String strTo = sdf.format(cal.getTime());
+
+            pstmt.setString(1, strFrom);
+            pstmt.setString(2, strTo);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Vector<Object> row = new Vector<>();
+                    row.add(rs.getInt("id"));
+                    row.add(rs.getString("date"));
+                    row.add(rs.getString("code"));
+                    row.add(rs.getString("name"));
+                    row.add(rs.getString("type"));
+                    row.add(rs.getInt("quantity"));
+                    row.add(rs.getString("observation"));
+                    data.add(row);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return data;
+    }
+    // --- FIN DEL BLOQUE AÑADIDO ---
 
     public Product getProductById(int id) {
         String sql = "SELECT * FROM products WHERE id = ?";

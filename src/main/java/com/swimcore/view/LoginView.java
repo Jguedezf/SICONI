@@ -10,7 +10,7 @@
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: Enero 2026
- * VERSIÓN: 1.0.0 (Stable Release)
+ * VERSIÓN: 1.2.0 (Cinematic Transition Update)
  *
  * DESCRIPCIÓN TÉCNICA:
  * Clase de la Capa de Vista (View Layer) encargada de la interfaz de autenticación.
@@ -21,7 +21,8 @@
  * 1. Captura y sanitización de credenciales de acceso.
  * 2. Orquestación de la validación contra la Capa de Acceso a Datos (DAO).
  * 3. Gestión de feedback visual asíncrono (animaciones y temporizadores).
- * 4. Control de navegación hacia el contenedor principal (DashboardView).
+ * 4. Control de navegación hacia la Pantalla de Bienvenida (Splash Screen).
+ * 5. Activación de la experiencia sensorial auditiva (SoundManager).
  *
  * PRINCIPIOS DE PROGRAMACIÓN ORIENTADA A OBJETOS (POO):
  * 1. HERENCIA: Especialización de la clase `javax.swing.JFrame` para el comportamiento de ventana.
@@ -39,6 +40,7 @@ package com.swimcore.view;
 import com.swimcore.dao.UserDAO;
 import com.swimcore.model.User;
 import com.swimcore.util.LanguageManager;
+import com.swimcore.util.SoundManager; // <--- DEPENDENCIA DE AUDIO (Motor de Sonido)
 
 import javax.swing.*;
 import java.awt.*;
@@ -205,6 +207,11 @@ public class LoginView extends JFrame {
 
         if (accesoBD || accesoEmergencia) {
 
+            // --- ACTIVACIÓN DE EXPERIENCIA SENSORIAL ---
+            // Reproduce el audio "Echo Hit" ambiental para dar la bienvenida triunfal
+            SoundManager.getInstance().playLoginSuccess();
+            // -------------------------------------------
+
             // LÓGICA DE AUTORECUPERACIÓN (Self-Healing):
             // Si el acceso fue por emergencia y no existe registro en BD, se inyecta el usuario admin.
             if (!accesoBD && accesoEmergencia) {
@@ -233,14 +240,17 @@ public class LoginView extends JFrame {
             // Timer ejecuta la transición en el Event Dispatch Thread después de 1500ms
             Timer t = new Timer(1500, e -> {
                 dispose(); // Liberación de recursos de la ventana actual
-                // Navegación hacia el contenedor principal (Dashboard)
-                new DashboardView().setVisible(true);
+
+                // CAMBIO: Navegación hacia la Pantalla de Bienvenida (Splash Screen)
+                // Inicia la secuencia de carga cinemática antes del Dashboard
+                new WelcomeView().setVisible(true);
             });
             t.setRepeats(false);
             t.start();
 
         } else {
             // Manejo de excepción de negocio: Credenciales inválidas
+            SoundManager.getInstance().playError(); // Sonido de error sutil
             JOptionPane.showMessageDialog(this, "Credenciales incorrectas", "Error", JOptionPane.ERROR_MESSAGE);
             txtPass.setText("");
             txtPass.requestFocus(); // Retorno de foco para reintento rápido
@@ -292,12 +302,16 @@ public class LoginView extends JFrame {
     private void agregarEfectoClick(JButton btn) {
         btn.addMouseListener(new MouseAdapter() {
             public void mousePressed(MouseEvent e) {
+                SoundManager.getInstance().playClick(); // Sonido Click al presionar
                 // Desplazamiento positivo en ejes X/Y para simular profundidad
                 btn.setLocation(btn.getX()+2, btn.getY()+2);
             }
             public void mouseReleased(MouseEvent e) {
                 // Retorno a posición original (Elasticidad)
                 btn.setLocation(btn.getX()-2, btn.getY()-2);
+            }
+            public void mouseEntered(MouseEvent e) {
+                SoundManager.getInstance().playHover(); // Sonido Hover al pasar el mouse
             }
         });
     }

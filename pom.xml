@@ -15,6 +15,7 @@
     </properties>
 
     <dependencies>
+        <!-- UI Framework: FlatLaf (Base del Look & Feel) -->
         <dependency>
             <groupId>com.formdev</groupId>
             <artifactId>flatlaf</artifactId>
@@ -27,28 +28,44 @@
             <version>3.5</version>
         </dependency>
 
+        <!-- Database: SQLite -->
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.45.1.0</version>
         </dependency>
 
+        <!-- Reporting: iText PDF (Requerido para Exportar Auditoría) -->
         <dependency>
             <groupId>com.itextpdf</groupId>
             <artifactId>itextpdf</artifactId>
             <version>5.5.13.3</version>
         </dependency>
 
-        <dependency>
-            <groupId>com.toedter</groupId>
-            <artifactId>jcalendar</artifactId>
-            <version>1.4</version>
-        </dependency>
-
+        <!-- Layout Manager -->
         <dependency>
             <groupId>com.miglayout</groupId>
             <artifactId>miglayout-swing</artifactId>
             <version>5.3</version>
         </dependency>
+
+        <!-- ============================================== -->
+        <!-- NUEVAS DEPENDENCIAS - FASE 1 (AUDITORÍA LUXURY) -->
+        <!-- ============================================== -->
+
+        <!-- 1. Calendario Moderno (Reemplaza a JCalendar) -->
+        <dependency>
+            <groupId>com.github.lgooddatepicker</groupId>
+            <artifactId>LGoodDatePicker</artifactId>
+            <version>11.2.1</version>
+        </dependency>
+
+        <!-- 2. Motor de Animaciones (Para efectos Fade-In/Slide) -->
+        <dependency>
+            <groupId>org.jdesktop</groupId>
+            <artifactId>timingframework-swing</artifactId>
+            <version>5.0.0</version>
+        </dependency>
+
     </dependencies>
 </project>
