@@ -1,45 +1,24 @@
 /*
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
- * CARRERA: Ingeniería en Informática
- * ASIGNATURA: Programación III / Proyecto de Software
- *
- * PROYECTO: GESTIÓN DE INVENTARIO DE UNA TIENDA (SICONI)
  * ARCHIVO: DashboardView.java
- *
- * AUTORA: Johanna Guedez - V14089807
- * PROFESORA: Ing. Dubraska Roca
- * FECHA: Enero 2026
- * VERSIÓN: 1.0.0 (Stable Release)
- *
- * DESCRIPCIÓN TÉCNICA:
- * Clase de la Capa de Vista (View) que funge como Contenedor Principal (Main Container) del sistema.
- * Implementa una arquitectura de navegación centralizada ("Hub & Spoke"), actuando como
- * el nodo central desde el cual se instancian y visualizan los módulos funcionales.
- *
- * Características de Ingeniería de UI:
- * 1. Diseño Responsivo: Implementación de `GridBagLayout` y `BorderLayout` anidados para centrado dinámico.
- * 2. Custom Rendering: Sobreescritura del delegado de UI (`BasicButtonUI`) para renderizado
- * vectorial personalizado de botones (bordes redondeados, efectos hover).
- * 3. Gestión de Recursos: Carga dinámica de assets gráficos mediante ClassLoader.
- *
- * PRINCIPIOS DE PROGRAMACIÓN ORIENTADA A OBJETOS (POO):
- * 1. HERENCIA: Extiende de `javax.swing.JFrame` para heredar propiedades de ventana de sistema.
- * 2. POLIMORFISMO: Sobreescritura (Override) del método `paint()` en componentes Swing anónimos
- * para alterar su comportamiento gráfico estándar.
- * 3. COMPOSICIÓN: Construcción de la interfaz compleja mediante la agregación de paneles y componentes.
- *
- * PATRONES DE DISEÑO IMPLEMENTADOS:
- * - Composite: Estructura jerárquica de componentes Swing (Paneles dentro de Paneles).
- * - Command: Encapsulamiento de las acciones de navegación en los Listeners de los botones.
+ * VERSIÓN: 2.4.1 En desarrollo.
  * -----------------------------------------------------------------------------
  */
 
 package com.swimcore.view;
 
+import com.swimcore.util.CurrencyManager;
 import com.swimcore.util.ImagePanel;
+import com.swimcore.util.SoundManager;
+import com.swimcore.view.components.SoftButton;
+import com.swimcore.view.dialogs.CurrencySettingsDialog;
 import com.swimcore.view.dialogs.SupplierManagementDialog;
-// import com.swimcore.view.ClientManagementDialog; // Comentado temporalmente para evitar errores (Dependencia futura)
+import com.swimcore.view.ReportsView;
+import com.swimcore.view.SalesView;
+// Imports verificados
+import com.swimcore.view.dialogs.ClientCheckInDialog;
+import com.swimcore.model.Client;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -47,116 +26,142 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.net.URL;
+import java.util.Locale;
 
-/**
- * Vista Principal (Dashboard).
- * Centraliza el acceso a los subsistemas mediante un menú de rejilla.
- */
 public class DashboardView extends JFrame {
 
-    // --- DEFINICIÓN DE CONSTANTES DE ESTILO (PALETA DARK MODE) ---
     private final Color COLOR_BG = new Color(18, 18, 18);
     private final Color COLOR_CARD = new Color(30, 30, 30);
     private final Color COLOR_FUCSIA = new Color(220, 0, 115);
     private final Color COLOR_TEXTO = new Color(240, 240, 240);
+    private JLabel lblRateValue;
 
-    /**
-     * Constructor.
-     * Inicializa el contenedor raíz, configura la estrategia de Layout y carga los componentes.
-     */
     public DashboardView() {
-        // Configuración de propiedades del Frame
         setTitle("SICONI - Panel Principal");
-        setSize(1100, 680); // Resolución optimizada
-        setLocationRelativeTo(null); // Centrado en viewport
+        setSize(1100, 700);
+        setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         JPanel mainPanel;
-        try {
-            // Intento de instanciación del panel con imagen de fondo (ImagePanel)
-            mainPanel = new ImagePanel("/images/bg.png");
-        } catch(Exception e) {
-            // Manejo de excepción: Fallback a panel sólido si el recurso no carga
-            mainPanel = new JPanel();
-            mainPanel.setBackground(COLOR_BG);
-        }
+        try { mainPanel = new ImagePanel("/images/bg.png"); }
+        catch(Exception e) { mainPanel = new JPanel(); mainPanel.setBackground(COLOR_BG); }
 
-        // Estrategia de Layout: BorderLayout para dividir Norte, Centro y Sur
         mainPanel.setLayout(new BorderLayout());
         setContentPane(mainPanel);
 
-        // 1. ESPACIO SUPERIOR (Spacer para margen visual)
-        JPanel headerSpacer = new JPanel();
-        headerSpacer.setOpaque(false);
-        headerSpacer.setPreferredSize(new Dimension(1, 40));
-        mainPanel.add(headerSpacer, BorderLayout.NORTH);
-
-        // 2. CENTRO (Inyección del Menú de Módulos)
+        mainPanel.add(createHeader(), BorderLayout.NORTH);
         mainPanel.add(createCentralMenu(), BorderLayout.CENTER);
-
-        // 3. PIE DE PÁGINA (Footer informativo)
         mainPanel.add(createFooter(), BorderLayout.SOUTH);
     }
 
-    /**
-     * Construye el panel central contenedor de la matriz de navegación.
-     * Utiliza anidamiento de layouts (GridBagLayout) para centrado absoluto.
-     *
-     * @return JPanel configurado con la rejilla de botones.
-     */
+    private JPanel createHeader() {
+        JPanel headerPanel = new JPanel();
+        headerPanel.setLayout(new BoxLayout(headerPanel, BoxLayout.X_AXIS));
+        headerPanel.setOpaque(false);
+        headerPanel.setBorder(new EmptyBorder(20, 30, 20, 30));
+
+        JLabel lblTitle = new JLabel("SICONI");
+        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 28));
+        lblTitle.setForeground(Color.WHITE);
+
+        headerPanel.add(lblTitle);
+        headerPanel.add(Box.createHorizontalGlue());
+
+        JPanel rateWidget = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        rateWidget.setOpaque(false);
+
+        lblRateValue = new JLabel(String.format(Locale.US, "TASA BCV: Bs. %.2f", CurrencyManager.getTasa()));
+        lblRateValue.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        lblRateValue.setForeground(Color.LIGHT_GRAY);
+
+        SoftButton btnEditRate = new SoftButton(createIcon("/images/icons/icon_edit.png", 20, 20));
+        btnEditRate.setPreferredSize(new Dimension(40, 40));
+        btnEditRate.addActionListener(e -> {
+            SoundManager.getInstance().playClick();
+            new CurrencySettingsDialog(this).setVisible(true);
+            lblRateValue.setText(String.format(Locale.US, "TASA BCV: Bs. %.2f", CurrencyManager.getTasa()));
+        });
+
+        rateWidget.add(lblRateValue);
+        rateWidget.add(btnEditRate);
+        headerPanel.add(rateWidget);
+        return headerPanel;
+    }
+
     private JPanel createCentralMenu() {
-        // Contenedor intermedio con GridBagLayout para centrado vertical/horizontal
         JPanel container = new JPanel(new GridBagLayout());
         container.setOpaque(false);
 
-        // REJILLA: 2 Filas, 3 Columnas, con Gaps de 25px
         JPanel grid = new JPanel(new GridLayout(2, 3, 25, 25));
         grid.setOpaque(false);
 
-        // --- INSTANCIACIÓN Y MAPEO DE BOTONES ---
-
-        // 1. CLIENTES (Mensaje temporal - Placeholder)
+        // 1. CLIENTES
         grid.add(createBigButton("CLIENTES", "Registro y Atletas", "/images/client.png", e -> {
-            JOptionPane.showMessageDialog(this, "Módulo Clientes en construcción");
-            // new ClientManagementDialog(this).setVisible(true);
+            JOptionPane.showMessageDialog(this, "Módulo Clientes en construcción.\nUtilice el botón PEDIDOS para registrar clientes.");
         }));
 
-        // 2. INVENTARIO (Módulo Core)
-        // Navegación hacia InventoryView inyectando 'this' como dependencia padre (Modalidad)
+        // 2. INVENTARIO
         grid.add(createBigButton("INVENTARIO", "Insumos y Catálogo", "/images/inventory.png", e -> {
-            // Ahora abre InventoryView correctamente
-            new InventoryView(this).setVisible(true);
+            setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+            new SwingWorker<Void, Void>() {
+                @Override protected Void doInBackground() throws Exception {
+                    new InventoryView(DashboardView.this).setVisible(true);
+                    return null;
+                }
+                @Override protected void done() { setCursor(Cursor.getDefaultCursor()); }
+            }.execute();
         }));
 
-        // 3. PEDIDOS
-        grid.add(createBigButton("PEDIDOS", "Ventas y Producción", "/images/orders.png", null));
+        // 3. PEDIDOS (CORRECTO)
+        grid.add(createBigButton("PEDIDOS", "Ventas y Producción", "/images/orders.png", e -> {
+            ClientCheckInDialog checkIn = new ClientCheckInDialog(this);
+            checkIn.setVisible(true);
+
+            Client clienteSeleccionado = checkIn.getSelectedClient();
+
+            if (clienteSeleccionado != null) {
+                JFrame frameVentas = new JFrame("SICONI - Gestión de Pedidos (" + clienteSeleccionado.getFullName() + ")");
+                frameVentas.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+                frameVentas.setSize(1100, 700);
+                frameVentas.setLocationRelativeTo(null);
+                frameVentas.setContentPane(new SalesView(clienteSeleccionado));
+                frameVentas.setVisible(true);
+            }
+        }));
 
         // 4. REPORTES
-        grid.add(createBigButton("REPORTES", "Estadísticas", "/images/reports.png", null));
+        grid.add(createBigButton("REPORTES", "Estadísticas", "/images/reports.png", e -> {
+            setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+            new SwingWorker<Void, Void>() {
+                @Override protected Void doInBackground() throws Exception {
+                    new ReportsView(DashboardView.this).setVisible(true);
+                    return null;
+                }
+                @Override protected void done() { setCursor(Cursor.getDefaultCursor()); }
+            }.execute();
+        }));
 
         // 5. PROVEEDORES
-        grid.add(createBigButton("AJUSTES", "Proveedores y Dólar", "/images/settings.png", e -> {
+        grid.add(createBigButton("PROVEEDORES", "Gestión de Contactos", "/images/settings.png", e -> {
             new SupplierManagementDialog(this).setVisible(true);
         }));
 
-        // 6. SALIR (Control de Sesión)
+        // 6. SALIR
         JButton btnExit = createBigButton("SALIR", "Cerrar Sesión", "/images/logout.png", null);
-
-        // Listener anónimo para gestión de estado Hover (MouseOver) personalizado
         btnExit.addMouseListener(new MouseAdapter() {
             public void mouseEntered(MouseEvent e) {
-                btnExit.putClientProperty("hoverColor", new Color(220, 20, 60)); // Rojo Alerta
+                btnExit.putClientProperty("hoverColor", new Color(220, 20, 60));
                 btnExit.putClientProperty("hover", true);
-                btnExit.repaint(); // Solicitud de repintado al EDT
+                btnExit.repaint();
+                SoundManager.getInstance().playHover();
             }
             public void mouseExited(MouseEvent e) {
                 btnExit.putClientProperty("hoverColor", null);
                 btnExit.putClientProperty("hover", false);
                 btnExit.repaint();
             }
+            public void mousePressed(MouseEvent e) { SoundManager.getInstance().playClick(); }
         });
-
-        // Lógica de terminación de la aplicación (System Exit)
         btnExit.addActionListener(e -> {
             if(JOptionPane.showConfirmDialog(this, "¿Desea cerrar el sistema?", "SICONI", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) System.exit(0);
         });
@@ -166,58 +171,46 @@ public class DashboardView extends JFrame {
         return container;
     }
 
-    /**
-     * Genera el pie de página.
-     * @return JPanel con etiquetas de créditos.
-     */
     private JPanel createFooter() {
         JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER));
         footer.setOpaque(false);
         footer.setBorder(new EmptyBorder(0,0,10,0));
         JLabel lbl = new JLabel("© 2026 Desarrollado por Johanna Guédez - Ingeniería Informática UNEG");
-        lbl.setForeground(Color.GRAY);
+        lbl.setForeground(Color.BLACK);
         lbl.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         footer.add(lbl);
         return footer;
     }
 
-    // --- MÉTODOS FACTORY PARA COMPONENTES UI (Visuales) ---
+    private ImageIcon createIcon(String path, int width, int height) {
+        try {
+            URL url = getClass().getResource(path);
+            if (url != null) return new ImageIcon(new ImageIcon(url).getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH));
+        } catch (Exception e) {}
+        return null;
+    }
 
-    /**
-     * Método Factory para la creación de botones personalizados (Custom Components).
-     * Sobreescribe el delegado UI para dibujar formas vectoriales en lugar de los botones nativos.
-     *
-     * @param title Título del botón.
-     * @param subtitle Subtítulo descriptivo.
-     * @param iconPath Ruta relativa del recurso gráfico.
-     * @param action Implementación funcional de la acción (ActionListener).
-     * @return JButton configurado.
-     */
     private JButton createBigButton(String title, String subtitle, String iconPath, java.awt.event.ActionListener action) {
         JButton btn = new JButton();
         btn.setLayout(new BorderLayout());
-        btn.setPreferredSize(new Dimension(320, 200)); // Restricción de dimensiones
+        btn.setPreferredSize(new Dimension(320, 200));
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
         btn.setFocusPainted(false);
         btn.setBorderPainted(false);
-        btn.setContentAreaFilled(false); // Desactiva el pintado por defecto de Swing
+        btn.setContentAreaFilled(false);
 
-        // Configuración de Icono Central
         JLabel lblIcon = new JLabel();
         lblIcon.setHorizontalAlignment(SwingConstants.CENTER);
         try {
             URL url = getClass().getResource(iconPath);
             if (url != null) {
-                // Escalado de imagen con algoritmo Smooth para evitar aliasing
                 ImageIcon icon = new ImageIcon(new ImageIcon(url).getImage().getScaledInstance(130, 130, Image.SCALE_SMOOTH));
                 lblIcon.setIcon(icon);
             } else {
-                // Fallback visual en caso de error de carga
                 lblIcon.setText("🔹"); lblIcon.setFont(new Font("Segoe UI", Font.PLAIN, 80)); lblIcon.setForeground(COLOR_FUCSIA);
             }
         } catch (Exception e) { }
 
-        // Panel de Textos (Sur)
         JPanel textPanel = new JPanel(new GridLayout(2, 1));
         textPanel.setOpaque(false);
         textPanel.setBorder(new EmptyBorder(0, 0, 15, 0));
@@ -236,42 +229,40 @@ public class DashboardView extends JFrame {
         btn.add(lblIcon, BorderLayout.CENTER);
         btn.add(textPanel, BorderLayout.SOUTH);
 
-        // Vinculación del Action Listener
         if(action != null) btn.addActionListener(action);
 
-        // Listeners para efectos visuales de interacción (Hover)
         btn.addMouseListener(new MouseAdapter() {
-            public void mouseEntered(MouseEvent e) { btn.putClientProperty("hover", true); btn.repaint(); }
-            public void mouseExited(MouseEvent e) { btn.putClientProperty("hover", false); btn.repaint(); }
+            public void mouseEntered(MouseEvent e) {
+                btn.putClientProperty("hover", true);
+                btn.repaint();
+                SoundManager.getInstance().playHover();
+            }
+            public void mouseExited(MouseEvent e) {
+                btn.putClientProperty("hover", false);
+                btn.repaint();
+            }
+            public void mousePressed(MouseEvent e) { SoundManager.getInstance().playClick(); }
         });
 
-        // SOBREESCRITURA DEL UI DELEGATE (CUSTOM PAINTING)
-        // Dibuja el fondo redondeado y el borde dinámico directamente en el Graphics2D
         btn.setUI(new javax.swing.plaf.basic.BasicButtonUI() {
             public void paint(Graphics g, JComponent c) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                // Activación de Antialiasing para bordes suaves
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-                // Recuperación de estado desde propiedades del cliente
                 boolean isHover = Boolean.TRUE.equals(c.getClientProperty("hover"));
                 Color hoverColor = (Color) c.getClientProperty("hoverColor");
-                int arc = 35; // Radio de curvatura del borde
-
+                int arc = 35;
                 if (isHover) {
-                    // Estado Hover: Fondo gris claro + Borde de color (Fucsia o Rojo)
                     g2.setColor(new Color(50, 50, 50));
                     g2.fillRoundRect(0, 0, c.getWidth(), c.getHeight(), arc, arc);
                     g2.setColor(hoverColor != null ? hoverColor : COLOR_FUCSIA);
-                    g2.setStroke(new BasicStroke(3)); // Borde grueso
+                    g2.setStroke(new BasicStroke(3));
                     g2.drawRoundRect(0, 0, c.getWidth()-1, c.getHeight()-1, arc, arc);
                 } else {
-                    // Estado Normal: Fondo oscuro (Card Color)
                     g2.setColor(COLOR_CARD);
                     g2.fillRoundRect(0, 0, c.getWidth(), c.getHeight(), arc, arc);
                 }
                 g2.dispose();
-                super.paint(g, c); // Dibuja los hijos (Icono y Texto) encima del fondo
+                super.paint(g, c);
             }
         });
         return btn;

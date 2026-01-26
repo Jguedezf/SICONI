@@ -10,12 +10,12 @@
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: Enero 2026
- * VERSIÓN: 1.5.0 (Standard UI & Social Integration)
+ * VERSIÓN: 2.1.0 (Black & Gold Edition)
  *
  * DESCRIPCIÓN TÉCNICA:
  * Diálogo modal para la gestión del directorio de proveedores.
- * Implementa una interfaz de doble panel (Tabla/Formulario) con acceso
- * directo a APIs externas de comunicación (WhatsApp e Instagram).
+ * - MEJORA: Rediseño visual completo "Luxury" (Undecorated, Borde Dorado, Fondo Oscuro).
+ * - LÓGICA: Gestión CRUD optimizada con feedback visual y sonoro.
  * -----------------------------------------------------------------------------
  */
 
@@ -23,6 +23,9 @@ package com.swimcore.view.dialogs;
 
 import com.swimcore.dao.SupplierDAO;
 import com.swimcore.model.Supplier;
+import com.swimcore.util.SoundManager;
+import com.swimcore.view.components.SoftButton;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
@@ -30,12 +33,8 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.net.URI;
-import java.util.List;
+import java.net.URL;
 
-/**
- * Vista de administración de socios comerciales.
- * Aplica principios de encapsulamiento para la gestión de contactos corporativos.
- */
 public class SupplierManagementDialog extends JDialog {
 
     private final SupplierDAO supplierDAO = new SupplierDAO();
@@ -45,20 +44,24 @@ public class SupplierManagementDialog extends JDialog {
     private JTextField txtCompany, txtContact, txtPhone, txtEmail, txtAddress, txtInstagram, txtWhatsapp;
     private int selectedId = 0;
 
-    // --- PALETA CORPORATIVA UNIFICADA ---
-    private static final Font FONT_INPUT = new Font("Segoe UI", Font.PLAIN, 15);
-    private static final Font FONT_LABEL = new Font("Segoe UI", Font.BOLD, 13);
-    private static final Color COLOR_BG_APP = new Color(18, 18, 18);
-    private static final Color COLOR_BG_CARD = new Color(28, 28, 28);
-    private static final Color COLOR_ACCENT = new Color(255, 140, 0); // Naranja corporativo
-    private static final Color COLOR_FUCSIA = new Color(220, 0, 115); // Fucsia SICONI
+    // --- PALETA LUXURY ---
+    private static final Font FONT_INPUT = new Font("Segoe UI", Font.PLAIN, 14);
+    private static final Font FONT_LABEL = new Font("Segoe UI", Font.BOLD, 12);
+    private static final Color COLOR_BG_APP = new Color(20, 20, 20); // Negro profundo
+    private static final Color COLOR_BG_CARD = new Color(35, 35, 35); // Gris oscuro panel
+    private static final Color COLOR_GOLD = new Color(212, 175, 55); // Dorado SICONI
+    private static final Color COLOR_TEXT = new Color(230, 230, 230); // Platino
 
     public SupplierManagementDialog(Window parent) {
-        super(parent, "Directorio de Proveedores - SICONI", ModalityType.APPLICATION_MODAL);
+        super(parent, "Proveedores SICONI", ModalityType.APPLICATION_MODAL);
         setSize(1150, 700);
         setLocationRelativeTo(parent);
-        setLayout(new BorderLayout());
+        setUndecorated(true); // Estilo Luxury sin bordes Windows
+        getRootPane().setBorder(new LineBorder(COLOR_GOLD, 2)); // Borde dorado
+
+        // Fondo oscuro sólido para consistencia
         getContentPane().setBackground(COLOR_BG_APP);
+        setLayout(new BorderLayout());
 
         initUI();
 
@@ -67,14 +70,14 @@ public class SupplierManagementDialog extends JDialog {
     }
 
     private void initUI() {
-        // Encabezado Profesional
-        JLabel title = new JLabel("DIRECTORIO ESTRATÉGICO DE PROVEEDORES", SwingConstants.CENTER);
-        title.setFont(new Font("Segoe UI", Font.BOLD, 26));
-        title.setForeground(COLOR_ACCENT);
-        title.setBorder(new EmptyBorder(20, 0, 10, 0));
+        // Encabezado
+        JLabel title = new JLabel("DIRECTORIO DE PROVEEDORES", SwingConstants.CENTER);
+        title.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        title.setForeground(COLOR_GOLD);
+        title.setBorder(new EmptyBorder(25, 0, 15, 0));
         add(title, BorderLayout.NORTH);
 
-        // Panel Central (Split: Tabla y Formulario)
+        // Panel Central
         JPanel panel = new JPanel(new BorderLayout(25, 0));
         panel.setOpaque(false);
         panel.setBorder(new EmptyBorder(5, 30, 5, 30));
@@ -83,7 +86,7 @@ public class SupplierManagementDialog extends JDialog {
         panel.add(buildFormPanel(), BorderLayout.EAST);
         add(panel, BorderLayout.CENTER);
 
-        // Barra de Herramientas Inferior
+        // Barra Inferior
         add(buildBottomToolbar(), BorderLayout.SOUTH);
     }
 
@@ -94,8 +97,8 @@ public class SupplierManagementDialog extends JDialog {
         table = new JTable(model);
         styleTable();
         JScrollPane scroll = new JScrollPane(table);
-        scroll.setBorder(new LineBorder(new Color(60, 60, 60)));
-        scroll.getViewport().setBackground(new Color(32, 32, 32));
+        scroll.setBorder(new LineBorder(COLOR_GOLD, 1));
+        scroll.getViewport().setBackground(COLOR_BG_CARD);
         return scroll;
     }
 
@@ -120,7 +123,7 @@ public class SupplierManagementDialog extends JDialog {
         txtPhone     = buildField(form, "TELÉFONO DE OFICINA", gbc);
         txtEmail     = buildField(form, "CORREO ELECTRÓNICO", gbc);
         txtWhatsapp  = buildSocialField(form, "WHATSAPP", "https://wa.me/", gbc, new Color(37, 211, 102));
-        txtInstagram = buildSocialField(form, "INSTAGRAM (@)", "https://instagram.com/", gbc, COLOR_FUCSIA);
+        txtInstagram = buildSocialField(form, "INSTAGRAM (@)", "https://instagram.com/", gbc, new Color(220, 0, 115));
         txtAddress   = buildField(form, "DIRECCIÓN FÍSICA", gbc);
 
         JScrollPane scroll = new JScrollPane(form);
@@ -131,24 +134,39 @@ public class SupplierManagementDialog extends JDialog {
     }
 
     private JComponent buildBottomToolbar() {
-        JPanel bar = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 15));
+        JPanel bar = new JPanel(new FlowLayout(FlowLayout.CENTER, 25, 20));
         bar.setOpaque(false);
-        bar.add(createStandardButton("NUEVO", new Color(70, 70, 70), e -> resetForm()));
-        bar.add(createStandardButton("ELIMINAR", new Color(190, 45, 45), e -> performDelete()));
-        bar.add(createStandardButton("GUARDAR", COLOR_ACCENT, e -> performSave()));
-        bar.add(createStandardButton("SALIR", new Color(55, 55, 55), e -> dispose()));
+
+        SoftButton btnNew = createSoftButton("NUEVO", "/images/icons/icon_add.png", e -> resetForm());
+        SoftButton btnDelete = createSoftButton("ELIMINAR", "/images/icons/icon_delete.png", e -> performDelete());
+        SoftButton btnSave = createSoftButton("GUARDAR", "/images/icons/icon_save.png", e -> performSave()); // Asegurar icono save
+        SoftButton btnExit = createSoftButton("CERRAR", "/images/icons/icon_exit.png", e -> dispose());
+
+        bar.add(btnNew);
+        bar.add(btnDelete);
+        bar.add(btnSave);
+        bar.add(btnExit);
+
         return bar;
     }
 
-    private JButton createStandardButton(String text, Color bg, java.awt.event.ActionListener al) {
-        JButton btn = new JButton(text);
-        btn.setPreferredSize(new Dimension(140, 42));
-        btn.setBackground(bg); btn.setForeground(Color.WHITE);
-        btn.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        btn.setFocusPainted(false);
-        btn.setBorder(BorderFactory.createLineBorder(bg.brighter(), 1));
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.addActionListener(al);
+    private SoftButton createSoftButton(String tooltip, String iconPath, java.awt.event.ActionListener al) {
+        ImageIcon icon = null;
+        try {
+            URL url = getClass().getResource(iconPath);
+            if (url != null) {
+                Image img = new ImageIcon(url).getImage().getScaledInstance(32, 32, Image.SCALE_SMOOTH);
+                icon = new ImageIcon(img);
+            }
+        } catch (Exception e) {}
+
+        SoftButton btn = new SoftButton(icon);
+        btn.setToolTipText(tooltip);
+        btn.setPreferredSize(new Dimension(80, 60)); // Botones más cómodos
+        btn.addActionListener(e -> {
+            SoundManager.getInstance().playClick();
+            al.actionPerformed(e);
+        });
         return btn;
     }
 
@@ -165,27 +183,41 @@ public class SupplierManagementDialog extends JDialog {
         p.add(lbl, gbc); gbc.gridy++;
         JPanel row = new JPanel(new BorderLayout(8, 0)); row.setOpaque(false);
         JTextField txt = createTextField();
-        JButton go = new JButton("↗"); go.setPreferredSize(new Dimension(45, 34));
-        go.setBackground(c); go.setForeground(Color.WHITE); go.setBorderPainted(false);
+
+        JButton go = new JButton("↗");
+        go.setPreferredSize(new Dimension(45, 34));
+        go.setBackground(c);
+        go.setForeground(Color.WHITE);
+        go.setBorderPainted(false);
+        go.setFocusPainted(false);
+        go.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         go.addActionListener(e -> openLink(prefix, txt.getText()));
+
         row.add(txt, BorderLayout.CENTER); row.add(go, BorderLayout.EAST);
         p.add(row, gbc); gbc.gridy++;
         return txt;
     }
 
     private JTextField createTextField() {
-        JTextField t = new JTextField(); t.setFont(FONT_INPUT); t.setBackground(new Color(45, 45, 45));
-        t.setForeground(Color.WHITE); t.setCaretColor(Color.WHITE);
-        t.setBorder(new LineBorder(new Color(85, 85, 85)));
+        JTextField t = new JTextField(); t.setFont(FONT_INPUT);
+        t.setBackground(new Color(50, 50, 50));
+        t.setForeground(Color.WHITE); t.setCaretColor(COLOR_GOLD);
+        t.setBorder(new LineBorder(new Color(80, 80, 80)));
         return t;
     }
 
     private void styleTable() {
-        table.setRowHeight(45);
-        table.setBackground(new Color(32, 32, 32));
-        table.setForeground(Color.WHITE);
-        table.setSelectionBackground(COLOR_FUCSIA);
+        table.setRowHeight(40);
+        table.setBackground(COLOR_BG_CARD);
+        table.setForeground(COLOR_TEXT);
+        table.setSelectionBackground(new Color(60, 60, 60));
+        table.setSelectionForeground(COLOR_GOLD);
         table.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+
+        table.getTableHeader().setBackground(new Color(25, 25, 25));
+        table.getTableHeader().setForeground(COLOR_GOLD);
+        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 12));
+
         DefaultTableCellRenderer c = new DefaultTableCellRenderer();
         c.setHorizontalAlignment(JLabel.CENTER);
         for (int i = 0; i < table.getColumnCount(); i++) table.getColumnModel().getColumn(i).setCellRenderer(c);

@@ -10,133 +10,119 @@
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: Enero 2026
- * VERSIÓN: 1.0.0 (Stable Release)
+ * VERSIÓN: 2.1.0 (PDF Receipt Integration)
  *
  * DESCRIPCIÓN TÉCNICA:
  * Clase perteneciente a la Capa de Controlador (Controller Layer).
- * Actúa como orquestador de la lógica transaccional de ventas, coordinando
- * múltiples modelos y DAOs de forma atómica.
+ * Actúa como intermediario puro entre la Interfaz Gráfica (View) y la Capa de
+ * Acceso a Datos (DAO).
  *
  * Características de Ingeniería:
- * 1. Gestión de Transacciones (ACID): Implementa control manual de commits para asegurar
- * que la venta y la actualización de stock se ejecuten como una sola unidad de trabajo.
- * 2. Integridad de Datos: Aplica mecanismos de Rollback en caso de excepciones SQL,
- * previniendo inconsistencias entre la facturación y el inventario físico.
- * 3. Orquestación Multitabla: Impacta simultáneamente las entidades 'sales',
- * 'sale_details' y 'products'.
- *
- * PRINCIPIOS POO:
- * - ABSTRACCIÓN: El controlador oculta la complejidad del proceso de venta tras
- * un método simplificado `registerSale`.
- * - ENCAPSULAMIENTO: Gestiona el estado de la conexión JDBC de forma interna.
- *
- * PATRONES DE DISEÑO:
- * - Controller (MVC): Separa la lógica de negocio de la interfaz de usuario.
- * - Transaction Script: Organiza la lógica de negocio por procedimientos que
- * manejan solicitudes desde la vista.
+ * 1. Desacoplamiento (High Cohesion): Se eliminó toda lógica SQL de esta clase.
+ * 2. Validación de Entrada: Asegura integridad de datos previos al procesamiento.
+ * 3. Automatización de Salida: Genera automáticamente el recibo PDF tras el
+ * registro exitoso de la transacción.
  * -----------------------------------------------------------------------------
  */
 
 package com.swimcore.controller;
 
-import com.swimcore.dao.Conexion;
-import com.swimcore.model.Product;
+import com.swimcore.dao.ClientDAO;
+import com.swimcore.dao.SaleDAO;
+import com.swimcore.model.Client;
 import com.swimcore.model.Sale;
 import com.swimcore.model.SaleDetail;
-
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
+import com.swimcore.util.ReceiptGenerator; // Importante: Generador de Recibos
 import java.util.List;
 
 /**
- * Controlador de Ventas.
- * Gestiona el ciclo de vida de una transacción comercial, desde el registro
- * de factura hasta el egreso de inventario.
+ * Controlador de Gestión de Ventas.
+ * Orquestador de las operaciones comerciales. Coordina la comunicación entre
+ * la pantalla de facturación, el motor de base de datos y el generador de reportes.
  */
 public class SaleController {
 
+    // ATRIBUTOS: Instancias de DAO (Colaboración entre clases)
+    private final SaleDAO saleDAO;
+    private final ClientDAO clientDAO; // Necesario para buscar datos del recibo
+
     /**
-     * Registra una venta completa bajo una transacción atómica.
-     * Realiza tres operaciones críticas:
-     * 1. Inserta cabecera de venta.
-     * 2. Inserta detalles de renglones.
-     * 3. Actualiza existencias en almacén.
+     * Constructor.
+     * Inicializa las dependencias necesarias.
+     */
+    public SaleController() {
+        this.saleDAO = new SaleDAO();
+        this.clientDAO = new ClientDAO();
+    }
+
+    /**
+     * Procesa la solicitud de registro de una nueva venta.
      *
-     * @param sale Objeto con los datos maestros de la factura.
-     * @param details Lista de productos y cantidades transaccionadas.
-     * @return true si la transacción se completó y confirmó exitosamente.
+     * ENTRADA:
+     * @param sale Objeto 'Sale' con la metadata de la factura.
+     * @param details Lista de objetos 'SaleDetail' con los productos.
+     *
+     * PROCESO:
+     * 1. Valida integridad de datos.
+     * 2. Delega persistencia al DAO.
+     * 3. Si es exitoso, invoca la generación del Recibo PDF.
+     *
+     * SALIDA:
+     * @return true si la operación fue exitosa en la base de datos.
      */
     public boolean registerSale(Sale sale, List<SaleDetail> details) {
-        Connection con = null;
-        try {
-            con = Conexion.conectar();
-
-            // INGENIERÍA DE TRANSACCIONES:
-            // Desactivamos el auto-commit para asegurar la atomicidad de la operación.
-            con.setAutoCommit(false);
-
-            // 1. PERSISTENCIA DE CABECERA (Factura)
-            String sqlSale = "INSERT INTO sales(id, date, client_id, total_divisa, currency, rate, total_bs, payment_method) VALUES(?,?,?,?,?,?,?,?)";
-            try (PreparedStatement pst = con.prepareStatement(sqlSale)) {
-                pst.setString(1, sale.getId());
-                pst.setString(2, sale.getDate());
-                pst.setString(3, sale.getClientId());
-                pst.setDouble(4, sale.getTotalAmountUSD());
-                pst.setString(5, sale.getCurrency());
-                pst.setDouble(6, sale.getExchangeRate());
-                pst.setDouble(7, sale.getTotalAmountBs());
-                pst.setString(8, sale.getPaymentMethod());
-                pst.executeUpdate();
-            }
-
-            // 2. PERSISTENCIA DE DETALLES Y ACTUALIZACIÓN DE STOCK (DML Secuencial)
-            String sqlDetail = "INSERT INTO sale_details(sale_id, product_id, price) VALUES(?,?,?)";
-            String sqlStock = "UPDATE products SET stock = stock - ? WHERE id = ?";
-
-            try (PreparedStatement pstDetail = con.prepareStatement(sqlDetail);
-                 PreparedStatement pstStock = con.prepareStatement(sqlStock)) {
-
-                for (SaleDetail det : details) {
-                    // Registro de renglón individual
-                    pstDetail.setString(1, sale.getId());
-                    pstDetail.setString(2, det.getProductId());
-                    pstDetail.setDouble(3, det.getUnitPrice());
-                    pstDetail.executeUpdate();
-
-                    // EGRESO DE INVENTARIO:
-                    // Resta la cantidad vendida de la columna stock en la tabla productos.
-                    pstStock.setInt(1, det.getQuantity());
-                    pstStock.setString(2, det.getProductId());
-                    pstStock.executeUpdate();
-                }
-            }
-
-            // CONFIRMACIÓN DE LA TRANSACCIÓN:
-            // Solo si todas las sentencias previas fueron exitosas.
-            con.commit();
-            System.out.println("✅ Transacción completada: Venta registrada y Stock actualizado.");
-            return true;
-
-        } catch (SQLException e) {
-            // MANEJO DE FALLOS CRÍTICOS:
-            // Si ocurre cualquier error, se deshacen todos los cambios (Rollback)
-            // para mantener la consistencia de la base de datos.
-            System.err.println("❌ Error en transacción de venta: " + e.getMessage());
-            if (con != null) {
-                try {
-                    con.rollback();
-                    System.err.println("🔄 Rollback ejecutado: Base de datos restaurada.");
-                } catch (SQLException ex) {
-                    ex.printStackTrace();
-                }
-            }
+        // VALIDACIÓN DE INTEGRIDAD (Validación Previa - Tu lógica original)
+        if (sale == null || details == null || details.isEmpty()) {
+            System.err.println("❌ Error de Validación: Intento de venta vacía o nula.");
             return false;
-        } finally {
-            // RESTAURACIÓN DEL ESTADO DE CONEXIÓN
+        }
+
+        // DELEGACIÓN (Llamada al DAO)
+        // El controlador pasa la responsabilidad de la transacción ACID al DAO.
+        boolean success = saleDAO.registerSale(sale, details);
+
+        // LÓGICA DE CIERRE: Generación de Recibo (Solo si guardó bien)
+        if (success) {
+            generarReciboPDF(sale, details);
+        }
+
+        return success;
+    }
+
+    /**
+     * Método auxiliar privado para manejar la generación del PDF.
+     * Busca al cliente completo para que el recibo tenga todos los datos (Club, Atleta).
+     */
+    private void generarReciboPDF(Sale sale, List<SaleDetail> details) {
+        try {
+            Client client = null;
+            // Intentamos recuperar los datos del cliente usando el ID guardado en la venta
             try {
-                if (con != null) con.setAutoCommit(true);
-            } catch (SQLException e) { e.printStackTrace(); }
+                String clientIdStr = sale.getClientId();
+                // Buscamos usando el método del ClientDAO (puede ser por ID numérico o código)
+                // Aquí asumimos que sale.getClientId() tiene el ID numérico de la BD
+                int id = Integer.parseInt(clientIdStr);
+
+                // Buscamos en la lista completa (Estrategia segura sin modificar DAO)
+                List<Client> allClients = clientDAO.getAllClients();
+                for (Client c : allClients) {
+                    if (c.getId() == id) {
+                        client = c;
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("⚠️ No se pudo vincular cliente al PDF (Venta Anónima o Error ID): " + e.getMessage());
+            }
+
+            // Invocamos al Generador
+            ReceiptGenerator.generateReceipt(sale, details, client);
+
+        } catch (Exception e) {
+            System.err.println("❌ Error generando el PDF: " + e.getMessage());
+            e.printStackTrace();
+            // No retornamos false porque la venta SI se guardó en BD.
+            // Solo falló el papelito.
         }
     }
 }

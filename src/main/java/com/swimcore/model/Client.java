@@ -1,118 +1,108 @@
 /*
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
- * CARRERA: Ingeniería en Informática
- * ASIGNATURA: Programación III / Proyecto de Software
- *
- * PROYECTO: GESTIÓN DE INVENTARIO DE UNA TIENDA (SICONI)
  * ARCHIVO: Client.java
- *
- * AUTORA: Johanna Guedez - V14089807
- * PROFESORA: Ing. Dubraska Roca
- * FECHA: Enero 2026
- * VERSIÓN: 1.1.0 (Extended Release)
- *
- * DESCRIPCIÓN TÉCNICA:
- * Clase de la Capa de Modelo (Model Layer) que representa la entidad 'Cliente'.
- * Implementa el patrón POJO (Plain Old Java Object) para el transporte de datos
- * entre la persistencia SQLite y los componentes visuales de la galería de clientes.
- *
- * Características de Ingeniería:
- * 1. Mapeo de Atributos Extendidos: Incorpora lógica para la gestión de lealtad
- * (VIP Status) y marketing relacional (Birthdate Tracking).
- * 2. Gestión de Tipos de Entidad: Soporta una clasificación polimórfica interna
- * (ATLETA, REPRESENTANTE, CLUB) para adaptar la lógica de negocio según el perfil.
- * 3. Integridad de Datos: Proporciona una estructura de campos de texto (measurements)
- * para el almacenamiento de datos biométricos necesarios en la confección de trajes de baño.
- *
- * PRINCIPIOS POO:
- * - ENCAPSULAMIENTO: Atributos privados con métodos accesores públicos para garantizar
- * que el estado interno del objeto solo se modifique mediante la interfaz definida.
- * - ABSTRACCIÓN: Modela al cliente no solo como un comprador, sino como una entidad
- * técnica con medidas y perfiles específicos.
+ * VERSIÓN: 2.1.0 (Address Field Added)
+ * DESCRIPCIÓN: Se agregó el campo 'address' (Dirección) al modelo.
  * -----------------------------------------------------------------------------
  */
 
 package com.swimcore.model;
 
-/**
- * Entidad de Cliente.
- * Centraliza la información personal, técnica y de fidelización de los clientes de SICONI.
- */
 public class Client {
 
-    // --- ATRIBUTOS PRIVADOS (IDENTIDAD Y CONTACTO) ---
-    private String id;          // Cédula o identificador técnico (DG-CLI-001)
-    private String name;        // Nombre completo o razón social
-    private String phone;       // Contacto telefónico
-    private String type;        // Clasificación: ATLETA, REPRESENTANTE, CLUB
-    private String email;       // Correo electrónico de contacto
+    // --- IDENTIFICACIÓN DEL SISTEMA ---
+    private int id;
+    private String code;
 
-    // --- ATRIBUTOS DE NEGOCIO (BIOMETRÍA Y FIDELIZACIÓN) ---
-    private String measurements;// Resumen de medidas corporales para producción
-    private String birthDate;   // Fecha de nacimiento (Formato estándar ISO 8601: YYYY-MM-DD)
-    private boolean isVip;      // Flag de fidelización para beneficios exclusivos
+    // --- DATOS DEL REPRESENTANTE ---
+    private String idType;
+    private String idNumber;
+    private String fullName;
+    private String phone;
+    private String email;
+    private String instagram;
+    private boolean isVip;
+    private String address; // <--- NUEVO CAMPO AGREGADO
 
-    /**
-     * Constructor por defecto.
-     * Requerido para la instanciación dinámica y compatibilidad con DAOs.
-     */
+    // --- DATOS DEL ATLETA ---
+    private String athleteName;
+    private String birthDate;
+    private String club;
+    private String category;
+
+    // --- DATOS TÉCNICOS ---
+    private String measurements;
+
     public Client() {
     }
 
-    /**
-     * Constructor completo para inicialización rápida.
-     * @param id Identificador de cuenta.
-     * @param name Nombre o denominación.
-     * @param phone Número de contacto.
-     * @param type Perfil de cliente.
-     * @param email Dirección electrónica.
-     * @param measurements Datos biométricos.
-     * @param birthDate Fecha de onomástico.
-     * @param isVip Estado de cliente preferencial.
-     */
-    public Client(String id, String name, String phone, String type, String email, String measurements, String birthDate, boolean isVip) {
+    // Constructor Actualizado con Address
+    public Client(int id, String code, String idType, String idNumber, String fullName,
+                  String phone, String email, String instagram, boolean isVip,
+                  String athleteName, String birthDate, String club, String category,
+                  String measurements, String address) { // <--- Recibimos Address
         this.id = id;
-        this.name = name;
+        this.code = code;
+        this.idType = idType;
+        this.idNumber = idNumber;
+        this.fullName = fullName;
         this.phone = phone;
-        this.type = type;
         this.email = email;
-        this.measurements = measurements;
-        this.birthDate = birthDate;
+        this.instagram = instagram;
         this.isVip = isVip;
+        this.athleteName = athleteName;
+        this.birthDate = birthDate;
+        this.club = club;
+        this.category = category;
+        this.measurements = measurements;
+        this.address = address; // <--- Asignamos
     }
 
-    // --- MÉTODOS DE ACCESO (GETTERS Y SETTERS) ---
+    // --- GETTERS Y SETTERS ---
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
 
-    /** @return El identificador de cuenta del cliente. */
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public String getCode() { return code; }
+    public void setCode(String code) { this.code = code; }
 
-    /** @return El nombre legal o comercial. */
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
+    public String getIdType() { return idType; }
+    public void setIdType(String idType) { this.idType = idType; }
 
-    /** @return Número telefónico registrado. */
+    public String getIdNumber() { return idNumber; }
+    public void setIdNumber(String idNumber) { this.idNumber = idNumber; }
+
+    public String getFullName() { return fullName; }
+    public void setFullName(String fullName) { this.fullName = fullName; }
+
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
 
-    /** @return Clasificación del perfil (ATLETA/CLUB). */
-    public String getType() { return type; }
-    public void setType(String type) { this.type = type; }
-
-    /** @return Correo electrónico validado. */
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
 
-    /** @return Cadena con el resumen de medidas técnicas. */
-    public String getMeasurements() { return measurements; }
-    public void setMeasurements(String measurements) { this.measurements = measurements; }
+    public String getInstagram() { return instagram; }
+    public void setInstagram(String instagram) { this.instagram = instagram; }
 
-    /** @return Fecha de nacimiento almacenada. */
+    public boolean isVip() { return isVip; }
+    public void setVip(boolean vip) { isVip = vip; }
+
+    public String getAthleteName() { return athleteName; }
+    public void setAthleteName(String athleteName) { this.athleteName = athleteName; }
+
     public String getBirthDate() { return birthDate; }
     public void setBirthDate(String birthDate) { this.birthDate = birthDate; }
 
-    /** @return true si el cliente posee estatus VIP. */
-    public boolean isVip() { return isVip; }
-    public void setVip(boolean vip) { isVip = vip; }
+    public String getClub() { return club; }
+    public void setClub(String club) { this.club = club; }
+
+    public String getCategory() { return category; }
+    public void setCategory(String category) { this.category = category; }
+
+    public String getMeasurements() { return measurements; }
+    public void setMeasurements(String measurements) { this.measurements = measurements; }
+
+    // Nuevo Getter y Setter para Dirección
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
 }

@@ -6,68 +6,40 @@
  *
  * PROYECTO: GESTIÓN DE INVENTARIO DE UNA TIENDA (SICONI)
  * ARCHIVO: Product.java
- *
- * AUTORA: Johanna Guedez - V14089807
- * PROFESORA: Ing. Dubraska Roca
- * FECHA: Enero 2026
- * VERSIÓN: 1.0.0 (Stable Release)
- *
- * DESCRIPCIÓN TÉCNICA:
- * Clase de la Capa de Modelo (Model Layer) que representa la entidad 'Producto'.
- * Actúa como un POJO (Plain Old Java Object) que encapsula tanto los atributos
- * descriptivos como la lógica de estado del inventario.
- *
- * Características de Ingeniería:
- * 1. Mapeo Objeto-Relacional (ORM): Estructura alineada estrictamente con el esquema
- * de la tabla 'products' en SQLite, incluyendo claves foráneas (`categoryId`, `supplierId`).
- * 2. Lógica de Negocio Embebida: Implementa métodos de evaluación de estado (`isLowStock`)
- * para facilitar la toma de decisiones en la Capa de Vista.
- * 3. Gestión Financiera: Diferenciación entre precio de costo y venta para el cálculo
- * posterior de márgenes de utilidad.
- *
- * PRINCIPIOS POO:
- * - ENCAPSULAMIENTO: Atributos privados con acceso controlado mediante Getters y Setters.
- * - ABSTRACCIÓN: Modela un artículo del mundo real mediante sus propiedades esenciales
- * para el control de stock y ventas.
- * -----------------------------------------------------------------------------
+ * ... (Encabezado original mantenido) ...
  */
 
 package com.swimcore.model;
 
-/**
- * Entidad de Producto.
- * Centraliza la información técnica, comercial y de inventario de los artículos de SICONI.
- */
 public class Product {
 
-    // --- ATRIBUTOS DESCRIPTIVOS (Identidad) ---
-    private int id;             // Identificador interno autoincremental
-    private String code;        // Código SKU personalizado (Ej: BIK-001)
-    private String name;        // Denominación comercial
-    private String description; // Detalles técnicos o de diseño
+    // --- ATRIBUTOS DESCRIPTIVOS ---
+    private int id;
+    private String code;
+    private String name;
+    private String description;
 
-    // --- ATRIBUTOS FINANCIEROS (Gestión Económica) ---
-    private double costPrice;   // Inversión unitaria por producto
-    private double salePrice;   // Precio de oferta al consumidor final
+    // --- ATRIBUTOS FINANCIEROS ---
+    private double costPrice;
+    private double salePrice;
 
-    // --- ATRIBUTOS DE INVENTARIO (Control de Stock) ---
-    private int currentStock;   // Existencia física actual en almacén
-    private int minStock;       // Umbral crítico para reposición
+    // --- ATRIBUTOS DE INVENTARIO ---
+    private int currentStock;
+    private int minStock;
 
-    // --- ATRIBUTOS DE RELACIÓN (Foreign Keys) ---
-    private int categoryId;     // Vinculación jerárquica con Categoría
-    private int supplierId;     // Vinculación comercial con Proveedor
+    // --- ATRIBUTOS DE RELACIÓN ---
+    private int categoryId;
+    private int supplierId;
 
-    private String imagePath;   // Referencia al recurso gráfico en disco
+    // --- EXTRAS ---
+    private String imagePath;
 
-    /**
-     * Constructor por defecto.
-     */
+    // Campos auxiliares para mostrar nombres en tablas (No se guardan en BD Product, se llenan con JOINs)
+    private String categoryName;
+    private String supplierName;
+
     public Product() { }
 
-    /**
-     * Constructor completo para la instanciación de productos desde la base de datos.
-     */
     public Product(int id, String code, String name, String description, double costPrice,
                    double salePrice, int currentStock, int minStock, int categoryId,
                    int supplierId, String imagePath) {
@@ -84,8 +56,7 @@ public class Product {
         this.imagePath = imagePath;
     }
 
-    // --- MÉTODOS DE ACCESO (GETTERS Y SETTERS) ---
-
+    // --- GETTERS Y SETTERS ---
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
 
@@ -119,20 +90,18 @@ public class Product {
     public String getImagePath() { return imagePath; }
     public void setImagePath(String imagePath) { this.imagePath = imagePath; }
 
-    // --- LÓGICA DE DOMINIO ---
+    // Getters/Setters Auxiliares
+    public String getCategoryName() { return categoryName; }
+    public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
 
-    /**
-     * Evalúa si el producto se encuentra en niveles de stock crítico.
-     * @return true si la existencia actual es menor o igual al stock mínimo configurado.
-     */
+    public String getSupplierName() { return supplierName; }
+    public void setSupplierName(String supplierName) { this.supplierName = supplierName; }
+
+    // --- LÓGICA DE DOMINIO ---
     public boolean isLowStock() {
         return this.currentStock <= this.minStock;
     }
 
-    /**
-     * Representación textual de la entidad.
-     * @return Cadena formateada para su visualización en componentes de lista.
-     */
     @Override
     public String toString() {
         return name + " (" + code + ")";

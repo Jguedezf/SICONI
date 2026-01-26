@@ -10,14 +10,12 @@
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: Enero 2026
- * VERSIÓN: 2.4.0 (Final Audit Report & Filter Fix)
+ * VERSIÓN: 2.5.0 (Luxury Consistency Polish)
  *
  * DESCRIPCIÓN TÉCNICA:
  * Módulo de Auditoría Visual Avanzada.
- * Implementa el patrón "Dark Luxury" (Negro Mate + Dorado).
- * - CORRECCIÓN CRÍTICA: Lógica de carga de Logo y escalado proporcional.
- * - MEJORA: Precisión de filtrado de fechas (Start-End Day).
- * - UI: Centrado estricto de elementos en reporte PDF.
+ * - MEJORA: Refinamiento de la interfaz para máxima consistencia visual con el resto
+ * del sistema SICONI.
  * -----------------------------------------------------------------------------
  */
 
@@ -39,7 +37,6 @@ import javax.swing.border.LineBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-// Importaciones de Eventos
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.FileOutputStream;
@@ -52,9 +49,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Vector;
 
-/**
- * Pantalla de Auditoría con estilo "Luxury" y funciones forenses.
- */
 public class InventoryHistoryDialog extends JDialog {
 
     private final ProductDAO productDAO = new ProductDAO();
@@ -63,10 +57,10 @@ public class InventoryHistoryDialog extends JDialog {
     private DatePicker dateTo;
 
     // --- PALETA 3D LUXURY ---
-    private final Color LUX_BG_DARK = new Color(18, 18, 18);
-    private final Color LUX_BG_PANEL = new Color(30, 30, 30);
-    private final Color LUX_GOLD = new Color(218, 165, 32);
-    private final Color LUX_TEXT_WHITE = new Color(240, 240, 240);
+    private final Color LUX_BG_DARK = new Color(20, 20, 20);
+    private final Color LUX_BG_PANEL = new Color(35, 35, 35);
+    private final Color LUX_GOLD = new Color(212, 175, 55); // Dorado Estándar SICONI
+    private final Color LUX_TEXT_WHITE = new Color(230, 230, 230);
 
     public InventoryHistoryDialog(Window parent) {
         super(parent, "AUDITORÍA CORPORATIVA - SICONI", ModalityType.APPLICATION_MODAL);
@@ -82,7 +76,7 @@ public class InventoryHistoryDialog extends JDialog {
         initTable();
         initFooter();
 
-        loadData(); // Carga inicial
+        loadData();
     }
 
     private void initHeader() {
@@ -103,44 +97,29 @@ public class InventoryHistoryDialog extends JDialog {
         panel.setBackground(LUX_BG_PANEL);
         panel.setBorder(BorderFactory.createMatteBorder(1, 0, 1, 0, new Color(60, 60, 60)));
 
-        DatePickerSettings s1 = new DatePickerSettings();
-        styleCalendar(s1);
+        DatePickerSettings s1 = new DatePickerSettings(); styleCalendar(s1);
+        DatePickerSettings s2 = new DatePickerSettings(); styleCalendar(s2);
 
-        DatePickerSettings s2 = new DatePickerSettings();
-        styleCalendar(s2);
-
-        dateFrom = new DatePicker(s1);
-        dateFrom.setDate(LocalDate.now().minusDays(30));
-
-        dateTo = new DatePicker(s2);
-        dateTo.setDateToToday();
+        dateFrom = new DatePicker(s1); dateFrom.setDate(LocalDate.now().minusDays(30));
+        dateTo = new DatePicker(s2); dateTo.setDateToToday();
 
         JButton btnFilter = createLuxuryButton("FILTRAR DATOS", LUX_GOLD);
-        btnFilter.addActionListener(e -> {
-            SoundManager.getInstance().playClick();
-            loadData();
-        });
+        btnFilter.addActionListener(e -> { SoundManager.getInstance().playClick(); loadData(); });
 
         JButton btnExport = createLuxuryButton("EXPORTAR PDF", new Color(0, 150, 255));
-        btnExport.addActionListener(e -> {
-            SoundManager.getInstance().playClick();
-            exportToPDF();
-        });
+        btnExport.addActionListener(e -> { SoundManager.getInstance().playClick(); exportToPDF(); });
 
-        panel.add(createLabel("DESDE:"));
-        panel.add(dateFrom);
-        panel.add(createLabel("HASTA:"));
-        panel.add(dateTo);
+        panel.add(createLabel("DESDE:")); panel.add(dateFrom);
+        panel.add(createLabel("HASTA:")); panel.add(dateTo);
         panel.add(Box.createHorizontalStrut(30));
-        panel.add(btnFilter);
-        panel.add(btnExport);
+        panel.add(btnFilter); panel.add(btnExport);
 
         add(panel, BorderLayout.NORTH);
     }
 
     private void styleCalendar(DatePickerSettings s) {
         s.setFormatForDatesCommonEra("yyyy-MM-dd");
-        s.setColor(DateArea.BackgroundOverallCalendarPanel, new Color(230, 230, 230));
+        s.setColor(DateArea.BackgroundOverallCalendarPanel, new Color(240, 240, 240));
         s.setColor(DateArea.BackgroundMonthAndYearMenuLabels, LUX_GOLD);
         s.setColor(DateArea.BackgroundTodayLabel, new Color(255, 140, 0));
         s.setColor(DateArea.CalendarBackgroundSelectedDate, LUX_GOLD);
@@ -159,7 +138,7 @@ public class InventoryHistoryDialog extends JDialog {
         table.setBackground(LUX_BG_DARK);
         table.setForeground(LUX_TEXT_WHITE);
         table.setShowVerticalLines(false);
-        table.setGridColor(new Color(50, 50, 50));
+        table.setGridColor(new Color(60, 60, 60));
         table.setFont(new java.awt.Font("Segoe UI", java.awt.Font.PLAIN, 13));
 
         table.getTableHeader().setBackground(new Color(25, 25, 25));
@@ -171,13 +150,13 @@ public class InventoryHistoryDialog extends JDialog {
             @Override
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSel, boolean hasFocus, int row, int col) {
                 Component c = super.getTableCellRendererComponent(table, value, isSel, hasFocus, row, col);
-                if (!isSel) c.setBackground(row % 2 == 0 ? LUX_BG_DARK : new Color(25, 25, 25));
-                else c.setBackground(new Color(60, 60, 60));
+                if (!isSel) c.setBackground(row % 2 == 0 ? LUX_BG_DARK : new Color(30, 30, 30));
+                else c.setBackground(new Color(70, 70, 70));
 
                 String tipo = (String) model.getValueAt(row, 4);
                 if (col == 4 || col == 5) {
                     if ("ENTRADA".equals(tipo)) c.setForeground(new Color(46, 204, 113));
-                    else c.setForeground(new Color(255, 0, 100));
+                    else c.setForeground(new Color(255, 80, 80));
                     setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 13));
                 } else {
                     c.setForeground(LUX_TEXT_WHITE);
@@ -204,107 +183,69 @@ public class InventoryHistoryDialog extends JDialog {
         footer.setBackground(LUX_BG_DARK);
         footer.setBorder(new EmptyBorder(10, 0, 20, 0));
 
-        JButton btnBack = createLuxuryButton("VOLVER AL INVENTARIO", new Color(180, 0, 0));
-        btnBack.setPreferredSize(new Dimension(250, 45));
-        btnBack.addActionListener(e -> {
-            SoundManager.getInstance().playClick();
-            dispose();
-        });
+        JButton btnBack = createLuxuryButton("CERRAR AUDITORÍA", new Color(180, 50, 50));
+        btnBack.setPreferredSize(new Dimension(200, 45));
+        btnBack.addActionListener(e -> { SoundManager.getInstance().playClick(); dispose(); });
 
         footer.add(btnBack);
         add(footer, BorderLayout.SOUTH);
     }
 
-    /**
-     * Lógica de filtrado de alta precisión.
-     * Convierte LocalDate (Selector) -> LocalDateTime (00:00 - 23:59) -> Date (JDBC).
-     */
     private void loadData() {
         if (dateFrom.getDate() == null || dateTo.getDate() == null) return;
-
         LocalDate ldFrom = dateFrom.getDate();
         LocalDate ldTo = dateTo.getDate();
 
-        // VALIDACIÓN DE NEGOCIO: Rango coherente
         if(ldFrom.isAfter(ldTo)) {
-            JOptionPane.showMessageDialog(this, "La fecha 'Desde' no puede ser mayor que 'Hasta'.");
+            JOptionPane.showMessageDialog(this, "Rango de fechas inválido.");
             return;
         }
 
-        // Definición de límites del día (Start of Day vs End of Day)
-        LocalDateTime ldtFrom = ldFrom.atStartOfDay(); // 00:00:00
-        LocalDateTime ldtTo = ldTo.atTime(LocalTime.MAX); // 23:59:59.999999
-
+        LocalDateTime ldtFrom = ldFrom.atStartOfDay();
+        LocalDateTime ldtTo = ldTo.atTime(LocalTime.MAX);
         Date d1 = Date.from(ldtFrom.atZone(ZoneId.systemDefault()).toInstant());
         Date d2 = Date.from(ldtTo.atZone(ZoneId.systemDefault()).toInstant());
 
         model.setRowCount(0);
         List<Vector<Object>> data = productDAO.getHistoryByDateRange(d1, d2);
-
         for (Vector<Object> row : data) model.addRow(row);
     }
 
-    /**
-     * Genera un reporte PDF con diseño corporativo "SICONI".
-     */
     private void exportToPDF() {
         try {
             String fileName = "Reporte_Auditoria_SICONI.pdf";
             Document doc = new Document(PageSize.A4.rotate());
-
             PdfWriter writer = PdfWriter.getInstance(doc, new FileOutputStream(fileName));
             writer.setViewerPreferences(PdfWriter.PageLayoutSinglePage | PdfWriter.FitWindow);
-
             doc.open();
 
-            // Zoom automático al ancho de la página
-            PdfAction action = PdfAction.gotoLocalPage(1, new PdfDestination(PdfDestination.FITH, doc.top()), writer);
-            writer.setOpenAction(action);
-
-            // --- 1. LOGO CORPORATIVO (Escalado Grande) ---
+            // LOGO
             try {
-                // Busca en: src/main/resources/images/logo.png
                 URL logoUrl = getClass().getResource("/images/logo.png");
                 if (logoUrl != null) {
                     Image logo = Image.getInstance(logoUrl);
-                    // ESCALA AUMENTADA: 300px ancho x 150px alto
                     logo.scaleToFit(300, 150);
                     logo.setAlignment(Element.ALIGN_CENTER);
                     doc.add(logo);
-                } else {
-                    // Fallback si no encuentra la imagen (Para que sepas que pasó)
-                    System.err.println("⚠ ALERTA: No se encontró logo.png en /resources/images/");
                 }
-            } catch (Exception ex) { ex.printStackTrace(); }
+            } catch (Exception ex) {}
 
             doc.add(new Paragraph(" "));
 
-            // --- 2. TÍTULOS ---
-            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 22, new BaseColor(220, 0, 115)); // Fucsia
-            Paragraph pTitle = new Paragraph("SICONI - SISTEMA DE CONTROL DE NEGOCIO E INVENTARIO", titleFont);
+            // TÍTULOS
+            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 22, new BaseColor(220, 0, 115));
+            Paragraph pTitle = new Paragraph("SICONI - AUDITORÍA DE INVENTARIO", titleFont);
             pTitle.setAlignment(Element.ALIGN_CENTER);
             doc.add(pTitle);
 
-            Font sloganFont = FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 11, BaseColor.DARK_GRAY);
-            Paragraph pSlogan = new Paragraph("Solución Tecnológica de control de negocio e inventario, optimizada para la gestión administrativa de Pequeñas y Medianas Empresas (PyMEs)", sloganFont);
-            pSlogan.setAlignment(Element.ALIGN_CENTER);
-            doc.add(pSlogan);
-
-            doc.add(new Paragraph(" "));
-
-            // --- 3. METADATOS ---
             Font metaFont = FontFactory.getFont(FontFactory.HELVETICA, 10, BaseColor.BLACK);
-            Paragraph pMeta = new Paragraph("REPORTE OFICIAL DE MOVIMIENTOS | Generado: " + new Date(), metaFont);
+            Paragraph pMeta = new Paragraph("Generado el: " + new Date(), metaFont);
             pMeta.setAlignment(Element.ALIGN_CENTER);
             doc.add(pMeta);
 
-            Paragraph pRango = new Paragraph("Rango de Auditoría: " + dateFrom.getText() + " al " + dateTo.getText(), metaFont);
-            pRango.setAlignment(Element.ALIGN_CENTER);
-            doc.add(pRango);
-
             doc.add(new Paragraph(" "));
 
-            // --- 4. TABLA DE DATOS ---
+            // TABLA
             PdfPTable table = new PdfPTable(7);
             table.setWidthPercentage(100);
             table.setWidths(new float[]{5, 12, 10, 25, 8, 5, 25});
@@ -318,7 +259,6 @@ public class InventoryHistoryDialog extends JDialog {
                 PdfPCell cell = new PdfPCell(new Phrase(h, headerFont));
                 cell.setBackgroundColor(headerBg);
                 cell.setHorizontalAlignment(Element.ALIGN_CENTER);
-                cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
                 cell.setPadding(6);
                 table.addCell(cell);
             }
@@ -328,36 +268,17 @@ public class InventoryHistoryDialog extends JDialog {
                     String val = model.getValueAt(i, j).toString();
                     PdfPCell cell = new PdfPCell(new Phrase(val, dataFont));
                     cell.setPadding(4);
-                    cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-
-                    // ALINEACIÓN CENTRADA PARA ID Y CANTIDAD
                     if (j == 0 || j == 5) cell.setHorizontalAlignment(Element.ALIGN_CENTER);
                     else cell.setHorizontalAlignment(Element.ALIGN_LEFT);
-
-                    if (j == 4) { // Columna Tipo
-                        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
-                        if ("ENTRADA".equals(val)) cell.setBackgroundColor(new BaseColor(220, 255, 220));
-                        else cell.setBackgroundColor(new BaseColor(255, 220, 220));
-                    }
                     table.addCell(cell);
                 }
             }
-
             doc.add(table);
-
-            // Footer
-            Font footerFont = FontFactory.getFont(FontFactory.HELVETICA, 8, BaseColor.GRAY);
-            Paragraph footerP = new Paragraph("\nDocumento oficial de uso interno | Dayana Guédez Swimwear", footerFont);
-            footerP.setAlignment(Element.ALIGN_CENTER);
-            doc.add(footerP);
-
             doc.close();
-
-            JOptionPane.showMessageDialog(this, "✅ REPORTE GENERADO CON ÉXITO.\nArchivo: " + fileName, "SICONI PDF", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Reporte PDF Generado: " + fileName);
 
         } catch (Exception e) {
-            SoundManager.getInstance().playError();
-            JOptionPane.showMessageDialog(this, "Error generando reporte PDF: " + e.getMessage());
+            JOptionPane.showMessageDialog(this, "Error al exportar: " + e.getMessage());
         }
     }
 

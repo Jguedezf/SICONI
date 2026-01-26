@@ -1,111 +1,97 @@
 /*
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
- * CARRERA: Ingeniería en Informática
- * ASIGNATURA: Programación III / Proyecto de Software
- *
- * PROYECTO: GESTIÓN DE INVENTARIO DE UNA TIENDA (SICONI)
  * ARCHIVO: DatabaseSetup.java
- *
- * AUTORA: Johanna Guedez - V14089807
- * PROFESORA: Ing. Dubraska Roca
- * FECHA: Enero 2026
- * VERSIÓN: 1.0.0 (Stable Release)
- *
- * DESCRIPCIÓN TÉCNICA:
- * Clase de utilidad encargada de la configuración e inicialización del motor de base de datos.
- * Utiliza el motor embebido SQLite para la persistencia de datos local.
- *
- * Responsabilidades de Ingeniería:
- * 1. Definición del Esquema (DDL): Crea la estructura de tablas relacionales si no existen
- * en el sistema de archivos local.
- * 2. Integración de Constraints: Implementa Claves Primarias (PK) y Claves Foráneas (FK)
- * para garantizar la Integridad Referencial.
- * 3. Data Seeding: Inyecta registros maestros iniciales (Categorías) mediante la instrucción
- * `INSERT OR IGNORE` para evitar colisiones de datos únicos.
- * 4. Gestión de Recursos JDBC: Implementa el patrón "Try-with-resources" para asegurar
- * el cierre automático de conexiones y liberar recursos del sistema operativo.
- *
- * PRINCIPIOS POO:
- * - ABSTRACCIÓN: Simplifica el proceso complejo de configuración de BD en un único método `inicializarBD()`.
- * - ENCAPSULAMIENTO: Centraliza la cadena de conexión (URL) como una constante privada.
+ * VERSIÓN: 2.6.0 (Clubs & Clients Schema)
  * -----------------------------------------------------------------------------
  */
 
 package com.swimcore.util;
 
+import com.swimcore.dao.Conexion;
 import java.sql.Connection;
-import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.sql.Statement;
 
-/**
- * Orquestador de la Infraestructura de Datos.
- * Gestiona el despliegue automático de tablas y datos semilla al arrancar el sistema.
- */
 public class DatabaseSetup {
 
-    // Identificador de conexión JDBC para SQLite (Base de datos local en archivo .db)
-    private static final String URL = "jdbc:sqlite:siconi.db";
-
-    /**
-     * Inicializa la Base de Datos.
-     * Realiza las rutinas de verificación y creación de objetos de base de datos.
-     */
     public static void inicializarBD() {
-        // Uso de try-with-resources para garantizar el cierre del Statement y la Conexión
-        try (Connection conn = DriverManager.getConnection(URL);
+        try (Connection conn = Conexion.conectar();
              Statement stmt = conn.createStatement()) {
 
-            System.out.println("--- VERIFICANDO BASE DE DATOS ---");
+            System.out.println("--- ACTUALIZANDO BASE DE DATOS SICONI ---");
 
-            // 1. DEFINICIÓN DE TABLA: CATEGORIAS (Muestra de Entidad Independiente)
-            String sqlCategorias = "CREATE TABLE IF NOT EXISTS categorias (" +
+            // 1. TABLA: CLUBES DE NATACIÓN (Lista Fija)
+            stmt.execute("CREATE TABLE IF NOT EXISTS clubs (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    "nombre TEXT NOT NULL UNIQUE, " +
-                    "descripcion TEXT)";
-            stmt.execute(sqlCategorias);
+                    "name TEXT UNIQUE)");
 
-            // 2. DEFINICIÓN DE TABLA: PROVEEDORES (Directorio de Entidades Externas)
-            String sqlProveedores = "CREATE TABLE IF NOT EXISTS proveedores (" +
+            // 2. TABLA: CLIENTES (Estructura Representante/Atleta)
+            // Se elimina la anterior si existe para evitar conflictos de columnas
+            // (ADVERTENCIA: Esto borra clientes previos, ideal para fase desarrollo)
+            stmt.execute("DROP TABLE IF EXISTS clients");
+
+            stmt.execute("CREATE TABLE IF NOT EXISTS clients (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    "empresa TEXT NOT NULL, " +
-                    "contacto TEXT, " +
-                    "telefono TEXT, " +
-                    "email TEXT, " +
-                    "direccion TEXT)";
-            stmt.execute(sqlProveedores);
+                    "code TEXT UNIQUE, " +          // DG-0001
+                    "id_type TEXT, " +              // V, E, J
+                    "id_number TEXT UNIQUE, " +     // Cédula
+                    "full_name TEXT NOT NULL, " +   // Representante
+                    "phone TEXT, " +
+                    "instagram TEXT, " +
+                    "is_vip INTEGER DEFAULT 0, " +
+                    "athlete_name TEXT, " +         // Atleta
+                    "birth_date TEXT, " +
+                    "club_name TEXT, " +
+                    "category TEXT, " +
+                    "measurements TEXT)");
 
-            // 3. DEFINICIÓN DE TABLA: PRODUCTOS (Entidad Relacional / Dependiente)
-            // Implementa Integridad Referencial mediante FOREIGN KEYs hacia Categorías y Proveedores.
-            String sqlProductos = "CREATE TABLE IF NOT EXISTS productos (" +
-                    "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    "codigo TEXT UNIQUE, " +
-                    "nombre TEXT NOT NULL, " +
-                    "descripcion TEXT, " +
-                    "precio_costo REAL, " +
-                    "precio_venta REAL, " +
-                    "stock_actual INTEGER DEFAULT 0, " +
-                    "stock_minimo INTEGER DEFAULT 5, " +
-                    "id_categoria INTEGER, " +
-                    "id_proveedor INTEGER, " +
-                    "ruta_imagen TEXT, " +
-                    "FOREIGN KEY (id_categoria) REFERENCES categorias(id), " +
-                    "FOREIGN KEY (id_proveedor) REFERENCES proveedores(id))";
-            stmt.execute(sqlProductos);
+            // 3. TABLAS DEL SISTEMA (Sin cambios)
+            stmt.execute("CREATE TABLE IF NOT EXISTS categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, description TEXT)");
+            stmt.execute("CREATE TABLE IF NOT EXISTS suppliers (id INTEGER PRIMARY KEY AUTOINCREMENT, company TEXT NOT NULL, contact_person TEXT, phone TEXT, email TEXT, address TEXT, instagram TEXT, whatsapp TEXT)");
+            stmt.execute("CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT UNIQUE, name TEXT NOT NULL, description TEXT, cost_price REAL, sale_price REAL, current_stock INTEGER DEFAULT 0, min_stock INTEGER DEFAULT 5, category_id INTEGER, supplier_id INTEGER, image_path TEXT, FOREIGN KEY (category_id) REFERENCES categories(id), FOREIGN KEY (supplier_id) REFERENCES suppliers(id))");
+            stmt.execute("CREATE TABLE IF NOT EXISTS sales (id INTEGER PRIMARY KEY AUTOINCREMENT, invoice_number TEXT UNIQUE, sale_date TEXT NOT NULL, client_id INTEGER, total_amount_usd REAL, amount_paid_usd REAL, balance_due_usd REAL, total_amount_bs REAL, exchange_rate REAL, currency TEXT, payment_method TEXT, reference_number TEXT, status TEXT, observations TEXT, FOREIGN KEY (client_id) REFERENCES clients(id))");
+            stmt.execute("CREATE TABLE IF NOT EXISTS sale_details (id INTEGER PRIMARY KEY AUTOINCREMENT, sale_id INTEGER, product_id INTEGER, product_name TEXT, quantity INTEGER, unit_price REAL, subtotal REAL, FOREIGN KEY (sale_id) REFERENCES sales(id), FOREIGN KEY (product_id) REFERENCES products(id))");
+            stmt.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, full_name TEXT, role TEXT)");
 
-            // 4. INYECCIÓN DE DATOS SEMILLA (DATA SEEDING)
-            // La instrucción 'INSERT OR IGNORE' es una extensión de SQLite que garantiza
-            // la idempotencia de la operación (no duplica si el nombre ya existe).
-            stmt.execute("INSERT OR IGNORE INTO categorias (nombre) VALUES ('Bikinis')");
-            stmt.execute("INSERT OR IGNORE INTO categorias (nombre) VALUES ('Enterizos')");
-            stmt.execute("INSERT OR IGNORE INTO categorias (nombre) VALUES ('Ropa de Playa')");
-            stmt.execute("INSERT OR IGNORE INTO categorias (nombre) VALUES ('Insumos/Telas')");
+            // --- DATA SEEDING (SEMILLA DE DATOS) ---
 
-            System.out.println("--- BASE DE DATOS LISTA Y ACTUALIZADA ---");
+            // Admin
+            stmt.execute("INSERT OR IGNORE INTO users (username, password, full_name, role) VALUES ('admin', 'admin123', 'Administrador SICONI', 'ADMIN')");
 
-        } catch (Exception e) {
-            // Manejo de excepciones SQL y registro de trazabilidad de errores
-            System.out.println("ERROR CREANDO BASE DE DATOS: " + e.getMessage());
+            // CLUBES (Tu Lista)
+            stmt.execute("DELETE FROM clubs");
+            stmt.execute("INSERT INTO clubs (name) VALUES ('CIVG')");
+            stmt.execute("INSERT INTO clubs (name) VALUES ('Cimos')");
+            stmt.execute("INSERT INTO clubs (name) VALUES ('Tiburones de Bauxilum')");
+            stmt.execute("INSERT INTO clubs (name) VALUES ('Los Raudales')");
+            stmt.execute("INSERT INTO clubs (name) VALUES ('Delfines del Lourdes')");
+            stmt.execute("INSERT INTO clubs (name) VALUES ('Tritones de CVG')");
+            stmt.execute("INSERT INTO clubs (name) VALUES ('La Laja')");
+            stmt.execute("INSERT INTO clubs (name) VALUES ('Angostura')");
+
+            // CATEGORÍAS (Swimwear)
+            stmt.execute("DELETE FROM categories");
+            stmt.execute("INSERT INTO categories (name, description) VALUES ('Dama - Clásico Tiro Normal', 'Corte estándar')");
+            stmt.execute("INSERT INTO categories (name, description) VALUES ('Dama - Clásico Tiro Delgado', 'Tirante fino')");
+            stmt.execute("INSERT INTO categories (name, description) VALUES ('Dama - Clásico Tiro Cruzado', 'Espalda cruzada')");
+            stmt.execute("INSERT INTO categories (name, description) VALUES ('Dama - Colegial', 'Reglamentario escolar')");
+            stmt.execute("INSERT INTO categories (name, description) VALUES ('Dama - Enterizo Deportivo', 'Traje completo')");
+            stmt.execute("INSERT INTO categories (name, description) VALUES ('Dama - Kneeskin', 'Competencia rodilla')");
+            stmt.execute("INSERT INTO categories (name, description) VALUES ('Dama - Racing Back', 'Espalda de competencia')");
+            stmt.execute("INSERT INTO categories (name, description) VALUES ('Dama - Fastskin', 'Tecnología compresión')");
+            stmt.execute("INSERT INTO categories (name, description) VALUES ('Dama - Bikini Deportivo', 'Dos piezas')");
+            stmt.execute("INSERT INTO categories (name, description) VALUES ('Dama - Monokini', 'Cortes laterales')");
+            stmt.execute("INSERT INTO categories (name, description) VALUES ('Dama - Talla Grande', 'Plus Size')");
+            stmt.execute("INSERT INTO categories (name, description) VALUES ('Caballero - Jammer', 'Short largo')");
+            stmt.execute("INSERT INTO categories (name, description) VALUES ('Caballero - Boxer', 'Short corto')");
+            stmt.execute("INSERT INTO categories (name, description) VALUES ('Caballero - Tanga', 'Brief')");
+            stmt.execute("INSERT INTO categories (name, description) VALUES ('Accesorios - Gorros', 'Gorros')");
+            stmt.execute("INSERT INTO categories (name, description) VALUES ('Insumos - Telas', 'Materia prima')");
+
+            System.out.println("--- OK: ESTRUCTURA DE DATOS ACTUALIZADA ---");
+
+        } catch (SQLException e) {
             e.printStackTrace();
         }
     }

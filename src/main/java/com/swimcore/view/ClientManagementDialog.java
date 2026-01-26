@@ -133,7 +133,7 @@ public class ClientManagementDialog extends JDialog {
     }
 
     /**
-     * Método de refresco de UI (UI Refresh Pattern).
+     * Metodo de refresco de UI (UI Refresh Pattern).
      * 1. Limpia el contenedor.
      * 2. Solicita la lista actualizada al controlador.
      * 3. Re-instancia las tarjetas visuales.

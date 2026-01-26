@@ -10,12 +10,13 @@
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: Enero 2026
- * VERSIÓN: 2.0.0 (Persistent Exchange Rate System)
+ * VERSIÓN: 3.0.0 (Global Currency Centralization)
  *
  * DESCRIPCIÓN TÉCNICA:
  * Clase utilitaria encargada de la lógica de conversión monetaria y gestión de tasas.
- * Se ha implementado PERSISTENCIA mediante Java Preferences API para asegurar
- * que la Tasa BCV sobreviva al cierre del sistema.
+ * Implementación de "Modo de Moneda Global". Ahora el sistema
+ * puede cambiar dinámicamente entre USD, EUR y Bs, persistiendo la elección
+ * del usuario y el símbolo monetario asociado.
  * -----------------------------------------------------------------------------
  */
 
@@ -25,44 +26,85 @@ import java.util.prefs.Preferences;
 
 /**
  * Gestor de Divisas con Persistencia de Datos.
- * Garantiza que la tasa de cambio se mantenga sincronizada entre sesiones.
+ * Actúa como el "Cerebro Financiero" de SICONI, permitiendo que un cambio
+ * en la configuración afecte a todas las ventanas del sistema (Inventario, Ventas, Reportes).
  */
 public class CurrencyManager {
 
-    // Nodo de preferencias para guardar datos en el almacenamiento del sistema
+    // --- ATRIBUTOS (Claves de Persistencia) ---
     private static final Preferences prefs = Preferences.userNodeForPackage(CurrencyManager.class);
-    private static final String TASA_KEY = "tasa_bcv_siconi";
 
-    // Valor por defecto en caso de que no exista registro previo
-    private static final double TASA_DEFAULT = 60.00;
+    // Claves para guardar en la memoria del sistema
+    private static final String KEY_RATE = "exchange_rate_siconi";
+    private static final String KEY_SYMBOL = "currency_symbol_siconi";
+    private static final String KEY_MODE = "currency_mode_siconi"; // 0=USD, 1=EUR, 2=VES
 
-    /**
-     * Recupera la tasa de cambio actual desde el almacenamiento persistente.
-     * Si no hay una tasa guardada, retorna el valor por defecto (60.00).
-     * @return Valor guardado de la tasa (double).
-     */
+    // --- VALORES POR DEFECTO ---
+    private static final double RATE_DEFAULT = 35.00;
+    private static final String SYMBOL_DEFAULT = "$";
+    private static final int MODE_DEFAULT = 0; // Por defecto arranca en Dólares (0)
+
+    // --- GETTERS (Lectura de Memoria) ---
+
     public static double getTasa() {
-        return prefs.getDouble(TASA_KEY, TASA_DEFAULT);
+        return prefs.getDouble(KEY_RATE, RATE_DEFAULT);
+    }
+
+    public static String getSymbol() {
+        return prefs.get(KEY_SYMBOL, SYMBOL_DEFAULT);
     }
 
     /**
-     * Actualiza la tasa de cambio y la guarda físicamente en el sistema.
-     * @param nuevaTasa El nuevo valor de conversión ingresado por el usuario.
+     * Obtiene el modo de moneda actual.
+     * @return 0 para USD, 1 para EUR, 2 para Bolívares.
      */
-    public static void setTasa(double nuevaTasa) {
-        prefs.putDouble(TASA_KEY, nuevaTasa);
+    public static int getMode() {
+        return prefs.getInt(KEY_MODE, MODE_DEFAULT);
+    }
+
+    // --- SETTERS (Escritura y Configuración) ---
+
+    /**
+     * Guarda la configuración global de moneda para todo el sistema.
+     * @param tasa La tasa de cambio del día.
+     * @param symbol El símbolo visual (Ej: "Bs.", "$").
+     * @param mode El modo operativo (0, 1, 2).
+     */
+    public static void setConfig(double tasa, String symbol, int mode) {
+        prefs.putDouble(KEY_RATE, tasa);
+        prefs.put(KEY_SYMBOL, symbol);
+        prefs.putInt(KEY_MODE, mode);
+    }
+
+    // --- LÓGICA DE NEGOCIO Y CONVERSIÓN ---
+
+    /**
+     * Convierte un monto base (asumido en USD) a la moneda seleccionada actualmente.
+     * Este es el metodo que usarán las tablas para saber qué mostrar.
+     * * @param amountInUSD El precio base del producto en Dólares.
+     * @return El monto convertido (o el mismo si es USD).
+     */
+    public static double convert(double amountInUSD) {
+        int mode = getMode();
+        double tasa = getTasa();
+
+        switch (mode) {
+            case 0: return amountInUSD;        // USD -> USD (Base)
+            case 1: return amountInUSD;        // USD -> EUR (Asumimos paridad 1:1 o se ajustará a futuro)
+            case 2: return amountInUSD * tasa; // USD -> BS (Multiplicación por Tasa BCV)
+            default: return amountInUSD;
+        }
     }
 
     /**
-     * Metodo de utilidad para el formateo visual de precios en la interfaz.
-     * @param precioEnDivisa El monto base en moneda extranjera.
-     * @return String con el formato: "€ X.XX (Bs. X.XX)"
+     * Formatea un precio automáticamente según la configuración global.
+     * Útil para etiquetas y reportes.
+     * * @param amountInUSD Precio base en dólares.
+     * @return Texto formateado (Ej: "Bs. 500.00" o "$ 15.00").
      */
-    public static String formatPrice(double precioEnDivisa) {
-        double tasaActual = getTasa();
-        double enBolivares = precioEnDivisa * tasaActual;
-
-        // Formateo profesional con 2 decimales
-        return String.format("€ %.2f  (Bs. %.2f)", precioEnDivisa, enBolivares);
+    public static String formatPrice(double amountInUSD) {
+        double finalAmount = convert(amountInUSD);
+        String symbol = getSymbol();
+        return String.format("%s %.2f", symbol, finalAmount);
     }
 }

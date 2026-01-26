@@ -35,7 +35,7 @@
             <version>3.45.1.0</version>
         </dependency>
 
-        <!-- Reporting: iText PDF (Requerido para Exportar Auditoría) -->
+        <!-- Reporting: iText PDF -->
         <dependency>
             <groupId>com.itextpdf</groupId>
             <artifactId>itextpdf</artifactId>
@@ -50,21 +50,28 @@
         </dependency>
 
         <!-- ============================================== -->
-        <!-- NUEVAS DEPENDENCIAS - FASE 1 (AUDITORÍA LUXURY) -->
+        <!-- DEPENDENCIAS AVANZADAS DE UI Y REPORTES        -->
         <!-- ============================================== -->
 
-        <!-- 1. Calendario Moderno (Reemplaza a JCalendar) -->
+        <!-- 1. Calendario Moderno -->
         <dependency>
             <groupId>com.github.lgooddatepicker</groupId>
             <artifactId>LGoodDatePicker</artifactId>
             <version>11.2.1</version>
         </dependency>
 
-        <!-- 2. Motor de Animaciones (Para efectos Fade-In/Slide) -->
+        <!-- 2. Motor de Animaciones -->
         <dependency>
             <groupId>org.jdesktop</groupId>
             <artifactId>timingframework-swing</artifactId>
             <version>5.0.0</version>
+        </dependency>
+
+        <!-- 3. Motor de Gráficos (Para Reportes de Ventas) -->
+        <dependency>
+            <groupId>org.jfree</groupId>
+            <artifactId>jfreechart</artifactId>
+            <version>1.5.3</version>
         </dependency>
 
     </dependencies>

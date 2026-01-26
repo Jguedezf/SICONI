@@ -1,103 +1,137 @@
 /*
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
- * CARRERA: Ingeniería en Informática
- * ASIGNATURA: Programación III / Proyecto de Software
- *
- * PROYECTO: GESTIÓN DE INVENTARIO DE UNA TIENDA (SICONI)
+ * PROYECTO: SICONI - DAYANA GUEDEZ SWIMWEAR
  * ARCHIVO: WelcomeView.java
- *
- * AUTORA: Johanna Guedez - V14089807
- * PROFESORA: Ing. Dubraska Roca
- * FECHA: Enero 2026
- * VERSIÓN: 1.0.0 (Splash Screen Release)
- *
- * DESCRIPCIÓN TÉCNICA:
- * Pantalla de Carga (Splash Screen) que se muestra después de una autenticación exitosa.
- * Su propósito es mejorar la experiencia de usuario (UX) y reforzar la identidad de marca
- * mientras se cargan los módulos principales en segundo plano.
- *
- * PRINCIPIOS POO APLICADOS:
- * - HERENCIA: Extiende de JWindow para una ventana sin bordes ni controles.
- * - COMPOSICIÓN: Contiene un JPanel personalizado para el fondo y una JProgressBar.
- * - ABSTRACCIÓN: Oculta la complejidad del manejo de hilos (Threads) para la transición.
+ * DESCRIPCIÓN: Splash Screen V3.2 (Layout Corregido - Texto Arriba y Abajo)
  * -----------------------------------------------------------------------------
  */
 
 package com.swimcore.view;
 
+import com.swimcore.util.SoundManager;
+import com.swimcore.view.components.GoldenTitle;
+
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.net.URL;
 
-/**
- * Ventana de Bienvenida (Splash Screen).
- * Proporciona una transición visual elegante entre el Login y el Dashboard.
- */
 public class WelcomeView extends JWindow {
 
-    /**
-     * Constructor.
-     * ENTRADA: Ninguna.
-     * PROCESO: Renderiza la imagen de fondo, muestra una barra de carga animada
-     *          y utiliza un hilo para temporizar la transición al Dashboard.
-     * SALIDA: Ventana de bienvenida visible por 4 segundos.
-     */
-    public WelcomeView() {
-        // Configuración del tamaño de la ventana (ajusta a la proporción de tu imagen)
-        setSize(960, 540);
-        setLocationRelativeTo(null); // Centrado en pantalla
+    // Variable para controlar si el usuario saltó la intro
+    private boolean skipped = false;
+    private Thread transitionThread;
 
-        // Panel de Fondo con tu imagen corporativa
+    public WelcomeView() {
+        // Tamaño HD
+        setSize(960, 540);
+        setLocationRelativeTo(null);
+
+        // 1. INICIAR AUDIO
+        try {
+            SoundManager.getInstance().playLoginSuccess();
+        } catch (Exception e) {
+            System.err.println("Error de audio: " + e.getMessage());
+        }
+
+        // 2. PANEL DE FONDO
         JPanel content = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
                 try {
-                    // Carga la imagen desde la carpeta de recursos
                     URL url = getClass().getResource("/images/fondo_dashboard.png");
                     if (url != null) {
                         Image img = new ImageIcon(url).getImage();
-                        // Dibuja la imagen para que cubra todo el panel
                         g.drawImage(img, 0, 0, getWidth(), getHeight(), this);
                     } else {
-                        // Si no encuentra la imagen, muestra un fondo negro sólido
-                        g.setColor(Color.BLACK);
+                        g.setColor(new Color(20, 20, 20));
                         g.fillRect(0, 0, getWidth(), getHeight());
                     }
-                } catch (Exception e) {
-                    // Manejo de error silencioso para no interrumpir al usuario
-                }
+                } catch (Exception e) {}
             }
         };
         content.setLayout(new BorderLayout());
         add(content);
 
-        // Barra de Carga con estilo Fucsia Neón
-        JProgressBar progressBar = new JProgressBar();
-        progressBar.setIndeterminate(true); // Animación infinita (estilo "cargando...")
-        progressBar.setBackground(new Color(20, 20, 20));
-        progressBar.setForeground(new Color(220, 0, 115)); // Color Fucsia SICONI
-        progressBar.setBorderPainted(false);
-        progressBar.setPreferredSize(new Dimension(getWidth(), 5)); // Barra delgada y elegante
+        // 3. CAPA DE TEXTO (LAYOUT DISTRIBUIDO)
+        JPanel textPanel = new JPanel();
+        textPanel.setLayout(null);
+        textPanel.setOpaque(false);
 
+        int width = getWidth();
+
+        // --- A. BIENVENIDA (ARRIBA - Y=60) ---
+        // Se coloca en la parte superior para dejar el centro libre al logo
+        GoldenTitle lblBienvenida = new GoldenTitle("TE DAMOS LA BIENVENIDA", 42);
+        lblBienvenida.setBounds(0, 60, width, 50);
+        textPanel.add(lblBienvenida);
+
+        // --- B. BLOQUE INFERIOR (DESCRIPCIÓN) ---
+
+        // Título del Sistema (Y=400)
+        GoldenTitle lblDefinicion = new GoldenTitle("SISTEMA DE CONTROL DE NEGOCIO E INVENTARIO", 18);
+        lblDefinicion.setBounds(0, 400, width, 30);
+        textPanel.add(lblDefinicion);
+
+        // Slogan Línea 1 (Y=435)
+        GoldenTitle lblSlogan1 = new GoldenTitle("Solución Tecnológica de control de negocio e inventario,", 14);
+        lblSlogan1.setBounds(0, 435, width, 20);
+        textPanel.add(lblSlogan1);
+
+        // Slogan Línea 2 (Y=455)
+        GoldenTitle lblSlogan2 = new GoldenTitle("optimizada para la gestión administrativa de Pequeñas y Medianas Empresas (PyMEs)", 14);
+        lblSlogan2.setBounds(0, 455, width, 20);
+        textPanel.add(lblSlogan2);
+
+        // Aviso de Click (Y=490 - Al final)
+        JLabel lblSkip = new JLabel("(Click para iniciar)", SwingConstants.CENTER);
+        lblSkip.setForeground(new Color(212, 175, 55));
+        lblSkip.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        lblSkip.setBounds(0, 490, width, 20);
+        textPanel.add(lblSkip);
+
+        content.add(textPanel, BorderLayout.CENTER);
+
+        // 4. BARRA DE CARGA
+        JProgressBar progressBar = new JProgressBar();
+        progressBar.setIndeterminate(true);
+        progressBar.setBackground(new Color(10, 10, 10));
+        progressBar.setForeground(new Color(212, 175, 55));
+        progressBar.setBorderPainted(false);
+        progressBar.setPreferredSize(new Dimension(getWidth(), 6));
         content.add(progressBar, BorderLayout.SOUTH);
 
-        // Lógica de Transición Asíncrona
-        // Un nuevo hilo se encarga de la espera para no congelar la interfaz
-        new Thread(() -> {
+        // 5. LÓGICA DE TRANSICIÓN
+        transitionThread = new Thread(() -> {
             try {
-                // Espera 4 segundos para que se aprecie la imagen y la música
-                Thread.sleep(4000);
+                Thread.sleep(20000); // 20 Segundos de música
             } catch (InterruptedException e) {
-                e.printStackTrace();
             }
 
-            // Cierra esta ventana de bienvenida
-            dispose();
+            if (!skipped) {
+                abrirDashboard();
+            }
+        });
+        transitionThread.start();
 
-            // Llama a la apertura del Dashboard principal de forma segura
-            SwingUtilities.invokeLater(() -> new DashboardView().setVisible(true));
-        }).start();
+        // 6. EVENTO CLICK (SALTAR)
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (!skipped) {
+                    skipped = true;
+                    transitionThread.interrupt();
+                    abrirDashboard();
+                }
+            }
+        });
+    }
+
+    private void abrirDashboard() {
+        dispose(); // Cerrar bienvenida
+        SwingUtilities.invokeLater(() -> new DashboardView().setVisible(true));
     }
 }
