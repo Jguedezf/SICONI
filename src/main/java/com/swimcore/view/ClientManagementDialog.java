@@ -1,37 +1,10 @@
 /*
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
- * CARRERA: Ingeniería en Informática
- * ASIGNATURA: Programación III / Proyecto de Software
- *
- * PROYECTO: GESTIÓN DE INVENTARIO DE UNA TIENDA (SICONI)
  * ARCHIVO: ClientManagementDialog.java
- *
- * AUTORA: Johanna Guedez - V14089807
- * PROFESORA: Ing. Dubraska Roca
- * FECHA: Enero 2026
- * VERSIÓN: 1.0.0 (Stable Release)
- *
- * DESCRIPCIÓN TÉCNICA:
- * Clase de la Capa de Vista (View) encargada del módulo de gestión de clientes.
- * A diferencia del inventario (que usa JTable), esta vista implementa una interfaz
- * de tipo "Galería" o "Grid", renderizando cada registro como una tarjeta visual
- * independiente (ClientCard) dentro de un contenedor de flujo dinámico.
- *
- * Características de Ingeniería:
- * 1. Renderizado Dinámico de Componentes: Instanciación de objetos visuales en tiempo de ejecución
- * basados en la colección de datos recuperada por el controlador.
- * 2. Diseño Fluido: Uso de `FlowLayout` dentro de un `JScrollPane` para permitir
- * que las tarjetas se acomoden automáticamente según el ancho de la ventana.
- * 3. Integración MVC: Comunicación directa con `ClientController` para la obtención de datos.
- *
- * PRINCIPIOS POO:
- * - COMPOSICIÓN: La ventana se compone de múltiples instancias de `ClientCard`.
- * - HERENCIA: Extiende de `JDialog` para comportamiento modal/secundario.
- *
- * PATRONES DE DISEÑO:
- * - Composite: Manejo de una jerarquía de componentes (Panel > Scroll > Panel > Tarjetas).
- * - Controller (MVC): Delega la lógica de negocio al `ClientController`.
+ * VERSIÓN: 3.1.1 (Unified Directory & Selection Mode)
+ * DESCRIPCIÓN: Directorio unificado que ahora también funciona como selector
+ * de cliente para iniciar un nuevo pedido, eliminando ventanas duplicadas.
  * -----------------------------------------------------------------------------
  */
 
@@ -39,120 +12,300 @@ package com.swimcore.view;
 
 import com.swimcore.controller.ClientController;
 import com.swimcore.model.Client;
+import com.swimcore.util.ImagePanel;
+import com.swimcore.util.SoundManager;
 import com.swimcore.view.components.ClientCard;
+import com.swimcore.view.components.SoftButton;
 import com.swimcore.view.dialogs.AddEditClientDialog;
 
 import javax.swing.*;
+import javax.swing.border.CompoundBorder;
+import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.awt.event.*;
+import java.net.URL;
 import java.util.List;
+import java.util.stream.Collectors;
 
-/**
- * Ventana "Galería de Clientes".
- * Muestra los clientes registrados como tarjetas visuales interactivas.
- * Permite la búsqueda y la navegación hacia la creación/edición de registros.
- */
 public class ClientManagementDialog extends JDialog {
 
-    // Dependencia del Controlador (Patrón MVC)
     private final ClientController controller;
-
-    // Contenedor dinámico para las tarjetas
+    private List<Client> allClients;
     private JPanel cardsPanel;
+    private Client selectedClient = null; // Cliente seleccionado actualmente
+    private final boolean isSelectionMode; // Nuevo campo para el modo Pedidos
 
-    // --- PALETA DE COLORES ---
-    private final Color COLOR_BACKGROUND = new Color(40, 40, 40);
+    // Botones de acción
+    private SoftButton btnEdit, btnDelete, btnSelectClient;
+
+    private final Color COLOR_GOLD = new Color(212, 175, 55);
     private final Color COLOR_FUCSIA = new Color(220, 0, 115);
+    private final String PLACEHOLDER_TEXT = "Buscar por nombre, atleta o código...";
 
-    /**
-     * Constructor.
-     * @param owner Ventana propietaria (Dashboard) para mantener la jerarquía de ventanas.
-     */
-    public ClientManagementDialog(Frame owner) {
-        super(owner, "Gestión de Clientes", true); // 'true' indica modalidad (bloquea ventana padre)
+    // Constructor con modo Selección
+    public ClientManagementDialog(Frame owner, boolean isSelectionMode) {
+        super(owner, "Directorio de Clientes", true);
         this.controller = new ClientController();
+        this.isSelectionMode = isSelectionMode;
 
-        // Configuración inicial del contenedor
-        setSize(1200, 700);
+        setSize(1100, 650);
         setLocationRelativeTo(owner);
-        getContentPane().setBackground(COLOR_BACKGROUND);
-        setLayout(new BorderLayout());
+        setUndecorated(true);
+        getRootPane().setBorder(BorderFactory.createLineBorder(COLOR_GOLD, 2));
 
-        // Decoración de borde para resaltar la ventana activa
-        getRootPane().setBorder(BorderFactory.createLineBorder(COLOR_FUCSIA, 2));
+        JPanel backgroundPanel = new ImagePanel("/images/bg3.png");
+        backgroundPanel.setLayout(new BorderLayout());
+        setContentPane(backgroundPanel);
 
-        // 1. BARRA DE HERRAMIENTAS (Norte)
-        add(createToolbar(), BorderLayout.NORTH);
+        add(createHeader(), BorderLayout.NORTH);
+        add(createCenterPanel(), BorderLayout.CENTER);
+        add(createSideActionPanel(), BorderLayout.EAST);
 
-        // 2. ÁREA DE CONTENIDO (Centro)
-        // Panel con FlowLayout alineado a la izquierda para organizar las tarjetas
-        cardsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 15));
-        cardsPanel.setBackground(COLOR_BACKGROUND);
-
-        // ScrollPane para permitir desplazamiento cuando hay muchos clientes
-        JScrollPane scrollPane = new JScrollPane(cardsPanel);
-        scrollPane.setBorder(null); // Eliminar borde por defecto del scroll
-        add(scrollPane, BorderLayout.CENTER);
-
-        // Carga inicial de datos (Data Binding)
-        refreshClientCards();
+        loadAllClients();
+        refreshClientCards(allClients);
+        updateSelectionModeVisibility();
     }
 
-    /**
-     * Construye la barra superior con buscador y botón de agregar.
-     * @return JPanel configurado.
-     */
-    private JPanel createToolbar() {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        panel.setBackground(new Color(30, 30, 30));
+    // Constructor de compatibilidad (Modo Gestión por defecto)
+    public ClientManagementDialog(Frame owner) {
+        this(owner, false);
+    }
 
-        // Campo de búsqueda (Funcionalidad visual por ahora)
-        JTextField searchField = new JTextField("Buscar por nombre o ID...", 30);
+    // Nuevo método para que el Dashboard pueda recuperar el cliente seleccionado
+    public Client getSelectedClient() {
+        return selectedClient;
+    }
 
-        // Botón de Acción Principal (Call to Action)
-        JButton btnAdd = new JButton("+ Agregar Nuevo Cliente");
-        btnAdd.setBackground(COLOR_FUCSIA);
-        btnAdd.setForeground(Color.WHITE);
-        btnAdd.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        btnAdd.setCursor(new Cursor(Cursor.HAND_CURSOR));
+    private void updateSelectionModeVisibility() {
+        // En modo selección, solo se ve el botón de "SELECCIONAR CLIENTE"
+        if (isSelectionMode) {
+            btnEdit.setVisible(false);
+            btnDelete.setVisible(false);
+            // El botón "NUEVO CLIENTE" se mantiene por si no lo encuentra.
+            btnSelectClient.setVisible(true);
+            btnSelectClient.setText("CONFIRMAR PEDIDO");
 
-        panel.add(searchField);
-        panel.add(Box.createHorizontalStrut(20)); // Espaciador rígido
-        panel.add(btnAdd);
+            JLabel title = (JLabel) ((JPanel)getComponent(0)).getComponent(0);
+            title.setText("SELECCIONAR CLIENTE PARA PEDIDO");
+        } else {
+            // Modo Gestión
+            btnSelectClient.setVisible(false);
+        }
+    }
 
-        // Evento: Abrir diálogo de registro
-        btnAdd.addActionListener(e -> {
-            // Instancia del diálogo de edición en modo "Nuevo"
-            AddEditClientDialog addDialog = new AddEditClientDialog( (Frame) this.getOwner() );
-            addDialog.setVisible(true);
 
-            // Callback: Al cerrarse el pop-up, actualizamos la galería para mostrar cambios
-            refreshClientCards();
+    private JPanel createHeader() {
+        JPanel headerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        headerPanel.setOpaque(false);
+        headerPanel.setBorder(new EmptyBorder(15, 0, 5, 0));
+        JLabel title = new JLabel("DIRECTORIO DE CLIENTES");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 26));
+        title.setForeground(COLOR_GOLD);
+        headerPanel.add(title);
+        return headerPanel;
+    }
+
+    private JPanel createCenterPanel() {
+        JPanel centerPanel = new JPanel(new BorderLayout(0, 10));
+        centerPanel.setOpaque(false);
+        centerPanel.setBorder(new EmptyBorder(10, 20, 20, 10));
+
+        // --- Buscador ---
+        JTextField searchField = new JTextField(PLACEHOLDER_TEXT);
+        searchField.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        searchField.setForeground(Color.GRAY);
+        searchField.setPreferredSize(new Dimension(0, 45));
+        searchField.setBorder(new CompoundBorder(
+                BorderFactory.createLineBorder(Color.GRAY),
+                new EmptyBorder(0, 15, 0, 0)
+        ));
+
+        searchField.addFocusListener(new FocusAdapter() {
+            public void focusGained(FocusEvent e) {
+                if (searchField.getText().equals(PLACEHOLDER_TEXT)) {
+                    searchField.setText("");
+                    searchField.setForeground(Color.BLACK);
+                }
+            }
+            public void focusLost(FocusEvent e) {
+                if (searchField.getText().isEmpty()) {
+                    searchField.setForeground(Color.GRAY);
+                    searchField.setText(PLACEHOLDER_TEXT);
+                }
+            }
+        });
+        searchField.addKeyListener(new KeyAdapter() {
+            public void keyReleased(KeyEvent e) { filterClients(searchField.getText()); }
         });
 
-        return panel;
+        centerPanel.add(searchField, BorderLayout.NORTH);
+
+        // --- Galería de Tarjetas ---
+        cardsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 15));
+        cardsPanel.setOpaque(false);
+
+        JScrollPane scrollPane = new JScrollPane(cardsPanel);
+        scrollPane.setOpaque(false);
+        scrollPane.getViewport().setOpaque(false);
+        scrollPane.setBorder(null);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+
+        centerPanel.add(scrollPane, BorderLayout.CENTER);
+
+        return centerPanel;
     }
 
-    /**
-     * Metodo de refresco de UI (UI Refresh Pattern).
-     * 1. Limpia el contenedor.
-     * 2. Solicita la lista actualizada al controlador.
-     * 3. Re-instancia las tarjetas visuales.
-     * 4. Fuerza el repintado de la interfaz.
-     */
-    private void refreshClientCards() {
-        cardsPanel.removeAll(); // Limpieza de componentes obsoletos
+    private JPanel createSideActionPanel() {
+        JPanel sidePanel = new JPanel();
+        sidePanel.setLayout(new BoxLayout(sidePanel, BoxLayout.Y_AXIS));
+        sidePanel.setOpaque(false);
+        sidePanel.setBorder(new EmptyBorder(60, 10, 20, 20));
+        sidePanel.setPreferredSize(new Dimension(220, 0));
 
-        // Solicitud al Controlador (Backend logic)
-        List<Client> clients = controller.getAllClients();
+        // --- Botones de Gestión (Visibles en Modo Gestión) ---
+        SoftButton btnNew = createActionButton("NUEVO CLIENTE", "/images/icons/icon_add_user.png", new Color(0, 153, 76));
+        btnNew.addActionListener(e -> openAddEditDialog(null));
+        sidePanel.add(btnNew);
+        sidePanel.add(Box.createVerticalStrut(15));
 
-        // Iteración y construcción de componentes dinámicos (Composite Pattern)
+        btnEdit = createActionButton("EDITAR", "/images/icons/icon_edit.png", new Color(0, 102, 204));
+        btnEdit.setEnabled(false);
+        btnEdit.addActionListener(e -> {
+            if (selectedClient != null) openAddEditDialog(selectedClient);
+        });
+        sidePanel.add(btnEdit);
+        sidePanel.add(Box.createVerticalStrut(15));
+
+        btnDelete = createActionButton("ELIMINAR", "/images/icons/icon_delete.png", new Color(204, 0, 0));
+        btnDelete.setEnabled(false);
+        btnDelete.addActionListener(e -> deleteSelectedClient());
+        sidePanel.add(btnDelete);
+        sidePanel.add(Box.createVerticalStrut(15));
+
+        // --- Botón de Selección de Pedido (Visible en Modo Selección) ---
+        btnSelectClient = createActionButton("SELECCIONAR", "/images/icons/icon_check.png", COLOR_FUCSIA);
+        btnSelectClient.setEnabled(false);
+        btnSelectClient.addActionListener(e -> {
+            if(selectedClient != null) {
+                // Cierra la ventana, permitiendo que el Dashboard tome el selectedClient
+                dispose();
+            }
+        });
+        sidePanel.add(btnSelectClient);
+
+        sidePanel.add(Box.createVerticalGlue());
+
+        // Botón Volver
+        SoftButton btnBack = createActionButton("VOLVER AL MENÚ", "/images/icons/icon_exit.png", new Color(80, 80, 80));
+        btnBack.addActionListener(e -> {
+            SoundManager.getInstance().playClick();
+            dispose();
+        });
+        sidePanel.add(btnBack);
+
+        return sidePanel;
+    }
+
+    private SoftButton createActionButton(String text, String iconPath, Color bg) {
+        ImageIcon icon = null;
+        try {
+            URL url = getClass().getResource(iconPath);
+            if (url != null) icon = new ImageIcon(new ImageIcon(url).getImage().getScaledInstance(32, 32, Image.SCALE_SMOOTH));
+        } catch (Exception e) {}
+
+        SoftButton btn = new SoftButton(icon);
+        btn.setText(text);
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        btn.setPreferredSize(new Dimension(190, 60));
+        btn.setMaximumSize(new Dimension(190, 60));
+        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        return btn;
+    }
+
+    private void onCardSelected(Client client) {
+        this.selectedClient = client;
+        btnEdit.setEnabled(true);
+        btnDelete.setEnabled(true);
+        if(isSelectionMode) {
+            btnSelectClient.setEnabled(true);
+        }
+        refreshClientCards(allClients);
+    }
+
+    private void openAddEditDialog(Client clientToEdit) {
+        SoundManager.getInstance().playClick();
+        AddEditClientDialog dialog = new AddEditClientDialog((Frame) this.getOwner(), clientToEdit);
+
+        loadAllClients();
+        refreshClientCards(allClients);
+        selectedClient = null;
+        btnEdit.setEnabled(false);
+        btnDelete.setEnabled(false);
+        if(isSelectionMode) btnSelectClient.setEnabled(false);
+    }
+
+    private void deleteSelectedClient() {
+        if (selectedClient == null) return;
+        int opt = JOptionPane.showConfirmDialog(this,
+                "¿Eliminar a " + selectedClient.getFullName() + " del sistema?",
+                "Confirmar", JOptionPane.YES_NO_OPTION);
+
+        if (opt == JOptionPane.YES_OPTION) {
+            if (controller.deleteClient(selectedClient.getCode())) {
+                SoundManager.getInstance().playClick();
+                selectedClient = null;
+                btnEdit.setEnabled(false);
+                btnDelete.setEnabled(false);
+                loadAllClients();
+                refreshClientCards(allClients);
+            } else {
+                SoundManager.getInstance().playError();
+            }
+        }
+    }
+
+    private void loadAllClients() { this.allClients = controller.getAllClients(); }
+
+    private void filterClients(String query) {
+        String lowerCaseQuery = query.toLowerCase().trim();
+        if (lowerCaseQuery.isEmpty() || lowerCaseQuery.equals(PLACEHOLDER_TEXT.toLowerCase())) {
+            refreshClientCards(allClients);
+        } else {
+            List<Client> filteredList = allClients.stream()
+                    .filter(client ->
+                            client.getFullName().toLowerCase().contains(lowerCaseQuery) ||
+                                    client.getAthleteName().toLowerCase().contains(lowerCaseQuery) ||
+                                    (client.getCode() != null && client.getCode().toLowerCase().contains(lowerCaseQuery))
+                    )
+                    .collect(Collectors.toList());
+            refreshClientCards(filteredList);
+        }
+    }
+
+    private void refreshClientCards(List<Client> clients) {
+        cardsPanel.removeAll();
         for (Client client : clients) {
-            // ClientCard es un componente personalizado (JPanel) que visualiza un objeto Client
             ClientCard card = new ClientCard(client);
+            // Selección visual
+            if (selectedClient != null && client.getId() == selectedClient.getId()) {
+                card.setBorder(BorderFactory.createLineBorder(COLOR_GOLD, 3));
+            }
+            // Evento doble clic para editar/seleccionar
+            card.addMouseListener(new MouseAdapter() {
+                public void mouseClicked(MouseEvent e) {
+                    onCardSelected(client);
+                    if (e.getClickCount() == 2) {
+                        if (isSelectionMode) {
+                            selectedClient = client;
+                            dispose(); // Cierra y devuelve el cliente
+                        } else {
+                            openAddEditDialog(client);
+                        }
+                    }
+                }
+            });
             cardsPanel.add(card);
         }
-
-        // Validación de jerarquía y repintado (Swing Thread safety convention)
         cardsPanel.revalidate();
         cardsPanel.repaint();
     }

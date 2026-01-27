@@ -1,21 +1,8 @@
 /*
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
- * CARRERA: Ingeniería en Informática
- * ASIGNATURA: Programación III / Proyecto de Software
- *
- * PROYECTO: GESTIÓN DE INVENTARIO DE UNA TIENDA (SICONI)
  * ARCHIVO: ClientCard.java
- *
- * AUTORA: Johanna Guedez - V14089807
- * PROFESORA: Ing. Dubraska Roca
- * FECHA: Enero 2026
- * VERSIÓN: 2.0.0 (Data Model Update)
- *
- * DESCRIPCIÓN TÉCNICA:
- * Micro-componente de la Capa de Vista para representar una entidad 'Cliente'.
- * - ACTUALIZACIÓN v2.0.0: Renderiza los nuevos atributos del modelo:
- * Nombre del Atleta, Club y Nombre del Representante.
+ * VERSIÓN: 2.0.1 (Null-Safety & Layout Fix)
  * -----------------------------------------------------------------------------
  */
 
@@ -30,7 +17,6 @@ import java.awt.event.MouseEvent;
 
 public class ClientCard extends JPanel {
 
-    // Estilos Dark Mode
     private final Color COLOR_CARD_BG = new Color(45, 45, 45);
     private final Border BORDER_DEFAULT = BorderFactory.createLineBorder(new Color(80, 80, 80));
     private final Border BORDER_HOVER = BorderFactory.createLineBorder(new Color(220, 0, 115), 2);
@@ -38,31 +24,27 @@ public class ClientCard extends JPanel {
     public ClientCard(Client client) {
         setLayout(new BorderLayout(10, 10));
         setBackground(COLOR_CARD_BG);
-        setBorder(BORDER_DEFAULT);
-        setPreferredSize(new Dimension(220, 100));
+        setBorder(BorderFactory.createCompoundBorder(BORDER_DEFAULT, BorderFactory.createEmptyBorder(5, 10, 5, 5)));
+        setPreferredSize(new Dimension(240, 110));
 
-        // 1. SECCIÓN DE INFORMACIÓN TEXTUAL (CENTRO)
+        JLabel iconLabel = new JLabel("👤");
+        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 40));
+        iconLabel.setForeground(Color.GRAY);
+        add(iconLabel, BorderLayout.WEST);
+
         JPanel textPanel = new JPanel();
         textPanel.setOpaque(false);
         textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
-        textPanel.setBorder(BorderFactory.createEmptyBorder(10, 5, 10, 5));
 
-        // -- CORRECCIÓN DE MÉTODOS --
-
-        // Atleta (Jerarquía Alta)
-        // Usamos getAthleteName() en lugar de getName()
         JLabel lblAthlete = new JLabel(client.getAthleteName());
         lblAthlete.setFont(new Font("Segoe UI", Font.BOLD, 16));
         lblAthlete.setForeground(Color.WHITE);
 
-        // Club y Categoría
-        // Usamos getClub() en lugar de getType()
-        String clubInfo = (client.getClub() != null ? client.getClub() : "Sin Club");
+        String clubInfo = (client.getClub() != null && !client.getClub().isEmpty()) ? client.getClub() : "Sin Club";
         JLabel lblClub = new JLabel(clubInfo);
         lblClub.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        lblClub.setForeground(new Color(200, 160, 50)); // Dorado
+        lblClub.setForeground(new Color(200, 160, 50));
 
-        // Representante (Pie)
         JLabel lblRep = new JLabel("Rep: " + client.getFullName());
         lblRep.setFont(new Font("Segoe UI", Font.ITALIC, 11));
         lblRep.setForeground(Color.GRAY);
@@ -71,32 +53,30 @@ public class ClientCard extends JPanel {
         textPanel.add(lblClub);
         textPanel.add(Box.createVerticalGlue());
         textPanel.add(lblRep);
-
         add(textPanel, BorderLayout.CENTER);
 
-        // 2. CÓDIGO ID (DERECHA)
+        JPanel rightPanel = new JPanel(new BorderLayout());
+        rightPanel.setOpaque(false);
+
         JLabel lblCode = new JLabel(client.getCode());
         lblCode.setFont(new Font("Consolas", Font.BOLD, 12));
         lblCode.setForeground(Color.CYAN);
-        lblCode.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 10));
 
-        // Si es VIP, le ponemos una estrellita
         if (client.isVip()) {
             lblCode.setText("★ " + client.getCode());
             lblCode.setForeground(new Color(255, 215, 0));
         }
 
-        add(lblCode, BorderLayout.EAST);
+        rightPanel.add(lblCode, BorderLayout.NORTH);
+        add(rightPanel, BorderLayout.EAST);
 
-        // 3. INTERACTIVIDAD
+        setCursor(new Cursor(Cursor.HAND_CURSOR));
         addMouseListener(new MouseAdapter() {
             public void mouseEntered(MouseEvent e) {
-                setBorder(BORDER_HOVER);
-                setCursor(new Cursor(Cursor.HAND_CURSOR));
+                setBorder(BorderFactory.createCompoundBorder(BORDER_HOVER, BorderFactory.createEmptyBorder(5, 10, 5, 5)));
             }
             public void mouseExited(MouseEvent e) {
-                setBorder(BORDER_DEFAULT);
-                setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+                setBorder(BorderFactory.createCompoundBorder(BORDER_DEFAULT, BorderFactory.createEmptyBorder(5, 10, 5, 5)));
             }
         });
     }

@@ -1,3 +1,23 @@
+/*
+ * -----------------------------------------------------------------------------
+ * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
+ * CARRERA: Ingeniería en Informática
+ * ASIGNATURA: Programación III / Proyecto de Software
+ *
+ * PROYECTO: GESTIÓN DE INVENTARIO DE UNA TIENDA (SICONI)
+ * ARCHIVO: ProductDAO.java
+ *
+ * AUTORA: Johanna Guedez - V14089807
+ * PROFESORA: Ing. Dubraska Roca
+ * FECHA: Enero 2026
+ * VERSIÓN: 1.4.0 (Audit Logic Restored & Merged)
+ *
+ * DESCRIPCIÓN TÉCNICA:
+ * Capa de Acceso a Datos. Se integra la lógica de auditoría transaccional
+ * (inventory_movements) requerida por la ventana de gestión de existencias.
+ * -----------------------------------------------------------------------------
+ */
+
 package com.swimcore.dao;
 
 import com.swimcore.model.Category;
@@ -43,24 +63,45 @@ public class ProductDAO {
         } catch (SQLException e) { return false; }
     }
 
+    /**
+     * MÉTODO DE AUDITORÍA RESTAURADO (Transaccional).
+     * Gestiona la entrada/salida y registra el movimiento en el historial.
+     */
     public boolean auditStock(int productId, int quantity, String observation) {
+        // Aseguramos que la tabla de historial exista para evitar errores
+        String sqlTable = "CREATE TABLE IF NOT EXISTS inventory_movements (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER, quantity INTEGER, type TEXT, observation TEXT, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)";
+
         String sqlUpdate = "UPDATE products SET current_stock = current_stock + ? WHERE id = ?";
         String sqlHistory = "INSERT INTO inventory_movements (product_id, quantity, type, observation) VALUES (?, ?, ?, ?)";
+
         try (Connection conn = Conexion.conectar()) {
-            conn.setAutoCommit(false);
+            conn.setAutoCommit(false); // Inicio de transacción segura (ACID)
+
+            try (Statement stmt = conn.createStatement()) { stmt.execute(sqlTable); }
+
             try (PreparedStatement psUpd = conn.prepareStatement(sqlUpdate);
                  PreparedStatement psHis = conn.prepareStatement(sqlHistory)) {
+
+                // 1. Actualizar el stock numérico
                 psUpd.setInt(1, quantity);
                 psUpd.setInt(2, productId);
-                psUpd.executeUpdate();
+                int rows = psUpd.executeUpdate();
+
+                if (rows == 0) throw new SQLException("Producto no encontrado");
+
+                // 2. Guardar el registro histórico
                 psHis.setInt(1, productId);
                 psHis.setInt(2, Math.abs(quantity));
                 psHis.setString(3, (quantity > 0) ? "ENTRADA" : "SALIDA");
                 psHis.setString(4, observation.toUpperCase());
                 psHis.executeUpdate();
-                conn.commit();
+
+                conn.commit(); // Confirmar cambios
                 return true;
-            } catch (SQLException e) { conn.rollback(); return false; }
+            } catch (SQLException e) {
+                conn.rollback(); // Deshacer si hay error
+                return false;
+            }
         } catch (SQLException e) { return false; }
     }
 

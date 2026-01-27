@@ -2,8 +2,8 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: UNEG - SICONI
  * ARCHIVO: ClientCheckInDialog.java
- * VERSIÓN: 4.1.0 (UX Premium + Full CRUD)
- * DESCRIPCIÓN: Ventana avanzada con selector de país, padding visual y
+ * VERSIÓN: 4.2.0 (UX Premium + Padding Fix)
+ * DESCRIPCIÓN: Ventana avanzada con selector de país, padding visual mejorado y
  * lógica completa de Guardar/Editar/Eliminar.
  * -----------------------------------------------------------------------------
  */
@@ -183,6 +183,7 @@ public class ClientCheckInDialog extends JDialog {
         txtAddress = new JTextArea(2, 20);
         txtAddress.setBackground(COL_INPUT); txtAddress.setForeground(Color.WHITE);
         txtAddress.setCaretColor(COL_GOLD);
+        // Padding para JTextArea
         txtAddress.setBorder(new CompoundBorder(
                 BorderFactory.createLineBorder(Color.GRAY),
                 new EmptyBorder(5, 10, 5, 10)));
@@ -383,9 +384,10 @@ public class ClientCheckInDialog extends JDialog {
         t.setForeground(Color.WHITE);
         t.setCaretColor(COL_GOLD);
 
+        // CORRECCIÓN CLAVE: PADDING INTERNO APLICADO CORRECTAMENTE
         t.setBorder(new CompoundBorder(
                 BorderFactory.createLineBorder(Color.GRAY),
-                new EmptyBorder(5, 10, 5, 10) // Espacio interno
+                new EmptyBorder(5, 10, 5, 10) // Espacio interno (Top, Left, Bottom, Right)
         ));
 
         t.setFont(new Font("Segoe UI", Font.PLAIN, 14));

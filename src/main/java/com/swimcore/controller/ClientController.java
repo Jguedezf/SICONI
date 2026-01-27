@@ -2,8 +2,9 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
  * ARCHIVO: ClientController.java
- * VERSIÓN: 2.2.0 (CRUD Enabled)
- * DESCRIPCIÓN: Controlador actualizado. Ahora expone metodos para editar.
+ * VERSIÓN: 2.3.1 (generateNextCode Hotfix)
+ * DESCRIPCIÓN: Controlador actualizado. Ahora expone el método para generar
+ * el siguiente código de cliente, resolviendo el error de compilación.
  * -----------------------------------------------------------------------------
  */
 
@@ -37,7 +38,12 @@ public class ClientController {
         return clientDAO.saveClient(client);
     }
 
-    // --- NUEVO MÉTODO PARA EDITAR ---
+    // --- EXPONER MÉTODO PARA GENERAR EL SIGUIENTE CÓDIGO (SOLUCIÓN AL ERROR) ---
+    public String generateNextCode() {
+        return clientDAO.generateNextCode();
+    }
+
+    // --- MÉTODO PARA EDITAR ---
     public boolean updateClient(Client client) {
         // Validación: Debe tener código para saber a quién editar
         if (client.getCode() == null || client.getCode().trim().isEmpty()) {

@@ -2,7 +2,9 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
  * ARCHIVO: DashboardView.java
- * VERSIÓN: 2.4.1 En desarrollo.
+ * VERSIÓN: 2.5.1 (SalesView Integration)
+ * DESCRIPCIÓN: Se integra el flujo completo de Clientes y Pedidos a los
+ * botones del menú principal, creando un flujo de trabajo lógico para el taller.
  * -----------------------------------------------------------------------------
  */
 
@@ -14,9 +16,6 @@ import com.swimcore.util.SoundManager;
 import com.swimcore.view.components.SoftButton;
 import com.swimcore.view.dialogs.CurrencySettingsDialog;
 import com.swimcore.view.dialogs.SupplierManagementDialog;
-import com.swimcore.view.ReportsView;
-import com.swimcore.view.SalesView;
-// Imports verificados
 import com.swimcore.view.dialogs.ClientCheckInDialog;
 import com.swimcore.model.Client;
 
@@ -95,9 +94,9 @@ public class DashboardView extends JFrame {
         JPanel grid = new JPanel(new GridLayout(2, 3, 25, 25));
         grid.setOpaque(false);
 
-        // 1. CLIENTES
+        // 1. CLIENTES (ACCIÓN ACTUALIZADA)
         grid.add(createBigButton("CLIENTES", "Registro y Atletas", "/images/client.png", e -> {
-            JOptionPane.showMessageDialog(this, "Módulo Clientes en construcción.\nUtilice el botón PEDIDOS para registrar clientes.");
+            new ClientManagementDialog(this).setVisible(true);
         }));
 
         // 2. INVENTARIO
@@ -112,17 +111,19 @@ public class DashboardView extends JFrame {
             }.execute();
         }));
 
-        // 3. PEDIDOS (CORRECTO)
+        // 3. PEDIDOS (LÓGICA DE TALLER)
         grid.add(createBigButton("PEDIDOS", "Ventas y Producción", "/images/orders.png", e -> {
+            // 1. Abrir selector de clientes
             ClientCheckInDialog checkIn = new ClientCheckInDialog(this);
             checkIn.setVisible(true);
 
             Client clienteSeleccionado = checkIn.getSelectedClient();
 
+            // 2. Si se selecciona un cliente, abrir la ventana de pedidos para él
             if (clienteSeleccionado != null) {
-                JFrame frameVentas = new JFrame("SICONI - Gestión de Pedidos (" + clienteSeleccionado.getFullName() + ")");
-                frameVentas.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-                frameVentas.setSize(1100, 700);
+                JDialog frameVentas = new JDialog(this, "SICONI - Gestión de Pedidos (" + clienteSeleccionado.getFullName() + ")", true);
+                frameVentas.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+                frameVentas.setSize(1200, 750);
                 frameVentas.setLocationRelativeTo(null);
                 frameVentas.setContentPane(new SalesView(clienteSeleccionado));
                 frameVentas.setVisible(true);
