@@ -3,7 +3,8 @@
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
  * PROYECTO: SICONI - DAYANA GUEDEZ SWIMWEAR
  * ARCHIVO: LoginView.java
- * DESCRIPCIÓN: Login V1.3 (Cleaned & Audio Fixed)
+ * VERSIÓN: 2.0.0 (i18n Integration)
+ * DESCRIPCIÓN: Login V2.0 (Internacionalización y Refresco Dinámico)
  * -----------------------------------------------------------------------------
  */
 
@@ -29,13 +30,15 @@ public class LoginView extends JFrame {
     private final Color COLOR_TEXTO = new Color(200, 200, 200);
     private final Color COLOR_DORADO = new Color(200, 160, 51);
 
+    // --- COMPONENTES UI ---
+    private JLabel lblUser, lblPass; // Ahora son variables de instancia para poder actualizarlas
     private JLabel lblSecurity;
     private JTextField txtUser;
     private JPasswordField txtPass;
     private JButton btnLogin;
 
     public LoginView() {
-        setTitle("SICONI - Acceso al Sistema");
+        // El título se carga en updateTexts()
         setSize(480, 680);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
@@ -67,19 +70,25 @@ public class LoginView extends JFrame {
         JButton btnVe = new JButton();
         btnVe.setBounds(centerX - flagW - (gap/2), 160, flagW, flagH);
         estilizarBotonImagen(btnVe, "/images/ve.png");
-        btnVe.addActionListener(e -> LanguageManager.setLocale(new Locale("es")));
+        btnVe.addActionListener(e -> {
+            LanguageManager.setLocale(new Locale("es"));
+            updateTexts(); // Actualiza los textos al cambiar idioma
+        });
         panel.add(btnVe);
 
         JButton btnUs = new JButton();
         btnUs.setBounds(centerX + (gap/2), 160, flagW, flagH);
         estilizarBotonImagen(btnUs, "/images/us.png");
-        btnUs.addActionListener(e -> LanguageManager.setLocale(new Locale("en")));
+        btnUs.addActionListener(e -> {
+            LanguageManager.setLocale(new Locale("en"));
+            updateTexts(); // Actualiza los textos al cambiar idioma
+        });
         panel.add(btnUs);
 
         // 3. INPUTS
         int startY = 240, inputWidth = 320, inputX = centerX - (inputWidth / 2);
 
-        JLabel lblUser = new JLabel("Usuario:");
+        lblUser = new JLabel(); // Se inicializa vacío
         lblUser.setForeground(COLOR_TEXTO);
         lblUser.setBounds(inputX, startY, 200, 20);
         panel.add(lblUser);
@@ -92,7 +101,7 @@ public class LoginView extends JFrame {
         txtUser.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         panel.add(txtUser);
 
-        JLabel lblPass = new JLabel("Contraseña:");
+        lblPass = new JLabel(); // Se inicializa vacío
         lblPass.setForeground(COLOR_TEXTO);
         lblPass.setBounds(inputX, startY + 90, 200, 20);
         panel.add(lblPass);
@@ -115,7 +124,7 @@ public class LoginView extends JFrame {
         panel.add(lblSecurity);
 
         // 5. BOTÓN ENTRAR
-        btnLogin = new JButton("INGRESAR AL SISTEMA");
+        btnLogin = new JButton(); // Se inicializa vacío
         int btnWidth = 220;
         btnLogin.setBounds(centerX - (btnWidth/2), startY + 280, btnWidth, 50);
         btnLogin.setFont(new Font("Segoe UI", Font.BOLD, 14));
@@ -135,6 +144,21 @@ public class LoginView extends JFrame {
         firma.setHorizontalAlignment(SwingConstants.CENTER);
         firma.setBounds(centerX - 150, 610, 300, 20);
         panel.add(firma);
+
+        // Carga inicial de textos en el idioma por defecto
+        updateTexts();
+    }
+
+    /**
+     * NUEVO MÉTODO: Centraliza la actualización de todos los textos de la UI.
+     */
+    private void updateTexts() {
+        setTitle(LanguageManager.get("login.title"));
+        lblUser.setText(LanguageManager.get("login.userLabel"));
+        lblPass.setText(LanguageManager.get("login.passLabel"));
+        btnLogin.setText(LanguageManager.get("login.button"));
+        // Repintar para asegurar que los cambios se muestren
+        repaint();
     }
 
     private void validarYAnimar() {
@@ -146,21 +170,16 @@ public class LoginView extends JFrame {
         boolean accesoEmergencia = (u.equals("admin") && p.equals("1234"));
 
         if (accesoBD || accesoEmergencia) {
-            // CORRECCIÓN: Quitamos el sonido aquí para que lo maneje WelcomeView y no suene doble.
-            // SoundManager.getInstance().playLoginSuccess(); <--- ELIMINADO
-
-            // Autorecuperación Admin
             if (!accesoBD && accesoEmergencia) {
                 if (dao.findByUsername("admin") == null) {
                     dao.saveUser(new User("admin", "1234", "Johanna Guedez", "ADMIN"));
                 }
             }
 
-            // Animación Visual
             txtUser.setEnabled(false);
             txtPass.setEnabled(false);
-            btnLogin.setText("ACCEDIENDO...");
-            btnLogin.setBackground(new Color(46, 204, 113)); // Verde Éxito
+            btnLogin.setText(LanguageManager.get("login.success")); // Texto de éxito
+            btnLogin.setBackground(new Color(46, 204, 113));
 
             try {
                 URL gifUrl = getClass().getResource("/images/lock_animation.gif");
@@ -171,7 +190,6 @@ public class LoginView extends JFrame {
                 }
             } catch (Exception ex) { }
 
-            // Timer para abrir la Bienvenida
             Timer t = new Timer(1500, e -> {
                 dispose();
                 new WelcomeView().setVisible(true);
@@ -181,7 +199,11 @@ public class LoginView extends JFrame {
 
         } else {
             SoundManager.getInstance().playError();
-            JOptionPane.showMessageDialog(this, "Credenciales incorrectas", "Error", JOptionPane.ERROR_MESSAGE);
+            // Mensaje de error también multilenguaje
+            JOptionPane.showMessageDialog(this,
+                    LanguageManager.get("login.error.message"),
+                    LanguageManager.get("login.error.title"),
+                    JOptionPane.ERROR_MESSAGE);
             txtPass.setText("");
             txtPass.requestFocus();
         }

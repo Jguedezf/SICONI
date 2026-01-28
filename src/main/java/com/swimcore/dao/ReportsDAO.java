@@ -1,19 +1,10 @@
 /*
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
- * CARRERA: Ingeniería en Informática
- * ASIGNATURA: Programación III / Proyecto de Software
- *
- * PROYECTO: GESTIÓN DE INVENTARIO DE UNA TIENDA (SICONI)
  * ARCHIVO: ReportsDAO.java
- *
- * AUTORA: Johanna Guedez - V14089807
- * PROFESORA: Ing. Dubraska Roca
- * FECHA: Enero 2026
- * VERSIÓN: 1.1.0 (SQL Query Hotfix)
- *
- * DESCRIPCIÓN TÉCNICA:
- * Data Access Object (DAO) especializado en la generación de reportes y analíticas.
+ * VERSIÓN: 1.2.0 (Product Profitability Logic)
+ * DESCRIPCIÓN: Data Access Object para reportes. Se añade lógica para
+ * calcular la rentabilidad neta por producto en un rango de fechas.
  * -----------------------------------------------------------------------------
  */
 
@@ -37,7 +28,6 @@ public class ReportsDAO {
         summary.put("costos", 0.0);
         summary.put("ganancias", 0.0);
 
-        // --- CONSULTA SQL ---
         String sql = "SELECT SUM(sd.unit_price * sd.quantity) as total_ingresos, " +
                 "       SUM(p.cost_price * sd.quantity) as total_costos " +
                 "FROM sales s " +
@@ -70,7 +60,6 @@ public class ReportsDAO {
 
     public List<Object[]> getTopSellingProducts(Date startDate, Date endDate, int limit) {
         List<Object[]> topProducts = new ArrayList<>();
-        // --- CONSULTA SQL ---
         String sql = "SELECT p.name, SUM(sd.quantity) as total_vendido " +
                 "FROM sales s " +
                 "JOIN sale_details sd ON s.id = sd.sale_id " +
@@ -100,5 +89,47 @@ public class ReportsDAO {
             e.printStackTrace();
         }
         return topProducts;
+    }
+
+    /**
+     * NUEVO MÉTODO: Calcula la rentabilidad de cada producto vendido en un rango de fechas.
+     */
+    public List<Object[]> getProductProfitability(Date startDate, Date endDate) {
+        List<Object[]> profitabilityData = new ArrayList<>();
+        String sql = "SELECT p.name, " +
+                "       SUM(sd.quantity) as unidades_vendidas, " +
+                "       SUM(sd.subtotal) as ingresos_totales, " +
+                "       SUM(p.cost_price * sd.quantity) as costo_total, " +
+                "       (SUM(sd.subtotal) - SUM(p.cost_price * sd.quantity)) as ganancia_neta " +
+                "FROM sales s " +
+                "JOIN sale_details sd ON s.id = sd.sale_id " +
+                "JOIN products p ON sd.product_id = p.id " +
+                "WHERE s.date BETWEEN ? AND ? " +
+                "GROUP BY p.name " +
+                "ORDER BY ganancia_neta DESC";
+
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+        try (Connection conn = Conexion.conectar();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, sdf.format(startDate));
+            pstmt.setString(2, sdf.format(endDate));
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    profitabilityData.add(new Object[]{
+                            rs.getString("name"),
+                            rs.getInt("unidades_vendidas"),
+                            rs.getDouble("ingresos_totales"),
+                            rs.getDouble("costo_total"),
+                            rs.getDouble("ganancia_neta")
+                    });
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return profitabilityData;
     }
 }

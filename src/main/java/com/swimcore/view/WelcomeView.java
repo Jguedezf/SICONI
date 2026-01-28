@@ -3,12 +3,15 @@
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
  * PROYECTO: SICONI - DAYANA GUEDEZ SWIMWEAR
  * ARCHIVO: WelcomeView.java
- * DESCRIPCIÓN: Splash Screen V3.2 (Layout Corregido - Texto Arriba y Abajo)
+ * VERSIÓN: 3.3.0 (i18n & Layout Fix)
+ * DESCRIPCIÓN: Splash Screen internacionalizado. Se mejora la legibilidad
+ * de los textos inferiores y se ajusta la posición del título.
  * -----------------------------------------------------------------------------
  */
 
 package com.swimcore.view;
 
+import com.swimcore.util.LanguageManager; // <-- Importado
 import com.swimcore.util.SoundManager;
 import com.swimcore.view.components.GoldenTitle;
 
@@ -20,23 +23,17 @@ import java.net.URL;
 
 public class WelcomeView extends JWindow {
 
-    // Variable para controlar si el usuario saltó la intro
     private boolean skipped = false;
     private Thread transitionThread;
 
     public WelcomeView() {
-        // Tamaño HD
         setSize(960, 540);
         setLocationRelativeTo(null);
 
-        // 1. INICIAR AUDIO
         try {
             SoundManager.getInstance().playLoginSuccess();
-        } catch (Exception e) {
-            System.err.println("Error de audio: " + e.getMessage());
-        }
+        } catch (Exception e) {}
 
-        // 2. PANEL DE FONDO
         JPanel content = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -56,46 +53,41 @@ public class WelcomeView extends JWindow {
         content.setLayout(new BorderLayout());
         add(content);
 
-        // 3. CAPA DE TEXTO (LAYOUT DISTRIBUIDO)
         JPanel textPanel = new JPanel();
         textPanel.setLayout(null);
         textPanel.setOpaque(false);
 
         int width = getWidth();
 
-        // --- A. BIENVENIDA (ARRIBA - Y=60) ---
-        // Se coloca en la parte superior para dejar el centro libre al logo
-        GoldenTitle lblBienvenida = new GoldenTitle("TE DAMOS LA BIENVENIDA", 42);
-        lblBienvenida.setBounds(0, 60, width, 50);
+        // 1. TÍTULO PRINCIPAL (Usamos GoldenTitle porque es grande y se ve bien)
+        // Subido a Y=30 para dar más espacio
+        GoldenTitle lblBienvenida = new GoldenTitle(LanguageManager.get("welcome.title"), 42);
+        lblBienvenida.setBounds(0, 30, width, 60);
         textPanel.add(lblBienvenida);
 
-        // --- B. BLOQUE INFERIOR (DESCRIPCIÓN) ---
+        // 2. TEXTOS INFERIORES (Usamos JLabel normal para legibilidad)
+        // Fuente Segoe UI, color dorado sólido, sin sombras extrañas.
 
-        // Título del Sistema (Y=400)
-        GoldenTitle lblDefinicion = new GoldenTitle("SISTEMA DE CONTROL DE NEGOCIO E INVENTARIO", 18);
+        JLabel lblDefinicion = createCleanLabel(LanguageManager.get("welcome.system"), 18, true);
         lblDefinicion.setBounds(0, 400, width, 30);
         textPanel.add(lblDefinicion);
 
-        // Slogan Línea 1 (Y=435)
-        GoldenTitle lblSlogan1 = new GoldenTitle("Solución Tecnológica de control de negocio e inventario,", 14);
+        JLabel lblSlogan1 = createCleanLabel(LanguageManager.get("welcome.slogan1"), 14, false);
         lblSlogan1.setBounds(0, 435, width, 20);
         textPanel.add(lblSlogan1);
 
-        // Slogan Línea 2 (Y=455)
-        GoldenTitle lblSlogan2 = new GoldenTitle("optimizada para la gestión administrativa de Pequeñas y Medianas Empresas (PyMEs)", 14);
+        JLabel lblSlogan2 = createCleanLabel(LanguageManager.get("welcome.slogan2"), 14, false);
         lblSlogan2.setBounds(0, 455, width, 20);
         textPanel.add(lblSlogan2);
 
-        // Aviso de Click (Y=490 - Al final)
-        JLabel lblSkip = new JLabel("(Click para iniciar)", SwingConstants.CENTER);
-        lblSkip.setForeground(new Color(212, 175, 55));
-        lblSkip.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        lblSkip.setBounds(0, 490, width, 20);
+        JLabel lblSkip = new JLabel(LanguageManager.get("welcome.skip"), SwingConstants.CENTER);
+        lblSkip.setForeground(new Color(200, 200, 200)); // Gris claro para el aviso
+        lblSkip.setFont(new Font("SansSerif", Font.ITALIC, 11));
+        lblSkip.setBounds(0, 495, width, 20);
         textPanel.add(lblSkip);
 
         content.add(textPanel, BorderLayout.CENTER);
 
-        // 4. BARRA DE CARGA
         JProgressBar progressBar = new JProgressBar();
         progressBar.setIndeterminate(true);
         progressBar.setBackground(new Color(10, 10, 10));
@@ -104,20 +96,12 @@ public class WelcomeView extends JWindow {
         progressBar.setPreferredSize(new Dimension(getWidth(), 6));
         content.add(progressBar, BorderLayout.SOUTH);
 
-        // 5. LÓGICA DE TRANSICIÓN
         transitionThread = new Thread(() -> {
-            try {
-                Thread.sleep(20000); // 20 Segundos de música
-            } catch (InterruptedException e) {
-            }
-
-            if (!skipped) {
-                abrirDashboard();
-            }
+            try { Thread.sleep(20000); } catch (InterruptedException e) {}
+            if (!skipped) abrirDashboard();
         });
         transitionThread.start();
 
-        // 6. EVENTO CLICK (SALTAR)
         addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -130,8 +114,18 @@ public class WelcomeView extends JWindow {
         });
     }
 
+    // Método helper para crear etiquetas limpias y legibles
+    private JLabel createCleanLabel(String text, int size, boolean bold) {
+        JLabel label = new JLabel(text, SwingConstants.CENTER);
+        label.setFont(new Font("Segoe UI", bold ? Font.BOLD : Font.PLAIN, size));
+        label.setForeground(new Color(255, 215, 0)); // Dorado sólido (Gold)
+        // Añadimos una sombra muy sutil (negra simple) para contraste con el fondo
+        // usando HTML básico de Swing si es necesario, pero el color sólido suele bastar.
+        return label;
+    }
+
     private void abrirDashboard() {
-        dispose(); // Cerrar bienvenida
+        dispose();
         SwingUtilities.invokeLater(() -> new DashboardView().setVisible(true));
     }
 }

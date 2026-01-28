@@ -2,21 +2,24 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
  * ARCHIVO: DashboardView.java
- * VERSIÓN: 2.5.1 (SalesView Integration)
- * DESCRIPCIÓN: Se integra el flujo completo de Clientes y Pedidos a los
- * botones del menú principal, creando un flujo de trabajo lógico para el taller.
+ * VERSIÓN: 2.9.0 (Multilanguage Integration)
+ * DESCRIPCIÓN: Panel principal del sistema. Se ha integrado LanguageManager
+ * para soportar el cambio dinámico de idioma en etiquetas, botones y alertas.
  * -----------------------------------------------------------------------------
  */
 
 package com.swimcore.view;
 
+import com.swimcore.dao.ProductDAO;
+import com.swimcore.model.Product;
 import com.swimcore.util.CurrencyManager;
 import com.swimcore.util.ImagePanel;
+import com.swimcore.util.LanguageManager; // <-- Importante
 import com.swimcore.util.SoundManager;
+import com.swimcore.view.components.AlertCard;
 import com.swimcore.view.components.SoftButton;
 import com.swimcore.view.dialogs.CurrencySettingsDialog;
 import com.swimcore.view.dialogs.SupplierManagementDialog;
-import com.swimcore.view.dialogs.ClientCheckInDialog;
 import com.swimcore.model.Client;
 
 import javax.swing.*;
@@ -25,10 +28,16 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.net.URL;
+import java.util.List;
 import java.util.Locale;
 
 public class DashboardView extends JFrame {
 
+    // --- DAOs y Componentes ---
+    private final ProductDAO productDAO = new ProductDAO();
+    private AlertCard alertCardStock;
+
+    // --- Paleta de Colores ---
     private final Color COLOR_BG = new Color(18, 18, 18);
     private final Color COLOR_CARD = new Color(30, 30, 30);
     private final Color COLOR_FUCSIA = new Color(220, 0, 115);
@@ -36,7 +45,8 @@ public class DashboardView extends JFrame {
     private JLabel lblRateValue;
 
     public DashboardView() {
-        setTitle("SICONI - Panel Principal");
+        // Uso de LanguageManager para el título de la ventana
+        setTitle(LanguageManager.get("dashboard.title"));
         setSize(1100, 700);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -51,25 +61,55 @@ public class DashboardView extends JFrame {
         mainPanel.add(createHeader(), BorderLayout.NORTH);
         mainPanel.add(createCentralMenu(), BorderLayout.CENTER);
         mainPanel.add(createFooter(), BorderLayout.SOUTH);
+
+        // Cargar la alerta de stock al iniciar
+        updateStockAlert();
     }
 
     private JPanel createHeader() {
-        JPanel headerPanel = new JPanel();
-        headerPanel.setLayout(new BoxLayout(headerPanel, BoxLayout.X_AXIS));
+        JPanel headerPanel = new JPanel(new BorderLayout(20, 0));
         headerPanel.setOpaque(false);
         headerPanel.setBorder(new EmptyBorder(20, 30, 20, 30));
 
-        JLabel lblTitle = new JLabel("SICONI");
-        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 28));
-        lblTitle.setForeground(Color.WHITE);
+        // --- Panel Izquierdo: Logo y Alerta ---
+        JPanel leftPanel = new JPanel();
+        leftPanel.setOpaque(false);
+        leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
 
-        headerPanel.add(lblTitle);
-        headerPanel.add(Box.createHorizontalGlue());
+        JLabel lblLogo = new JLabel();
+        try {
+            URL url = getClass().getResource("/images/logo_small.png");
+            if (url != null) {
+                ImageIcon icon = new ImageIcon(new ImageIcon(url).getImage().getScaledInstance(150, -1, Image.SCALE_SMOOTH));
+                lblLogo.setIcon(icon);
+            } else {
+                lblLogo.setText("SICONI");
+                lblLogo.setFont(new Font("Segoe UI", Font.BOLD, 28));
+                lblLogo.setForeground(Color.WHITE);
+            }
+        } catch (Exception e) {}
 
+        leftPanel.add(lblLogo);
+        leftPanel.add(Box.createVerticalStrut(10));
+
+        // --- Creación de la Tarjeta de Alerta (Texto inicial traducido) ---
+        alertCardStock = new AlertCard("⚠️", LanguageManager.get("dashboard.alert.calc"));
+        alertCardStock.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                SoundManager.getInstance().playClick();
+                InventoryView inventoryView = new InventoryView(DashboardView.this);
+                inventoryView.setVisible(true);
+            }
+        });
+        leftPanel.add(alertCardStock);
+
+        // --- Panel Derecho: Tasa de Cambio ---
         JPanel rateWidget = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         rateWidget.setOpaque(false);
 
-        lblRateValue = new JLabel(String.format(Locale.US, "TASA BCV: Bs. %.2f", CurrencyManager.getTasa()));
+        // Texto de la tasa traducido y formateado
+        lblRateValue = new JLabel(String.format(Locale.US, LanguageManager.get("dashboard.rate"), CurrencyManager.getTasa()));
         lblRateValue.setFont(new Font("Segoe UI", Font.BOLD, 14));
         lblRateValue.setForeground(Color.LIGHT_GRAY);
 
@@ -78,13 +118,44 @@ public class DashboardView extends JFrame {
         btnEditRate.addActionListener(e -> {
             SoundManager.getInstance().playClick();
             new CurrencySettingsDialog(this).setVisible(true);
-            lblRateValue.setText(String.format(Locale.US, "TASA BCV: Bs. %.2f", CurrencyManager.getTasa()));
+            // Actualizar texto al cerrar diálogo
+            lblRateValue.setText(String.format(Locale.US, LanguageManager.get("dashboard.rate"), CurrencyManager.getTasa()));
         });
 
         rateWidget.add(lblRateValue);
         rateWidget.add(btnEditRate);
-        headerPanel.add(rateWidget);
+
+        headerPanel.add(leftPanel, BorderLayout.WEST);
+        headerPanel.add(rateWidget, BorderLayout.EAST);
+
         return headerPanel;
+    }
+
+    private void updateStockAlert() {
+        new SwingWorker<Long, Void>() {
+            @Override
+            protected Long doInBackground() throws Exception {
+                List<Product> allProducts = productDAO.getAllProducts();
+                return allProducts.stream().filter(Product::isLowStock).count();
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    long lowStockCount = get();
+                    if (lowStockCount > 0) {
+                        // Mensaje dinámico traducido: "%d productos con bajo stock"
+                        alertCardStock.setMessage(String.format(LanguageManager.get("dashboard.alert.msg"), lowStockCount));
+                        alertCardStock.setVisible(true);
+                    } else {
+                        alertCardStock.setVisible(false);
+                    }
+                } catch (Exception e) {
+                    alertCardStock.setMessage(LanguageManager.get("dashboard.alert.error"));
+                    e.printStackTrace();
+                }
+            }
+        }.execute();
     }
 
     private JPanel createCentralMenu() {
@@ -94,77 +165,86 @@ public class DashboardView extends JFrame {
         JPanel grid = new JPanel(new GridLayout(2, 3, 25, 25));
         grid.setOpaque(false);
 
-        // 1. CLIENTES (ACCIÓN ACTUALIZADA)
-        grid.add(createBigButton("CLIENTES", "Registro y Atletas", "/images/client.png", e -> {
-            new ClientManagementDialog(this).setVisible(true);
-        }));
+        // 1. NUEVO PEDIDO (Traducido)
+        grid.add(createBigButton(
+                LanguageManager.get("dashboard.btn.newOrder"),
+                LanguageManager.get("dashboard.btn.newOrder.sub"),
+                "/images/orders.png", "🛒", e -> {
+                    ClientManagementDialog selector = new ClientManagementDialog(this, true);
+                    selector.setVisible(true);
+                    Client clienteSeleccionado = selector.getSelectedClient();
+                    if (clienteSeleccionado != null) {
+                        JDialog frameVentas = new JDialog(this, "SICONI - " + LanguageManager.get("dashboard.btn.newOrder"), true);
+                        frameVentas.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+                        frameVentas.setSize(1200, 750);
+                        frameVentas.setLocationRelativeTo(this);
+                        frameVentas.setContentPane(new SalesView(clienteSeleccionado));
+                        frameVentas.setVisible(true);
+                        updateStockAlert();
+                    }
+                }));
 
-        // 2. INVENTARIO
-        grid.add(createBigButton("INVENTARIO", "Insumos y Catálogo", "/images/inventory.png", e -> {
-            setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-            new SwingWorker<Void, Void>() {
-                @Override protected Void doInBackground() throws Exception {
-                    new InventoryView(DashboardView.this).setVisible(true);
-                    return null;
-                }
-                @Override protected void done() { setCursor(Cursor.getDefaultCursor()); }
-            }.execute();
-        }));
+        // 2. INVENTARIO (Traducido)
+        grid.add(createBigButton(
+                LanguageManager.get("dashboard.btn.inventory"),
+                LanguageManager.get("dashboard.btn.inventory.sub"),
+                "/images/inventory.png", "📦", e -> {
+                    setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+                    new InventoryView(this).setVisible(true);
+                    setCursor(Cursor.getDefaultCursor());
+                    updateStockAlert();
+                }));
 
-        // 3. PEDIDOS (LÓGICA DE TALLER)
-        grid.add(createBigButton("PEDIDOS", "Ventas y Producción", "/images/orders.png", e -> {
-            // 1. Abrir selector de clientes
-            ClientCheckInDialog checkIn = new ClientCheckInDialog(this);
-            checkIn.setVisible(true);
+        // 3. TALLER (Traducido)
+        grid.add(createBigButton(
+                LanguageManager.get("dashboard.btn.workshop"),
+                LanguageManager.get("dashboard.btn.workshop.sub"),
+                "/images/workshop.png", "✂️", e -> {
+                    new OrderManagementView(this).setVisible(true);
+                }));
 
-            Client clienteSeleccionado = checkIn.getSelectedClient();
+        // 4. CLIENTES (Traducido)
+        grid.add(createBigButton(
+                LanguageManager.get("dashboard.btn.clients"),
+                LanguageManager.get("dashboard.btn.clients.sub"),
+                "/images/client.png", "👥", e -> {
+                    new ClientManagementDialog(this, false).setVisible(true);
+                }));
 
-            // 2. Si se selecciona un cliente, abrir la ventana de pedidos para él
-            if (clienteSeleccionado != null) {
-                JDialog frameVentas = new JDialog(this, "SICONI - Gestión de Pedidos (" + clienteSeleccionado.getFullName() + ")", true);
-                frameVentas.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
-                frameVentas.setSize(1200, 750);
-                frameVentas.setLocationRelativeTo(null);
-                frameVentas.setContentPane(new SalesView(clienteSeleccionado));
-                frameVentas.setVisible(true);
-            }
-        }));
+        // 5. REPORTES (Traducido)
+        grid.add(createBigButton(
+                LanguageManager.get("dashboard.btn.reports"),
+                LanguageManager.get("dashboard.btn.reports.sub"),
+                "/images/reports.png", "📊", e -> {
+                    setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+                    new ReportsView(this).setVisible(true);
+                    setCursor(Cursor.getDefaultCursor());
+                }));
 
-        // 4. REPORTES
-        grid.add(createBigButton("REPORTES", "Estadísticas", "/images/reports.png", e -> {
-            setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-            new SwingWorker<Void, Void>() {
-                @Override protected Void doInBackground() throws Exception {
-                    new ReportsView(DashboardView.this).setVisible(true);
-                    return null;
-                }
-                @Override protected void done() { setCursor(Cursor.getDefaultCursor()); }
-            }.execute();
-        }));
+        // 6. SALIR (Traducido)
+        JButton btnExit = createBigButton(
+                LanguageManager.get("dashboard.btn.exit"),
+                LanguageManager.get("dashboard.btn.exit.sub"),
+                "/images/logout.png", "🚪", null);
 
-        // 5. PROVEEDORES
-        grid.add(createBigButton("PROVEEDORES", "Gestión de Contactos", "/images/settings.png", e -> {
-            new SupplierManagementDialog(this).setVisible(true);
-        }));
-
-        // 6. SALIR
-        JButton btnExit = createBigButton("SALIR", "Cerrar Sesión", "/images/logout.png", null);
         btnExit.addMouseListener(new MouseAdapter() {
             public void mouseEntered(MouseEvent e) {
                 btnExit.putClientProperty("hoverColor", new Color(220, 20, 60));
-                btnExit.putClientProperty("hover", true);
-                btnExit.repaint();
+                btnExit.putClientProperty("hover", true); btnExit.repaint();
                 SoundManager.getInstance().playHover();
             }
             public void mouseExited(MouseEvent e) {
                 btnExit.putClientProperty("hoverColor", null);
-                btnExit.putClientProperty("hover", false);
-                btnExit.repaint();
+                btnExit.putClientProperty("hover", false); btnExit.repaint();
             }
             public void mousePressed(MouseEvent e) { SoundManager.getInstance().playClick(); }
         });
+
         btnExit.addActionListener(e -> {
-            if(JOptionPane.showConfirmDialog(this, "¿Desea cerrar el sistema?", "SICONI", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) System.exit(0);
+            if(JOptionPane.showConfirmDialog(this,
+                    LanguageManager.get("dashboard.exit.msg"),
+                    LanguageManager.get("dashboard.exit.title"),
+                    JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) System.exit(0);
         });
         grid.add(btnExit);
 
@@ -176,8 +256,9 @@ public class DashboardView extends JFrame {
         JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER));
         footer.setOpaque(false);
         footer.setBorder(new EmptyBorder(0,0,10,0));
-        JLabel lbl = new JLabel("© 2026 Desarrollado por Johanna Guédez - Ingeniería Informática UNEG");
-        lbl.setForeground(Color.BLACK);
+        // Pie de página traducido
+        JLabel lbl = new JLabel(LanguageManager.get("dashboard.footer"));
+        lbl.setForeground(Color.DARK_GRAY);
         lbl.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         footer.add(lbl);
         return footer;
@@ -191,7 +272,7 @@ public class DashboardView extends JFrame {
         return null;
     }
 
-    private JButton createBigButton(String title, String subtitle, String iconPath, java.awt.event.ActionListener action) {
+    private JButton createBigButton(String title, String subtitle, String iconPath, String fallbackIcon, java.awt.event.ActionListener action) {
         JButton btn = new JButton();
         btn.setLayout(new BorderLayout());
         btn.setPreferredSize(new Dimension(320, 200));
@@ -208,7 +289,9 @@ public class DashboardView extends JFrame {
                 ImageIcon icon = new ImageIcon(new ImageIcon(url).getImage().getScaledInstance(130, 130, Image.SCALE_SMOOTH));
                 lblIcon.setIcon(icon);
             } else {
-                lblIcon.setText("🔹"); lblIcon.setFont(new Font("Segoe UI", Font.PLAIN, 80)); lblIcon.setForeground(COLOR_FUCSIA);
+                lblIcon.setText(fallbackIcon);
+                lblIcon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 80));
+                lblIcon.setForeground(COLOR_FUCSIA);
             }
         } catch (Exception e) { }
 
@@ -233,15 +316,8 @@ public class DashboardView extends JFrame {
         if(action != null) btn.addActionListener(action);
 
         btn.addMouseListener(new MouseAdapter() {
-            public void mouseEntered(MouseEvent e) {
-                btn.putClientProperty("hover", true);
-                btn.repaint();
-                SoundManager.getInstance().playHover();
-            }
-            public void mouseExited(MouseEvent e) {
-                btn.putClientProperty("hover", false);
-                btn.repaint();
-            }
+            public void mouseEntered(MouseEvent e) { btn.putClientProperty("hover", true); btn.repaint(); SoundManager.getInstance().playHover(); }
+            public void mouseExited(MouseEvent e) { btn.putClientProperty("hover", false); btn.repaint(); }
             public void mousePressed(MouseEvent e) { SoundManager.getInstance().playClick(); }
         });
 

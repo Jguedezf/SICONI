@@ -1,10 +1,14 @@
 /*
  * -----------------------------------------------------------------------------
- * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
+ * INSTITUCIÓN: UNEG - SICONI
  * ARCHIVO: ClientManagementDialog.java
- * VERSIÓN: 3.1.1 (Unified Directory & Selection Mode)
- * DESCRIPCIÓN: Directorio unificado que ahora también funciona como selector
- * de cliente para iniciar un nuevo pedido, eliminando ventanas duplicadas.
+ * VERSIÓN: 4.0.0 (Command Center UI)
+ * FECHA: January 27, 2026 - 11:55PM
+ * DESCRIPCIÓN: Rediseño completo a "Centro de Mando".
+ * 1. Barra de búsqueda inteligente con lupa y filtro en tiempo real.
+ * 2. Panel de acciones contextual (Editar/Eliminar solo al seleccionar).
+ * 3. Lógica de visibilidad corregida para "Modo Selección" vs "Modo Gestión".
+ * 4. Botón "Volver" reubicado en el footer para mejor UX.
  * -----------------------------------------------------------------------------
  */
 
@@ -13,7 +17,8 @@ package com.swimcore.view;
 import com.swimcore.controller.ClientController;
 import com.swimcore.model.Client;
 import com.swimcore.util.ImagePanel;
-import com.swimcore.util.SoundManager;
+import com.swimcore.util.LanguageManager;
+import com.swimcore.util.LuxuryMessage;
 import com.swimcore.view.components.ClientCard;
 import com.swimcore.view.components.SoftButton;
 import com.swimcore.view.dialogs.AddEditClientDialog;
@@ -32,116 +37,71 @@ public class ClientManagementDialog extends JDialog {
     private final ClientController controller;
     private List<Client> allClients;
     private JPanel cardsPanel;
-    private Client selectedClient = null; // Cliente seleccionado actualmente
-    private final boolean isSelectionMode; // Nuevo campo para el modo Pedidos
+    private Client selectedClient = null;
+    private final boolean isSelectionMode;
 
-    // Botones de acción
-    private SoftButton btnEdit, btnDelete, btnSelectClient;
+    private JTextField txtSearch;
+    private JLabel lblTitle;
+    private SoftButton btnNew, btnEdit, btnDelete, btnConfirm;
 
     private final Color COLOR_GOLD = new Color(212, 175, 55);
     private final Color COLOR_FUCSIA = new Color(220, 0, 115);
-    private final String PLACEHOLDER_TEXT = "Buscar por nombre, atleta o código...";
+    private final String PLACEHOLDER_TEXT = LanguageManager.get("clients.search") + "...";
 
-    // Constructor con modo Selección
     public ClientManagementDialog(Frame owner, boolean isSelectionMode) {
-        super(owner, "Directorio de Clientes", true);
+        super(owner, LanguageManager.get("clients.title"), true);
         this.controller = new ClientController();
         this.isSelectionMode = isSelectionMode;
 
-        setSize(1100, 650);
+        setSize(1150, 700); // Ancho para que quepa todo
         setLocationRelativeTo(owner);
         setUndecorated(true);
         getRootPane().setBorder(BorderFactory.createLineBorder(COLOR_GOLD, 2));
 
-        JPanel backgroundPanel = new ImagePanel("/images/bg3.png");
+        JPanel backgroundPanel = new ImagePanel("/images/bg2.png");
+        backgroundPanel.setBackground(new Color(40, 40, 40));
         backgroundPanel.setLayout(new BorderLayout());
         setContentPane(backgroundPanel);
 
         add(createHeader(), BorderLayout.NORTH);
-        add(createCenterPanel(), BorderLayout.CENTER);
-        add(createSideActionPanel(), BorderLayout.EAST);
+        add(createMainContent(), BorderLayout.CENTER);
+        add(createActionPanel(), BorderLayout.EAST);
+        add(createFooter(), BorderLayout.SOUTH);
 
         loadAllClients();
         refreshClientCards(allClients);
-        updateSelectionModeVisibility();
+        updateButtonStates(); // Lógica centralizada para botones
     }
 
-    // Constructor de compatibilidad (Modo Gestión por defecto)
-    public ClientManagementDialog(Frame owner) {
-        this(owner, false);
-    }
+    public ClientManagementDialog(Frame owner) { this(owner, false); }
 
-    // Nuevo método para que el Dashboard pueda recuperar el cliente seleccionado
-    public Client getSelectedClient() {
-        return selectedClient;
-    }
+    public Client getSelectedClient() { return selectedClient; }
 
-    private void updateSelectionModeVisibility() {
-        // En modo selección, solo se ve el botón de "SELECCIONAR CLIENTE"
-        if (isSelectionMode) {
-            btnEdit.setVisible(false);
-            btnDelete.setVisible(false);
-            // El botón "NUEVO CLIENTE" se mantiene por si no lo encuentra.
-            btnSelectClient.setVisible(true);
-            btnSelectClient.setText("CONFIRMAR PEDIDO");
-
-            JLabel title = (JLabel) ((JPanel)getComponent(0)).getComponent(0);
-            title.setText("SELECCIONAR CLIENTE PARA PEDIDO");
-        } else {
-            // Modo Gestión
-            btnSelectClient.setVisible(false);
-        }
-    }
-
+    // --- CONSTRUCCIÓN DE LA INTERFAZ ---
 
     private JPanel createHeader() {
         JPanel headerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
         headerPanel.setOpaque(false);
-        headerPanel.setBorder(new EmptyBorder(15, 0, 5, 0));
-        JLabel title = new JLabel("DIRECTORIO DE CLIENTES");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 26));
-        title.setForeground(COLOR_GOLD);
-        headerPanel.add(title);
+        headerPanel.setBorder(new EmptyBorder(20, 0, 10, 0));
+
+        lblTitle = new JLabel();
+        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 28));
+        lblTitle.setForeground(COLOR_GOLD);
+
+        headerPanel.add(lblTitle);
         return headerPanel;
     }
 
-    private JPanel createCenterPanel() {
-        JPanel centerPanel = new JPanel(new BorderLayout(0, 10));
-        centerPanel.setOpaque(false);
-        centerPanel.setBorder(new EmptyBorder(10, 20, 20, 10));
+    private JPanel createMainContent() {
+        JPanel mainPanel = new JPanel(new BorderLayout(0, 20));
+        mainPanel.setOpaque(false);
+        mainPanel.setBorder(new EmptyBorder(10, 30, 20, 20));
 
-        // --- Buscador ---
-        JTextField searchField = new JTextField(PLACEHOLDER_TEXT);
-        searchField.setFont(new Font("Segoe UI", Font.PLAIN, 16));
-        searchField.setForeground(Color.GRAY);
-        searchField.setPreferredSize(new Dimension(0, 45));
-        searchField.setBorder(new CompoundBorder(
-                BorderFactory.createLineBorder(Color.GRAY),
-                new EmptyBorder(0, 15, 0, 0)
-        ));
+        // 1. Panel de Búsqueda (Nuevo y Mejorado)
+        mainPanel.add(createSearchPanel(), BorderLayout.NORTH);
 
-        searchField.addFocusListener(new FocusAdapter() {
-            public void focusGained(FocusEvent e) {
-                if (searchField.getText().equals(PLACEHOLDER_TEXT)) {
-                    searchField.setText("");
-                    searchField.setForeground(Color.BLACK);
-                }
-            }
-            public void focusLost(FocusEvent e) {
-                if (searchField.getText().isEmpty()) {
-                    searchField.setForeground(Color.GRAY);
-                    searchField.setText(PLACEHOLDER_TEXT);
-                }
-            }
-        });
-        searchField.addKeyListener(new KeyAdapter() {
-            public void keyReleased(KeyEvent e) { filterClients(searchField.getText()); }
-        });
-
-        centerPanel.add(searchField, BorderLayout.NORTH);
-
-        // --- Galería de Tarjetas ---
-        cardsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 15));
+        // 2. Panel de Tarjetas
+        cardsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 20, 20));
         cardsPanel.setOpaque(false);
 
         JScrollPane scrollPane = new JScrollPane(cardsPanel);
@@ -149,122 +109,204 @@ public class ClientManagementDialog extends JDialog {
         scrollPane.getViewport().setOpaque(false);
         scrollPane.setBorder(null);
         scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
-        centerPanel.add(scrollPane, BorderLayout.CENTER);
+        mainPanel.add(scrollPane, BorderLayout.CENTER);
 
-        return centerPanel;
+        return mainPanel;
     }
 
-    private JPanel createSideActionPanel() {
-        JPanel sidePanel = new JPanel();
-        sidePanel.setLayout(new BoxLayout(sidePanel, BoxLayout.Y_AXIS));
-        sidePanel.setOpaque(false);
-        sidePanel.setBorder(new EmptyBorder(60, 10, 20, 20));
-        sidePanel.setPreferredSize(new Dimension(220, 0));
+    private JPanel createSearchPanel() {
+        JPanel searchContainer = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        searchContainer.setOpaque(false);
 
-        // --- Botones de Gestión (Visibles en Modo Gestión) ---
-        SoftButton btnNew = createActionButton("NUEVO CLIENTE", "/images/icons/icon_add_user.png", new Color(0, 153, 76));
+        JPanel searchPanel = new JPanel(new BorderLayout(5, 0));
+        searchPanel.setOpaque(false);
+        searchPanel.setPreferredSize(new Dimension(500, 45));
+
+        txtSearch = new JTextField(PLACEHOLDER_TEXT);
+        txtSearch.setFont(new Font("Segoe UI", Font.ITALIC, 16));
+        txtSearch.setForeground(Color.GRAY);
+        txtSearch.setCaretColor(COLOR_GOLD);
+        txtSearch.setBorder(new CompoundBorder(
+                BorderFactory.createLineBorder(Color.GRAY),
+                new EmptyBorder(0, 15, 0, 15)
+        ));
+
+        txtSearch.addFocusListener(new FocusAdapter() {
+            public void focusGained(FocusEvent e) {
+                if (txtSearch.getText().equals(PLACEHOLDER_TEXT)) {
+                    txtSearch.setText("");
+                    txtSearch.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+                    txtSearch.setForeground(Color.WHITE);
+                }
+            }
+            public void focusLost(FocusEvent e) {
+                if (txtSearch.getText().isEmpty()) {
+                    txtSearch.setFont(new Font("Segoe UI", Font.ITALIC, 16));
+                    txtSearch.setForeground(Color.GRAY);
+                    txtSearch.setText(PLACEHOLDER_TEXT);
+                }
+            }
+        });
+
+        txtSearch.addKeyListener(new KeyAdapter() {
+            public void keyReleased(KeyEvent e) {
+                filterClients(txtSearch.getText());
+            }
+        });
+
+        SoftButton btnSearch = new SoftButton(null);
+        btnSearch.setText("🔍");
+        btnSearch.setPreferredSize(new Dimension(55, 45));
+        btnSearch.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 20));
+
+        searchPanel.add(txtSearch, BorderLayout.CENTER);
+        searchPanel.add(btnSearch, BorderLayout.EAST);
+
+        searchContainer.add(searchPanel);
+        return searchContainer;
+    }
+
+    private JPanel createActionPanel() {
+        JPanel actionPanel = new JPanel();
+        actionPanel.setLayout(new BoxLayout(actionPanel, BoxLayout.Y_AXIS));
+        actionPanel.setOpaque(false);
+        actionPanel.setBorder(new EmptyBorder(30, 10, 20, 30));
+        actionPanel.setPreferredSize(new Dimension(240, 0));
+
+        // 1. Nuevo Cliente
+        btnNew = createActionButton(LanguageManager.get("clients.btn.new"), "/images/icons/icon_add_user_gold.png");
         btnNew.addActionListener(e -> openAddEditDialog(null));
-        sidePanel.add(btnNew);
-        sidePanel.add(Box.createVerticalStrut(15));
+        actionPanel.add(btnNew);
+        actionPanel.add(Box.createVerticalStrut(15));
 
-        btnEdit = createActionButton("EDITAR", "/images/icons/icon_edit.png", new Color(0, 102, 204));
-        btnEdit.setEnabled(false);
+        // 2. Editar Cliente
+        btnEdit = createActionButton(LanguageManager.get("clients.btn.edit"), "/images/icons/icon_edit_gold.png");
         btnEdit.addActionListener(e -> {
             if (selectedClient != null) openAddEditDialog(selectedClient);
         });
-        sidePanel.add(btnEdit);
-        sidePanel.add(Box.createVerticalStrut(15));
+        actionPanel.add(btnEdit);
+        actionPanel.add(Box.createVerticalStrut(15));
 
-        btnDelete = createActionButton("ELIMINAR", "/images/icons/icon_delete.png", new Color(204, 0, 0));
-        btnDelete.setEnabled(false);
+        // 3. Eliminar Cliente
+        btnDelete = createActionButton(LanguageManager.get("clients.btn.delete"), "/images/icons/icon_delete_gold.png");
         btnDelete.addActionListener(e -> deleteSelectedClient());
-        sidePanel.add(btnDelete);
-        sidePanel.add(Box.createVerticalStrut(15));
+        actionPanel.add(btnDelete);
+        actionPanel.add(Box.createVerticalStrut(15));
 
-        // --- Botón de Selección de Pedido (Visible en Modo Selección) ---
-        btnSelectClient = createActionButton("SELECCIONAR", "/images/icons/icon_check.png", COLOR_FUCSIA);
-        btnSelectClient.setEnabled(false);
-        btnSelectClient.addActionListener(e -> {
-            if(selectedClient != null) {
-                // Cierra la ventana, permitiendo que el Dashboard tome el selectedClient
-                dispose();
-            }
+        // 4. Botón de Confirmar (solo para modo selección)
+        btnConfirm = createActionButton(LanguageManager.get("clients.btn.confirm"), "/images/icons/icon_check_gold.png");
+        btnConfirm.setForeground(COLOR_FUCSIA);
+        btnConfirm.addActionListener(e -> {
+            if(selectedClient != null) dispose();
         });
-        sidePanel.add(btnSelectClient);
+        actionPanel.add(btnConfirm);
 
-        sidePanel.add(Box.createVerticalGlue());
-
-        // Botón Volver
-        SoftButton btnBack = createActionButton("VOLVER AL MENÚ", "/images/icons/icon_exit.png", new Color(80, 80, 80));
-        btnBack.addActionListener(e -> {
-            SoundManager.getInstance().playClick();
-            dispose();
-        });
-        sidePanel.add(btnBack);
-
-        return sidePanel;
+        actionPanel.add(Box.createVerticalGlue()); // Empuja el resto hacia arriba
+        return actionPanel;
     }
 
-    private SoftButton createActionButton(String text, String iconPath, Color bg) {
-        ImageIcon icon = null;
-        try {
-            URL url = getClass().getResource(iconPath);
-            if (url != null) icon = new ImageIcon(new ImageIcon(url).getImage().getScaledInstance(32, 32, Image.SCALE_SMOOTH));
-        } catch (Exception e) {}
+    private JPanel createFooter() {
+        JPanel footerPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        footerPanel.setOpaque(false);
+        footerPanel.setBorder(new EmptyBorder(0, 0, 20, 30));
 
+        SoftButton btnBack = createActionButton(LanguageManager.get("clients.btn.back"), "/images/icons/icon_cancel_gold.png");
+        btnBack.addActionListener(e -> {
+            selectedClient = null;
+            dispose();
+        });
+
+        footerPanel.add(btnBack);
+        return footerPanel;
+    }
+
+    private SoftButton createActionButton(String text, String iconPath) {
+        ImageIcon icon = createIcon(iconPath, 32, 32);
         SoftButton btn = new SoftButton(icon);
-        btn.setText(text);
-        btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        btn.setPreferredSize(new Dimension(190, 60));
-        btn.setMaximumSize(new Dimension(190, 60));
+        btn.setText(text.toUpperCase());
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        btn.setPreferredSize(new Dimension(200, 65));
+        btn.setMaximumSize(new Dimension(200, 65));
         btn.setAlignmentX(Component.CENTER_ALIGNMENT);
         return btn;
     }
 
+    private ImageIcon createIcon(String path, int w, int h) {
+        try {
+            URL url = getClass().getResource(path);
+            if(url == null) url = getClass().getResource(path.replace("_gold", ""));
+            if (url != null) return new ImageIcon(new ImageIcon(url).getImage().getScaledInstance(w, h, Image.SCALE_SMOOTH));
+        } catch (Exception e) {}
+        return null;
+    }
+
+    // --- LÓGICA DE LA APLICACIÓN ---
+
+    private void updateButtonStates() {
+        boolean clientIsSelected = (selectedClient != null);
+
+        if (isSelectionMode) {
+            lblTitle.setText(LanguageManager.get("clients.title.select"));
+            btnEdit.setVisible(false);
+            btnDelete.setVisible(false);
+            btnConfirm.setVisible(true);
+            btnConfirm.setEnabled(clientIsSelected);
+        } else {
+            lblTitle.setText(LanguageManager.get("clients.title"));
+            btnEdit.setVisible(true);
+            btnDelete.setVisible(true);
+            btnConfirm.setVisible(false);
+            btnEdit.setEnabled(clientIsSelected);
+            btnDelete.setEnabled(clientIsSelected);
+        }
+    }
+
     private void onCardSelected(Client client) {
         this.selectedClient = client;
-        btnEdit.setEnabled(true);
-        btnDelete.setEnabled(true);
-        if(isSelectionMode) {
-            btnSelectClient.setEnabled(true);
-        }
-        refreshClientCards(allClients);
+        updateButtonStates();
+        refreshClientCards(allClients); // Refresca para mostrar el borde seleccionado
     }
 
     private void openAddEditDialog(Client clientToEdit) {
-        SoundManager.getInstance().playClick();
-        AddEditClientDialog dialog = new AddEditClientDialog((Frame) this.getOwner(), clientToEdit);
+        new AddEditClientDialog((Frame) this.getOwner(), clientToEdit);
 
+        // Refrescar todo al volver
         loadAllClients();
-        refreshClientCards(allClients);
+        String currentSearch = txtSearch.getText();
+        if(!currentSearch.equals(PLACEHOLDER_TEXT) && !currentSearch.isEmpty()){
+            filterClients(currentSearch);
+        } else {
+            refreshClientCards(allClients);
+        }
+
         selectedClient = null;
-        btnEdit.setEnabled(false);
-        btnDelete.setEnabled(false);
-        if(isSelectionMode) btnSelectClient.setEnabled(false);
+        updateButtonStates();
     }
 
     private void deleteSelectedClient() {
         if (selectedClient == null) return;
-        int opt = JOptionPane.showConfirmDialog(this,
-                "¿Eliminar a " + selectedClient.getFullName() + " del sistema?",
-                "Confirmar", JOptionPane.YES_NO_OPTION);
+
+        String msg = String.format(LanguageManager.get("clients.msg.delete.confirm"), selectedClient.getFullName());
+        int opt = JOptionPane.showConfirmDialog(this, msg, LanguageManager.get("clients.msg.delete.title"), JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
 
         if (opt == JOptionPane.YES_OPTION) {
             if (controller.deleteClient(selectedClient.getCode())) {
-                SoundManager.getInstance().playClick();
+                LuxuryMessage.show("Éxito", LanguageManager.get("clients.msg.delete.success"), false);
                 selectedClient = null;
-                btnEdit.setEnabled(false);
-                btnDelete.setEnabled(false);
                 loadAllClients();
-                refreshClientCards(allClients);
+                filterClients(txtSearch.getText()); // Re-filtrar
+                updateButtonStates();
             } else {
-                SoundManager.getInstance().playError();
+                LuxuryMessage.show("Error", LanguageManager.get("clients.msg.delete.error"), true);
             }
         }
     }
 
-    private void loadAllClients() { this.allClients = controller.getAllClients(); }
+    private void loadAllClients() {
+        this.allClients = controller.getAllClients();
+    }
 
     private void filterClients(String query) {
         String lowerCaseQuery = query.toLowerCase().trim();
@@ -275,7 +317,8 @@ public class ClientManagementDialog extends JDialog {
                     .filter(client ->
                             client.getFullName().toLowerCase().contains(lowerCaseQuery) ||
                                     client.getAthleteName().toLowerCase().contains(lowerCaseQuery) ||
-                                    (client.getCode() != null && client.getCode().toLowerCase().contains(lowerCaseQuery))
+                                    (client.getCode() != null && client.getCode().toLowerCase().contains(lowerCaseQuery)) ||
+                                    (client.getIdNumber() != null && client.getIdNumber().contains(lowerCaseQuery))
                     )
                     .collect(Collectors.toList());
             refreshClientCards(filteredList);
@@ -284,27 +327,30 @@ public class ClientManagementDialog extends JDialog {
 
     private void refreshClientCards(List<Client> clients) {
         cardsPanel.removeAll();
-        for (Client client : clients) {
-            ClientCard card = new ClientCard(client);
-            // Selección visual
-            if (selectedClient != null && client.getId() == selectedClient.getId()) {
-                card.setBorder(BorderFactory.createLineBorder(COLOR_GOLD, 3));
-            }
-            // Evento doble clic para editar/seleccionar
-            card.addMouseListener(new MouseAdapter() {
-                public void mouseClicked(MouseEvent e) {
-                    onCardSelected(client);
-                    if (e.getClickCount() == 2) {
-                        if (isSelectionMode) {
-                            selectedClient = client;
-                            dispose(); // Cierra y devuelve el cliente
-                        } else {
-                            openAddEditDialog(client);
+        if (clients.isEmpty()) {
+            JLabel emptyLabel = new JLabel(LanguageManager.get("clients.msg.empty"));
+            emptyLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
+            emptyLabel.setForeground(Color.GRAY);
+            cardsPanel.add(emptyLabel);
+        } else {
+            for (Client client : clients) {
+                boolean isSelected = (selectedClient != null && client.getId() == selectedClient.getId());
+                ClientCard card = new ClientCard(client, isSelected);
+
+                card.addMouseListener(new MouseAdapter() {
+                    public void mouseClicked(MouseEvent e) {
+                        onCardSelected(client);
+                        if (e.getClickCount() == 2) {
+                            if (isSelectionMode) {
+                                dispose(); // Selecciona y cierra
+                            } else {
+                                openAddEditDialog(client); // Abre para editar
+                            }
                         }
                     }
-                }
-            });
-            cardsPanel.add(card);
+                });
+                cardsPanel.add(card);
+            }
         }
         cardsPanel.revalidate();
         cardsPanel.repaint();

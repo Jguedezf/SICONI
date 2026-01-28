@@ -1,15 +1,10 @@
 /*
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
- * PROYECTO: SICONI - Gestión de Inventario
  * ARCHIVO: AddEditProductDialog.java
- * DESCRIPCIÓN: Formulario de Producto V3.0 (Real Categories & Luxury UI)
- * AUTORA: Johanna Guedez
- *
- * CAMBIOS V3.0:
- * - Generación de Códigos Inteligentes basada en categorías REALES.
- * - Mapeo de prefijos: DAM (Dama), CAB (Caballero), INS (Insumos), etc.
- * - Interfaz gráfica oscura con acentos Dorados (Uniformidad).
+ * VERSIÓN: 3.2.0 (Multilanguage Integration)
+ * DESCRIPCIÓN: Formulario de producto adaptado para cargar etiquetas
+ * dinámicamente según el idioma seleccionado.
  * -----------------------------------------------------------------------------
  */
 
@@ -18,7 +13,7 @@ package com.swimcore.view.dialogs;
 import com.swimcore.dao.ProductDAO;
 import com.swimcore.model.Category;
 import com.swimcore.model.Product;
-import com.swimcore.util.SoundManager;
+import com.swimcore.util.LanguageManager; // <-- Importado
 import com.swimcore.view.InventoryView;
 import com.swimcore.view.components.SoftButton;
 
@@ -26,7 +21,6 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 import java.awt.*;
-import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -34,29 +28,25 @@ public class AddEditProductDialog extends JDialog {
 
     private final ProductDAO productDAO = new ProductDAO();
     private Product productToEdit = null;
-
-    // PATRÓN: Diccionario de mapeo para prefijos REALES
     private final Map<String, String> categoryPrefixes = new HashMap<>();
 
-    // Componentes
     private JTextField txtCode, txtName, txtCostPrice, txtSalePrice, txtStock, txtMinStock;
     private JTextArea txtDesc;
     private JComboBox<Category> cmbCategory;
 
-    // --- PALETA LUXURY ---
     private final Color COLOR_BG_MAIN = new Color(20, 20, 20);
     private final Color COLOR_INPUT_BG = new Color(40, 40, 40);
-    private final Color COLOR_TEXTO = new Color(229, 228, 226); // Platino
-    private final Color COLOR_GOLD = new Color(212, 175, 55);   // Dorado
+    private final Color COLOR_TEXTO = new Color(229, 228, 226);
+    private final Color COLOR_GOLD = new Color(212, 175, 55);
 
     private final Font FONT_INPUT = new Font("Segoe UI", Font.PLAIN, 14);
     private final Font FONT_LABEL = new Font("Segoe UI", Font.BOLD, 12);
 
     public AddEditProductDialog(InventoryView parent, Product product) {
-        super(parent, product == null ? "Nuevo Producto" : "Editar Producto", true);
+        super(parent, product == null ? LanguageManager.get("product.title.new") : String.format(LanguageManager.get("product.title.edit"), product.getCode()), true);
         this.productToEdit = product;
 
-        setupRealPrefixes(); // Carga lógica de negocio real
+        setupRealPrefixes();
 
         setSize(900, 600);
         setLocationRelativeTo(parent);
@@ -76,11 +66,7 @@ public class AddEditProductDialog extends JDialog {
         }
     }
 
-    /**
-     * Define los prefijos basados en las categorías reales de Dayana Guedez.
-     */
     private void setupRealPrefixes() {
-        // Mapeo Inteligente (Busca coincidencias parciales)
         categoryPrefixes.put("Dama", "DAM");
         categoryPrefixes.put("Caballero", "CAB");
         categoryPrefixes.put("Accesorios", "ACC");
@@ -90,7 +76,7 @@ public class AddEditProductDialog extends JDialog {
     }
 
     private void initHeader() {
-        String titulo = (productToEdit == null) ? "REGISTRAR PRENDA / MATERIAL" : "EDITAR: " + productToEdit.getCode();
+        String titulo = (productToEdit == null) ? LanguageManager.get("product.title.new") : String.format(LanguageManager.get("product.title.edit"), productToEdit.getCode());
         JLabel lblTitle = new JLabel(titulo, SwingConstants.CENTER);
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 24));
         lblTitle.setForeground(COLOR_GOLD);
@@ -107,16 +93,16 @@ public class AddEditProductDialog extends JDialog {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 0.5;
 
-        // Fila 1: Categoría y Código
-        gbc.gridy = 0; gbc.gridx = 0; formPanel.add(crearLabel("CATEGORÍA"), gbc);
-        gbc.gridx = 1; formPanel.add(crearLabel("CÓDIGO (Auto)"), gbc);
+        // Fila 1
+        gbc.gridy = 0; gbc.gridx = 0; formPanel.add(crearLabel(LanguageManager.get("product.category")), gbc);
+        gbc.gridx = 1; formPanel.add(crearLabel(LanguageManager.get("product.code")), gbc);
 
         gbc.gridy = 1; gbc.gridx = 0;
         cmbCategory = new JComboBox<>();
         cmbCategory.setFont(FONT_INPUT);
         cmbCategory.setBackground(COLOR_INPUT_BG);
         cmbCategory.setForeground(COLOR_TEXTO);
-        cargarCategorias(); // Carga desde BD
+        cargarCategorias();
         cmbCategory.addActionListener(e -> generarCodigo());
         formPanel.add(cmbCategory, gbc);
 
@@ -126,9 +112,9 @@ public class AddEditProductDialog extends JDialog {
         txtCode.setFont(new Font("Consolas", Font.BOLD, 14));
         formPanel.add(txtCode, gbc);
 
-        // Fila 2: Nombre y Descripción
-        gbc.gridy = 2; gbc.gridx = 0; formPanel.add(crearLabel("NOMBRE / MODELO"), gbc);
-        gbc.gridx = 1; formPanel.add(crearLabel("DESCRIPCIÓN"), gbc);
+        // Fila 2
+        gbc.gridy = 2; gbc.gridx = 0; formPanel.add(crearLabel(LanguageManager.get("product.name")), gbc);
+        gbc.gridx = 1; formPanel.add(crearLabel(LanguageManager.get("product.desc")), gbc);
 
         gbc.gridy = 3; gbc.gridx = 0; formPanel.add(txtName = crearInput(true), gbc);
 
@@ -143,16 +129,16 @@ public class AddEditProductDialog extends JDialog {
         scrollDesc.setPreferredSize(new Dimension(250, 35));
         formPanel.add(scrollDesc, gbc);
 
-        // Fila 3: Precios
-        gbc.gridy = 4; gbc.gridx = 0; formPanel.add(crearLabel("COSTO ($)"), gbc);
-        gbc.gridx = 1; formPanel.add(crearLabel("PRECIO VENTA ($)"), gbc);
+        // Fila 3
+        gbc.gridy = 4; gbc.gridx = 0; formPanel.add(crearLabel(LanguageManager.get("product.cost")), gbc);
+        gbc.gridx = 1; formPanel.add(crearLabel(LanguageManager.get("product.price")), gbc);
 
         gbc.gridy = 5; gbc.gridx = 0; formPanel.add(txtCostPrice = crearInput(true), gbc);
         gbc.gridx = 1; formPanel.add(txtSalePrice = crearInput(true), gbc);
 
-        // Fila 4: Stock
-        gbc.gridy = 6; gbc.gridx = 0; formPanel.add(crearLabel("STOCK INICIAL"), gbc);
-        gbc.gridx = 1; formPanel.add(crearLabel("STOCK MÍNIMO"), gbc);
+        // Fila 4
+        gbc.gridy = 6; gbc.gridx = 0; formPanel.add(crearLabel(LanguageManager.get("product.stock")), gbc);
+        gbc.gridx = 1; formPanel.add(crearLabel(LanguageManager.get("product.minStock")), gbc);
 
         gbc.gridy = 7; gbc.gridx = 0; formPanel.add(txtStock = crearInput(true), gbc);
         gbc.gridx = 1; formPanel.add(txtMinStock = crearInput(true), gbc);
@@ -165,13 +151,13 @@ public class AddEditProductDialog extends JDialog {
         btnPanel.setOpaque(false);
 
         SoftButton btnCancel = new SoftButton(null);
-        btnCancel.setText("CANCELAR");
+        btnCancel.setText(LanguageManager.get("product.btn.cancel"));
         btnCancel.setPreferredSize(new Dimension(120, 45));
         btnCancel.setForeground(Color.GRAY);
         btnCancel.addActionListener(e -> dispose());
 
         SoftButton btnSave = new SoftButton(null);
-        btnSave.setText("GUARDAR");
+        btnSave.setText(LanguageManager.get("product.btn.save"));
         btnSave.setPreferredSize(new Dimension(150, 45));
         btnSave.setForeground(COLOR_GOLD);
         btnSave.addActionListener(e -> guardar());
@@ -204,8 +190,7 @@ public class AddEditProductDialog extends JDialog {
         if (productToEdit != null) return;
         Category sel = (Category) cmbCategory.getSelectedItem();
         if (sel != null) {
-            // Algoritmo: Busca si el nombre contiene "Dama", "Caballero", etc.
-            String prefix = "GEN"; // Default
+            String prefix = "GEN";
             for (Map.Entry<String, String> entry : categoryPrefixes.entrySet()) {
                 if (sel.getName().contains(entry.getKey())) {
                     prefix = entry.getValue();
@@ -219,7 +204,7 @@ public class AddEditProductDialog extends JDialog {
     private void guardar() {
         try {
             if (txtName.getText().trim().isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Nombre obligatorio.");
+                JOptionPane.showMessageDialog(this, LanguageManager.get("product.msg.error.name"));
                 return;
             }
             Product p = (productToEdit == null) ? new Product() : productToEdit;
@@ -233,11 +218,11 @@ public class AddEditProductDialog extends JDialog {
             p.setCategoryId(((Category)cmbCategory.getSelectedItem()).getId());
 
             if (productDAO.save(p)) {
-                JOptionPane.showMessageDialog(this, "Guardado Exitosamente");
+                JOptionPane.showMessageDialog(this, LanguageManager.get("product.msg.success"));
                 dispose();
             }
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Error en datos numéricos.");
+            JOptionPane.showMessageDialog(this, LanguageManager.get("product.msg.error.num"));
         }
     }
 

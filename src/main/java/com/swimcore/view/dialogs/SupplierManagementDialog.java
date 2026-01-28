@@ -1,21 +1,10 @@
 /*
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
- * CARRERA: Ingeniería en Informática
- * ASIGNATURA: Programación III / Proyecto de Software
- *
- * PROYECTO: GESTIÓN DE INVENTARIO DE UNA TIENDA (SICONI)
  * ARCHIVO: SupplierManagementDialog.java
- *
- * AUTORA: Johanna Guedez - V14089807
- * PROFESORA: Ing. Dubraska Roca
- * FECHA: Enero 2026
- * VERSIÓN: 2.1.0 (Black & Gold Edition)
- *
- * DESCRIPCIÓN TÉCNICA:
- * Diálogo modal para la gestión del directorio de proveedores.
- * - MEJORA: Rediseño visual completo "Luxury" (Undecorated, Borde Dorado, Fondo Oscuro).
- * - LÓGICA: Gestión CRUD optimizada con feedback visual y sonoro.
+ * VERSIÓN: 2.2.0 (Multilanguage Integration)
+ * DESCRIPCIÓN: Diálogo modal para la gestión de proveedores.
+ * Todos los textos fijos han sido reemplazados por LanguageManager.
  * -----------------------------------------------------------------------------
  */
 
@@ -23,6 +12,7 @@ package com.swimcore.view.dialogs;
 
 import com.swimcore.dao.SupplierDAO;
 import com.swimcore.model.Supplier;
+import com.swimcore.util.LanguageManager; // <-- Importado
 import com.swimcore.util.SoundManager;
 import com.swimcore.view.components.SoftButton;
 
@@ -44,22 +34,20 @@ public class SupplierManagementDialog extends JDialog {
     private JTextField txtCompany, txtContact, txtPhone, txtEmail, txtAddress, txtInstagram, txtWhatsapp;
     private int selectedId = 0;
 
-    // --- PALETA LUXURY ---
     private static final Font FONT_INPUT = new Font("Segoe UI", Font.PLAIN, 14);
     private static final Font FONT_LABEL = new Font("Segoe UI", Font.BOLD, 12);
-    private static final Color COLOR_BG_APP = new Color(20, 20, 20); // Negro profundo
-    private static final Color COLOR_BG_CARD = new Color(35, 35, 35); // Gris oscuro panel
-    private static final Color COLOR_GOLD = new Color(212, 175, 55); // Dorado SICONI
-    private static final Color COLOR_TEXT = new Color(230, 230, 230); // Platino
+    private static final Color COLOR_BG_APP = new Color(20, 20, 20);
+    private static final Color COLOR_BG_CARD = new Color(35, 35, 35);
+    private static final Color COLOR_GOLD = new Color(212, 175, 55);
+    private static final Color COLOR_TEXT = new Color(230, 230, 230);
 
     public SupplierManagementDialog(Window parent) {
-        super(parent, "Proveedores SICONI", ModalityType.APPLICATION_MODAL);
+        super(parent, LanguageManager.get("supplier.title"), ModalityType.APPLICATION_MODAL);
         setSize(1150, 700);
         setLocationRelativeTo(parent);
-        setUndecorated(true); // Estilo Luxury sin bordes Windows
-        getRootPane().setBorder(new LineBorder(COLOR_GOLD, 2)); // Borde dorado
+        setUndecorated(true);
+        getRootPane().setBorder(new LineBorder(COLOR_GOLD, 2));
 
-        // Fondo oscuro sólido para consistencia
         getContentPane().setBackground(COLOR_BG_APP);
         setLayout(new BorderLayout());
 
@@ -70,14 +58,12 @@ public class SupplierManagementDialog extends JDialog {
     }
 
     private void initUI() {
-        // Encabezado
-        JLabel title = new JLabel("DIRECTORIO DE PROVEEDORES", SwingConstants.CENTER);
+        JLabel title = new JLabel(LanguageManager.get("supplier.title"), SwingConstants.CENTER);
         title.setFont(new Font("Segoe UI", Font.BOLD, 24));
         title.setForeground(COLOR_GOLD);
         title.setBorder(new EmptyBorder(25, 0, 15, 0));
         add(title, BorderLayout.NORTH);
 
-        // Panel Central
         JPanel panel = new JPanel(new BorderLayout(25, 0));
         panel.setOpaque(false);
         panel.setBorder(new EmptyBorder(5, 30, 5, 30));
@@ -86,12 +72,11 @@ public class SupplierManagementDialog extends JDialog {
         panel.add(buildFormPanel(), BorderLayout.EAST);
         add(panel, BorderLayout.CENTER);
 
-        // Barra Inferior
         add(buildBottomToolbar(), BorderLayout.SOUTH);
     }
 
     private JComponent buildTablePanel() {
-        model = new DefaultTableModel(new String[]{"ID", "EMPRESA", "INSTAGRAM"}, 0) {
+        model = new DefaultTableModel(new String[]{"ID", LanguageManager.get("supplier.company"), LanguageManager.get("supplier.instagram")}, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
         table = new JTable(model);
@@ -118,13 +103,13 @@ public class SupplierManagementDialog extends JDialog {
         gbc.gridx = 0; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 1;
         gbc.insets = new Insets(5, 0, 5, 0); gbc.gridy = 0;
 
-        txtCompany   = buildField(form, "EMPRESA / RAZÓN SOCIAL", gbc);
-        txtContact   = buildField(form, "PERSONA DE CONTACTO", gbc);
-        txtPhone     = buildField(form, "TELÉFONO DE OFICINA", gbc);
-        txtEmail     = buildField(form, "CORREO ELECTRÓNICO", gbc);
-        txtWhatsapp  = buildSocialField(form, "WHATSAPP", "https://wa.me/", gbc, new Color(37, 211, 102));
-        txtInstagram = buildSocialField(form, "INSTAGRAM (@)", "https://instagram.com/", gbc, new Color(220, 0, 115));
-        txtAddress   = buildField(form, "DIRECCIÓN FÍSICA", gbc);
+        txtCompany   = buildField(form, LanguageManager.get("supplier.company"), gbc);
+        txtContact   = buildField(form, LanguageManager.get("supplier.contact"), gbc);
+        txtPhone     = buildField(form, LanguageManager.get("supplier.phone"), gbc);
+        txtEmail     = buildField(form, LanguageManager.get("supplier.email"), gbc);
+        txtWhatsapp  = buildSocialField(form, LanguageManager.get("supplier.whatsapp"), "https://wa.me/", gbc, new Color(37, 211, 102));
+        txtInstagram = buildSocialField(form, LanguageManager.get("supplier.instagram"), "https://instagram.com/", gbc, new Color(220, 0, 115));
+        txtAddress   = buildField(form, LanguageManager.get("supplier.address"), gbc);
 
         JScrollPane scroll = new JScrollPane(form);
         scroll.setBorder(null); scroll.setOpaque(false);
@@ -137,10 +122,10 @@ public class SupplierManagementDialog extends JDialog {
         JPanel bar = new JPanel(new FlowLayout(FlowLayout.CENTER, 25, 20));
         bar.setOpaque(false);
 
-        SoftButton btnNew = createSoftButton("NUEVO", "/images/icons/icon_add.png", e -> resetForm());
-        SoftButton btnDelete = createSoftButton("ELIMINAR", "/images/icons/icon_delete.png", e -> performDelete());
-        SoftButton btnSave = createSoftButton("GUARDAR", "/images/icons/icon_save.png", e -> performSave()); // Asegurar icono save
-        SoftButton btnExit = createSoftButton("CERRAR", "/images/icons/icon_exit.png", e -> dispose());
+        SoftButton btnNew = createSoftButton(LanguageManager.get("supplier.btn.new"), "/images/icons/icon_add.png", e -> resetForm());
+        SoftButton btnDelete = createSoftButton(LanguageManager.get("supplier.btn.delete"), "/images/icons/icon_delete.png", e -> performDelete());
+        SoftButton btnSave = createSoftButton(LanguageManager.get("supplier.btn.save"), "/images/icons/icon_save.png", e -> performSave());
+        SoftButton btnExit = createSoftButton(LanguageManager.get("supplier.btn.close"), "/images/icons/icon_exit.png", e -> dispose());
 
         bar.add(btnNew);
         bar.add(btnDelete);
@@ -162,7 +147,7 @@ public class SupplierManagementDialog extends JDialog {
 
         SoftButton btn = new SoftButton(icon);
         btn.setToolTipText(tooltip);
-        btn.setPreferredSize(new Dimension(80, 60)); // Botones más cómodos
+        btn.setPreferredSize(new Dimension(80, 60));
         btn.addActionListener(e -> {
             SoundManager.getInstance().playClick();
             al.actionPerformed(e);
@@ -251,7 +236,7 @@ public class SupplierManagementDialog extends JDialog {
     }
 
     private void performDelete() {
-        if(selectedId != 0 && JOptionPane.showConfirmDialog(this, "¿Eliminar Proveedor?") == JOptionPane.YES_OPTION) {
+        if(selectedId != 0 && JOptionPane.showConfirmDialog(this, LanguageManager.get("supplier.msg.delete")) == JOptionPane.YES_OPTION) {
             if(supplierDAO.delete(selectedId)) { loadSuppliersData(); resetForm(); }
         }
     }

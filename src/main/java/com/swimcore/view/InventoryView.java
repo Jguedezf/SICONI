@@ -2,8 +2,9 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: UNEG - SICONI
  * ARCHIVO: InventoryView.java
- * VERSIÓN: 10.2.0 (Audit Popup Restored)
- * DESCRIPCIÓN: Inventario v10.1 con la ventana emergente de existencia estilo "3D" recuperada.
+ * VERSIÓN: 11.1.0 (Audit Dialog Translation)
+ * DESCRIPCIÓN: Inventario v11.1. Se completa la traducción de la ventana
+ * emergente de ajuste de stock (AuditStockDialog).
  * -----------------------------------------------------------------------------
  */
 
@@ -24,7 +25,6 @@ import com.swimcore.view.dialogs.SupplierManagementDialog;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
-import javax.swing.plaf.basic.BasicScrollBarUI;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
@@ -41,17 +41,14 @@ public class InventoryView extends JDialog {
     private DefaultTableModel tableModel;
     private final ProductDAO productDAO = new ProductDAO();
 
-    // --- PALETA DE COLORES ---
     private final Color COLOR_BG_MAIN = new Color(20, 20, 20);
     private final Color COLOR_TABLE_BG = new Color(30, 30, 30);
     private final Color COLOR_HEADER_BG = new Color(10, 10, 10);
     private final Color COLOR_GOLD = new Color(212, 175, 55);
     private final Color COLOR_TEXTO = new Color(229, 228, 226);
 
-    // Colores para botones y estados
     private final Color COLOR_VERDE_NEON = new Color(0, 255, 128);
     private final Color COLOR_FUCSIA_NEON = new Color(255, 0, 127);
-    private final Color COLOR_GRIS_BTN = new Color(100, 100, 100);
 
     private SoftButton btnTasa;
     private JComboBox<String> cmbMoneda;
@@ -76,18 +73,18 @@ public class InventoryView extends JDialog {
 
     private void initSidePanel() {
         InventorySidePanel sidePanel = new InventorySidePanel();
-        sidePanel.addButton("/images/icons/icon_add.png", "Agregar Nuevo Producto", e -> {
+        sidePanel.addButton("/images/icons/icon_add.png", LanguageManager.get("inventory.btn.add"), e -> {
             new AddEditProductDialog(this, null).setVisible(true);
             loadProducts("");
         });
-        sidePanel.addButton("/images/icons/icon_edit.png", "Editar Producto Seleccionado", e -> editSelected());
-        sidePanel.addButton("/images/icons/icon_delete.png", "Eliminar Producto Seleccionado", e -> deleteSelected());
+        sidePanel.addButton("/images/icons/icon_edit.png", LanguageManager.get("inventory.btn.edit"), e -> editSelected());
+        sidePanel.addButton("/images/icons/icon_delete.png", LanguageManager.get("inventory.btn.delete"), e -> deleteSelected());
         sidePanel.add(Box.createVerticalStrut(30));
-        sidePanel.addButton("/images/icons/icon_stock.png", "Ajustar Existencias", e -> abrirGestionExistencias());
-        sidePanel.addButton("/images/icons/icon_audit.png", "Auditoría e Historial", e -> new InventoryHistoryDialog(this).setVisible(true));
-        sidePanel.addButton("/images/icons/icon_users.png", "Gestión de Proveedores", e -> new SupplierManagementDialog(this).setVisible(true));
+        sidePanel.addButton("/images/icons/icon_stock.png", LanguageManager.get("inventory.btn.stock"), e -> abrirGestionExistencias());
+        sidePanel.addButton("/images/icons/icon_audit.png", LanguageManager.get("inventory.btn.audit"), e -> new InventoryHistoryDialog(this).setVisible(true));
+        sidePanel.addButton("/images/icons/icon_users.png", LanguageManager.get("inventory.btn.suppliers"), e -> new SupplierManagementDialog(this).setVisible(true));
         sidePanel.add(Box.createVerticalGlue());
-        sidePanel.addButton("/images/icons/icon_exit.png", "Cerrar Módulo", e -> dispose());
+        sidePanel.addButton("/images/icons/icon_exit.png", LanguageManager.get("inventory.btn.close"), e -> dispose());
         add(sidePanel, BorderLayout.WEST);
     }
 
@@ -96,14 +93,18 @@ public class InventoryView extends JDialog {
         headerPanel.setOpaque(false);
         headerPanel.setBorder(new EmptyBorder(20, 40, 10, 40));
 
-        JLabel lblTitle = new JLabel("INVENTARIO GENERAL");
+        JLabel lblTitle = new JLabel(LanguageManager.get("inventory.title"));
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 28));
         lblTitle.setForeground(COLOR_GOLD);
 
         JPanel ratePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
         ratePanel.setOpaque(false);
 
-        String[] monedas = {"VER EN DÓLARES ($)", "VER EN EUROS (€)", "VER EN BOLÍVARES (Bs.)"};
+        String[] monedas = {
+                LanguageManager.get("inventory.currency.usd"),
+                LanguageManager.get("inventory.currency.eur"),
+                LanguageManager.get("inventory.currency.bs")
+        };
         cmbMoneda = new JComboBox<>(monedas);
         cmbMoneda.setFont(new Font("Segoe UI", Font.BOLD, 12));
         cmbMoneda.setBackground(new Color(50,50,50));
@@ -115,7 +116,7 @@ public class InventoryView extends JDialog {
         });
 
         btnTasa = new SoftButton(null);
-        btnTasa.setText(String.format(Locale.US, "TASA BCV: %.2f", CurrencyManager.getTasa()));
+        btnTasa.setText(String.format(Locale.US, LanguageManager.get("inventory.rate_btn"), CurrencyManager.getTasa()));
         btnTasa.setPreferredSize(new Dimension(180, 35));
         btnTasa.setForeground(COLOR_GOLD);
         btnTasa.addActionListener(e -> {
@@ -136,6 +137,7 @@ public class InventoryView extends JDialog {
         centerContainer.setBorder(new EmptyBorder(10, 40, 40, 40));
 
         JTextField txtSearch = new JTextField(30);
+        txtSearch.setToolTipText(LanguageManager.get("inventory.search_placeholder"));
         txtSearch.setPreferredSize(new Dimension(400, 42));
         txtSearch.setFont(new Font("Segoe UI", Font.PLAIN, 16));
         txtSearch.setBackground(COLOR_TABLE_BG);
@@ -151,7 +153,17 @@ public class InventoryView extends JDialog {
         searchPanel.add(txtSearch);
         centerContainer.add(searchPanel, BorderLayout.NORTH);
 
-        tableModel = new DefaultTableModel(new String[]{"ID", "CÓDIGO", "PRODUCTO", "CATEGORÍA", "STOCK / CONTROL", "PRECIO BASE | CAMBIO (Bs.)", "PROVEEDOR"}, 0) {
+        String[] cols = {
+                LanguageManager.get("inventory.table.id"),
+                LanguageManager.get("inventory.table.code"),
+                LanguageManager.get("inventory.table.product"),
+                LanguageManager.get("inventory.table.category"),
+                LanguageManager.get("inventory.table.stock"),
+                LanguageManager.get("inventory.table.price"),
+                LanguageManager.get("inventory.table.supplier")
+        };
+
+        tableModel = new DefaultTableModel(cols, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
             @Override public Class<?> getColumnClass(int c) { return (c == 0 || c == 4) ? Integer.class : String.class; }
         };
@@ -159,7 +171,6 @@ public class InventoryView extends JDialog {
         productTable = new JTable(tableModel);
         styleTable();
 
-        // Lógica de botones +/- en tabla
         productTable.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
@@ -206,7 +217,7 @@ public class InventoryView extends JDialog {
 
     private void loadProducts(String search) {
         tableModel.setRowCount(0);
-        if(btnTasa != null) btnTasa.setText(String.format(Locale.US, "TASA BCV: %.2f", CurrencyManager.getTasa()));
+        if(btnTasa != null) btnTasa.setText(String.format(Locale.US, LanguageManager.get("inventory.rate_btn"), CurrencyManager.getTasa()));
         String sql = "SELECT p.id, p.code, p.name, c.name AS category_name, p.current_stock, p.sale_price, s.company FROM products p " +
                 "LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN suppliers s ON p.supplier_id = s.id ";
         if (search != null && !search.trim().isEmpty()) {
@@ -225,7 +236,7 @@ public class InventoryView extends JDialog {
 
     private void abrirGestionExistencias() {
         int r = productTable.getSelectedRow();
-        if (r == -1) { JOptionPane.showMessageDialog(this, "Seleccione un producto.", "Aviso", JOptionPane.WARNING_MESSAGE); return; }
+        if (r == -1) { JOptionPane.showMessageDialog(this, LanguageManager.get("inventory.msg.select"), "Aviso", JOptionPane.WARNING_MESSAGE); return; }
         int id = (int) productTable.getValueAt(r, 0);
         String nombre = (String) productTable.getValueAt(r, 2);
         int stock = (int) productTable.getValueAt(r, 4);
@@ -240,11 +251,13 @@ public class InventoryView extends JDialog {
 
     private void deleteSelected() {
         int r = productTable.getSelectedRow();
-        if (r != -1 && JOptionPane.showConfirmDialog(this, "¿Eliminar?") == JOptionPane.YES_OPTION) { productDAO.delete((int) productTable.getValueAt(r, 0)); loadProducts(""); }
+        if (r != -1 && JOptionPane.showConfirmDialog(this, LanguageManager.get("inventory.msg.confirm_delete")) == JOptionPane.YES_OPTION) {
+            productDAO.delete((int) productTable.getValueAt(r, 0));
+            loadProducts("");
+        }
     }
 
-    // --- RENDERIZADORES Y CLASES INTERNAS VISUALES ---
-
+    // --- RENDERIZADORES ---
     class PersistentStockRenderer extends JPanel implements javax.swing.table.TableCellRenderer {
         private final JLabel btnM = new JLabel("−", SwingConstants.CENTER);
         private final JLabel btnP = new JLabel("+", SwingConstants.CENTER);
@@ -273,8 +286,7 @@ public class InventoryView extends JDialog {
         @Override public int getIconHeight() { return 20; }
     }
 
-    // --- LA VENTANA DE AUDITORÍA (RECUPERADA Y MEJORADA DEL CÓDIGO VIEJO) ---
-    // ESTA CLASE ES LA QUE CONTIENE EL DISEÑO "3D" ORIGINAL QUE PEDISTE
+    // --- DIÁLOGO DE AUDITORÍA (Traducido) ---
     class AuditStockDialog extends JDialog {
         private boolean esEntrada = true;
         private final JLabel lblResultado;
@@ -283,11 +295,11 @@ public class InventoryView extends JDialog {
         private final Control3DBtn btnIn, btnOut;
 
         public AuditStockDialog(JDialog parent, int id, String nombre, int stockActual) {
-            super(parent, "SICONI - AUDITORÍA 3D", true);
+            super(parent, LanguageManager.get("audit.dialog.title"), true);
             setSize(440, 580);
             setLocationRelativeTo(parent);
             setLayout(new BorderLayout());
-            getContentPane().setBackground(new Color(18, 18, 18)); // Fondo Oscuro del viejo diseño
+            getContentPane().setBackground(new Color(18, 18, 18));
 
             JPanel pnlHeader = new JPanel(new GridLayout(2, 1));
             pnlHeader.setOpaque(false);
@@ -297,7 +309,8 @@ public class InventoryView extends JDialog {
             lblProd.setFont(new Font("Segoe UI Semibold", Font.BOLD, 24));
             lblProd.setForeground(Color.WHITE);
 
-            JLabel lblActual = new JLabel("EXISTENCIA ACTUAL: " + stockActual, SwingConstants.CENTER);
+            // "EXISTENCIA ACTUAL: 10"
+            JLabel lblActual = new JLabel(String.format(LanguageManager.get("audit.dialog.current"), stockActual), SwingConstants.CENTER);
             lblActual.setFont(new Font("Segoe UI", Font.PLAIN, 16));
             lblActual.setForeground(new Color(150, 150, 150));
 
@@ -313,9 +326,8 @@ public class InventoryView extends JDialog {
             pnlOp3D.setOpaque(false);
             pnlOp3D.setMaximumSize(new Dimension(240, 60));
 
-            // Botones del código viejo
-            btnIn = new Control3DBtn("ENTRADA", COLOR_VERDE_NEON);
-            btnOut = new Control3DBtn("SALIDA", Color.GRAY);
+            btnIn = new Control3DBtn(LanguageManager.get("audit.dialog.in"), COLOR_VERDE_NEON);
+            btnOut = new Control3DBtn(LanguageManager.get("audit.dialog.out"), Color.GRAY);
             btnIn.setSelected(true);
 
             btnIn.addActionListener(e -> setOp(true, stockActual));
@@ -333,7 +345,7 @@ public class InventoryView extends JDialog {
             txtCantidad.setMaximumSize(new Dimension(240, 90));
             txtCantidad.setBorder(BorderFactory.createMatteBorder(0, 1, 1, 1, new Color(60, 60, 60)));
 
-            lblResultado = new JLabel("PROYECCIÓN: " + stockActual, SwingConstants.CENTER);
+            lblResultado = new JLabel(String.format(LanguageManager.get("audit.dialog.projection"), stockActual), SwingConstants.CENTER);
             lblResultado.setFont(new Font("Segoe UI", Font.BOLD, 18));
             lblResultado.setForeground(Color.ORANGE);
             lblResultado.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -346,7 +358,7 @@ public class InventoryView extends JDialog {
             txtObs.setLineWrap(true);
             txtObs.setWrapStyleWord(true);
             JScrollPane scrollObs = new JScrollPane(txtObs);
-            scrollObs.setBorder(BorderFactory.createTitledBorder(new LineBorder(new Color(45, 45, 45)), "JUSTIFICACIÓN", 0, 0, null, Color.GRAY));
+            scrollObs.setBorder(BorderFactory.createTitledBorder(new LineBorder(new Color(45, 45, 45)), LanguageManager.get("audit.table.reason"), 0, 0, null, Color.GRAY));
             scrollObs.setMaximumSize(new Dimension(320, 100));
 
             pnlCentro.add(pnlOp3D);
@@ -362,18 +374,16 @@ public class InventoryView extends JDialog {
             pnlSouth.setOpaque(false);
             pnlSouth.setBorder(new EmptyBorder(25, 0, 35, 0));
 
-            // EL BOTÓN FUCSIA DEL CÓDIGO VIEJO
-            JButton btnSave = new JButton("ACTUALIZAR EXISTENCIA");
+            JButton btnSave = new JButton(LanguageManager.get("audit.dialog.update"));
             btnSave.setPreferredSize(new Dimension(320, 55));
             btnSave.setFont(new Font("Segoe UI", Font.BOLD, 16));
-            btnSave.setBackground(new Color(220, 0, 115)); // Rosa Siconi
+            btnSave.setBackground(new Color(220, 0, 115));
             btnSave.setForeground(Color.WHITE);
             btnSave.setFocusPainted(false);
             btnSave.setBorder(BorderFactory.createEmptyBorder());
             btnSave.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
             btnSave.addActionListener(e -> {
-                String cantStr = txtCantidad.getText().trim();
                 String obsStr = txtObs.getText().trim();
                 try {
                     int c = Integer.parseInt(txtCantidad.getText());
@@ -405,12 +415,14 @@ public class InventoryView extends JDialog {
         private void calc(int act) {
             try {
                 int n = Integer.parseInt(txtCantidad.getText());
-                lblResultado.setText("PROYECCIÓN: " + (esEntrada ? act + n : act - n));
-            } catch(Exception e) { lblResultado.setText("PROYECCIÓN: " + act); }
+                int proj = esEntrada ? act + n : act - n;
+                lblResultado.setText(String.format(LanguageManager.get("audit.dialog.projection"), proj));
+            } catch(Exception e) {
+                lblResultado.setText(String.format(LanguageManager.get("audit.dialog.projection"), act));
+            }
         }
     }
 
-    // CLASE NECESARIA PARA LOS BOTONES 3D DE LA VENTANA (Del código viejo)
     class Control3DBtn extends JButton {
         private Color baseColor;
         private boolean isSelected = false;
