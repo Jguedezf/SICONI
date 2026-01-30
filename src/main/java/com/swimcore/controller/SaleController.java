@@ -1,27 +1,9 @@
 /*
  * -----------------------------------------------------------------------------
- * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
- * CARRERA: Ingeniería en Informática
- * ASIGNATURA: Programación III / Proyecto de Software
- *
- * PROYECTO: GESTIÓN DE INVENTARIO DE UNA TIENDA (SICONI)
  * ARCHIVO: SaleController.java
- *
- * AUTORA: Johanna Guedez - V14089807
- * PROFESORA: Ing. Dubraska Roca
- * FECHA: Enero 2026
- * VERSIÓN: 2.1.0 (PDF Receipt Integration)
- *
- * DESCRIPCIÓN TÉCNICA:
- * Clase perteneciente a la Capa de Controlador (Controller Layer).
- * Actúa como intermediario puro entre la Interfaz Gráfica (View) y la Capa de
- * Acceso a Datos (DAO).
- *
- * Características de Ingeniería:
- * 1. Desacoplamiento (High Cohesion): Se eliminó toda lógica SQL de esta clase.
- * 2. Validación de Entrada: Asegura integridad de datos previos al procesamiento.
- * 3. Automatización de Salida: Genera automáticamente el recibo PDF tras el
- * registro exitoso de la transacción.
+ * VERSIÓN: 2.1.0 (Sequence Methods Bridge)
+ * CAMBIOS:
+ * 1. Métodos públicos para obtener los próximos N° de Pedido/Factura/Control.
  * -----------------------------------------------------------------------------
  */
 
@@ -32,97 +14,84 @@ import com.swimcore.dao.SaleDAO;
 import com.swimcore.model.Client;
 import com.swimcore.model.Sale;
 import com.swimcore.model.SaleDetail;
-import com.swimcore.util.ReceiptGenerator; // Importante: Generador de Recibos
+import com.swimcore.util.ReceiptGenerator;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 
-/**
- * Controlador de Gestión de Ventas.
- * Orquestador de las operaciones comerciales. Coordina la comunicación entre
- * la pantalla de facturación, el motor de base de datos y el generador de reportes.
- */
 public class SaleController {
 
-    // ATRIBUTOS: Instancias de DAO (Colaboración entre clases)
     private final SaleDAO saleDAO;
-    private final ClientDAO clientDAO; // Necesario para buscar datos del recibo
+    private final ClientDAO clientDAO;
 
-    /**
-     * Constructor.
-     * Inicializa las dependencias necesarias.
-     */
     public SaleController() {
         this.saleDAO = new SaleDAO();
         this.clientDAO = new ClientDAO();
     }
 
-    /**
-     * Procesa la solicitud de registro de una nueva venta.
-     *
-     * ENTRADA:
-     * @param sale Objeto 'Sale' con la metadata de la factura.
-     * @param details Lista de objetos 'SaleDetail' con los productos.
-     *
-     * PROCESO:
-     * 1. Valida integridad de datos.
-     * 2. Delega persistencia al DAO.
-     * 3. Si es exitoso, invoca la generación del Recibo PDF.
-     *
-     * SALIDA:
-     * @return true si la operación fue exitosa en la base de datos.
-     */
+    // --- NUEVOS MÉTODOS PARA CONSECUTIVOS ---
+
+    public int getNextOrderNumber() {
+        return saleDAO.getTotalSaleCount() + 1;
+    }
+
+    public String getNextInvoiceNumber() {
+        String lastInvoice = saleDAO.getLastInvoiceAndControlNumbers()[0];
+        try {
+            int num = Integer.parseInt(lastInvoice.split("-")[1]);
+            return String.format("FAC-%04d", num + 1);
+        } catch (Exception e) {
+            return "FAC-0001"; // Si hay error o es el primero
+        }
+    }
+
+    public String getNextControlNumber() {
+        String lastControl = saleDAO.getLastInvoiceAndControlNumbers()[1];
+        String year = new SimpleDateFormat("yyyy").format(new Date());
+        try {
+            String lastYear = lastControl.split("-")[1];
+            int num = Integer.parseInt(lastControl.split("-")[2]);
+            if (year.equals(lastYear)) {
+                return String.format("CTRL-%s-%04d", year, num + 1);
+            }
+        } catch (Exception e) {
+            // No hacer nada, se genera uno nuevo abajo
+        }
+        return "CTRL-" + year + "-0001"; // Si hay error, es año nuevo o es el primero
+    }
+
+
     public boolean registerSale(Sale sale, List<SaleDetail> details) {
-        // VALIDACIÓN DE INTEGRIDAD (Validación Previa - Tu lógica original)
-        if (sale == null || details == null || details.isEmpty()) {
-            System.err.println("❌ Error de Validación: Intento de venta vacía o nula.");
-            return false;
-        }
-
-        // DELEGACIÓN (Llamada al DAO)
-        // El controlador pasa la responsabilidad de la transacción ACID al DAO.
+        if (sale == null || details == null || details.isEmpty()) return false;
         boolean success = saleDAO.registerSale(sale, details);
-
-        // LÓGICA DE CIERRE: Generación de Recibo (Solo si guardó bien)
-        if (success) {
-            generarReciboPDF(sale, details);
-        }
-
+        if (success) { generarReciboPDF(sale, details); }
         return success;
     }
 
-    /**
-     * Método auxiliar privado para manejar la generación del PDF.
-     * Busca al cliente completo para que el recibo tenga todos los datos (Club, Atleta).
-     */
+    public double getCustomerTotalSpending(String clientId) {
+        return saleDAO.getAllSales().stream()
+                .filter(s -> s.getClientId().equals(clientId))
+                .mapToDouble(Sale::getTotalAmountUSD)
+                .sum();
+    }
+
+    public int getCustomerOrderCount(String clientId) {
+        if (clientId.isEmpty()) { // Si el ID es vacío, contamos todos
+            return saleDAO.getTotalSaleCount();
+        }
+        return (int) saleDAO.getAllSales().stream()
+                .filter(s -> s.getClientId().equals(clientId))
+                .count();
+    }
+
     private void generarReciboPDF(Sale sale, List<SaleDetail> details) {
         try {
-            Client client = null;
-            // Intentamos recuperar los datos del cliente usando el ID guardado en la venta
-            try {
-                String clientIdStr = sale.getClientId();
-                // Buscamos usando el método del ClientDAO (puede ser por ID numérico o código)
-                // Aquí asumimos que sale.getClientId() tiene el ID numérico de la BD
-                int id = Integer.parseInt(clientIdStr);
-
-                // Buscamos en la lista completa (Estrategia segura sin modificar DAO)
-                List<Client> allClients = clientDAO.getAllClients();
-                for (Client c : allClients) {
-                    if (c.getId() == id) {
-                        client = c;
-                        break;
-                    }
-                }
-            } catch (Exception e) {
-                System.err.println("⚠️ No se pudo vincular cliente al PDF (Venta Anónima o Error ID): " + e.getMessage());
+            Client client = clientDAO.getAllClients().stream()
+                    .filter(c -> String.valueOf(c.getId()).equals(sale.getClientId()))
+                    .findFirst().orElse(null);
+            if(client != null) {
+                ReceiptGenerator.generateReceipt(sale, details, client);
             }
-
-            // Invocamos al Generador
-            ReceiptGenerator.generateReceipt(sale, details, client);
-
-        } catch (Exception e) {
-            System.err.println("❌ Error generando el PDF: " + e.getMessage());
-            e.printStackTrace();
-            // No retornamos false porque la venta SI se guardó en BD.
-            // Solo falló el papelito.
-        }
+        } catch (Exception e) { e.printStackTrace(); }
     }
 }
