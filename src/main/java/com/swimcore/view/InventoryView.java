@@ -1,74 +1,84 @@
 /*
- * -----------------------------------------------------------------------------
- * INSTITUCIÓN: UNEG - SICONI
- * ARCHIVO: InventoryView.java
- * VERSIÓN: 11.1.0 (Audit Dialog Translation)
- * DESCRIPCIÓN: Inventario v11.1. Se completa la traducción de la ventana
- * emergente de ajuste de stock (AuditStockDialog).
- * -----------------------------------------------------------------------------
- */
-
+INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
+ARCHIVO: InventoryView.java
+VERSIÓN: 12.7.0 (Final - Audit Text Area Fix)
+FECHA: Enero 2026
+*/
 package com.swimcore.view;
 
-import com.swimcore.dao.Conexion;
 import com.swimcore.dao.ProductDAO;
 import com.swimcore.model.Product;
 import com.swimcore.util.CurrencyManager;
+import com.swimcore.util.ImagePanel;
 import com.swimcore.util.LanguageManager;
 import com.swimcore.view.components.InventorySidePanel;
 import com.swimcore.view.components.SoftButton;
-import com.swimcore.view.dialogs.AddEditProductDialog;
-import com.swimcore.view.dialogs.CurrencySettingsDialog;
-import com.swimcore.view.dialogs.InventoryHistoryDialog;
-import com.swimcore.view.dialogs.SupplierManagementDialog;
-
+import com.swimcore.view.dialogs.*;
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
-import javax.swing.border.LineBorder;
-import javax.swing.table.DefaultTableCellRenderer;
-import javax.swing.table.DefaultTableModel;
-import javax.swing.table.JTableHeader;
+import javax.swing.border.*;
+import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.Statement;
+import java.util.List;
 import java.util.Locale;
 
 public class InventoryView extends JDialog {
-
     private JTable productTable;
     private DefaultTableModel tableModel;
     private final ProductDAO productDAO = new ProductDAO();
 
-    private final Color COLOR_BG_MAIN = new Color(20, 20, 20);
-    private final Color COLOR_TABLE_BG = new Color(30, 30, 30);
-    private final Color COLOR_HEADER_BG = new Color(10, 10, 10);
+    // Paleta de Colores Corporativa (SICONI High Contrast)
     private final Color COLOR_GOLD = new Color(212, 175, 55);
     private final Color COLOR_TEXTO = new Color(229, 228, 226);
-
     private final Color COLOR_VERDE_NEON = new Color(0, 255, 128);
+    private final Color COLOR_ROJO_ALERTA = new Color(255, 60, 60);
     private final Color COLOR_FUCSIA_NEON = new Color(255, 0, 127);
+    private final Color COLOR_INPUT_BG = new Color(30, 30, 30);
+    private final Color COLOR_BG_DIALOG = new Color(18, 18, 18);
+    private final Color COLOR_LABEL = new Color(180, 180, 180);
 
     private SoftButton btnTasa;
-    private JComboBox<String> cmbMoneda;
+    private JTextField txtSearch;
+    private boolean filterLowStock = false;
 
     public InventoryView(JFrame parent) {
+        this(parent, false);
+    }
+
+    public InventoryView(JFrame parent, boolean showOnlyLowStock) {
         super(parent, LanguageManager.get("inventory.window_title"), true);
+        this.filterLowStock = showOnlyLowStock;
+
         setSize(1280, 720);
         setLocationRelativeTo(parent);
+
+        try {
+            setContentPane(new ImagePanel("/images/bg2.png"));
+        } catch (Exception e) {
+            getContentPane().setBackground(new Color(15, 15, 15));
+        }
         setLayout(new BorderLayout());
-        getContentPane().setBackground(COLOR_BG_MAIN);
 
         initSidePanel();
 
         JPanel mainPanel = new JPanel(new BorderLayout());
         mainPanel.setOpaque(false);
+
         initHeader(mainPanel);
         initCenterSection(mainPanel);
-        add(mainPanel, BorderLayout.CENTER);
 
+        add(mainPanel, BorderLayout.CENTER);
         loadProducts("");
+
+        if (showOnlyLowStock) {
+            SwingUtilities.invokeLater(() -> {
+                if (productTable.getRowCount() > 0) {
+                    productTable.setRowSelectionInterval(0, 0);
+                    productTable.scrollRectToVisible(productTable.getCellRect(0, 0, true));
+                    productTable.requestFocus();
+                }
+            });
+        }
     }
 
     private void initSidePanel() {
@@ -93,27 +103,12 @@ public class InventoryView extends JDialog {
         headerPanel.setOpaque(false);
         headerPanel.setBorder(new EmptyBorder(20, 40, 10, 40));
 
-        JLabel lblTitle = new JLabel(LanguageManager.get("inventory.title"));
+        JLabel lblTitle = new JLabel(filterLowStock ? "⚠️ CONTROL DE STOCK CRÍTICO" : LanguageManager.get("inventory.title"));
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 28));
-        lblTitle.setForeground(COLOR_GOLD);
+        lblTitle.setForeground(filterLowStock ? COLOR_ROJO_ALERTA : COLOR_GOLD);
 
         JPanel ratePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
         ratePanel.setOpaque(false);
-
-        String[] monedas = {
-                LanguageManager.get("inventory.currency.usd"),
-                LanguageManager.get("inventory.currency.eur"),
-                LanguageManager.get("inventory.currency.bs")
-        };
-        cmbMoneda = new JComboBox<>(monedas);
-        cmbMoneda.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        cmbMoneda.setBackground(new Color(50,50,50));
-        cmbMoneda.setForeground(Color.WHITE);
-        cmbMoneda.setSelectedIndex(CurrencyManager.getMode());
-        cmbMoneda.addActionListener(e -> {
-            CurrencyManager.setConfig(CurrencyManager.getTasa(), "$", cmbMoneda.getSelectedIndex());
-            loadProducts("");
-        });
 
         btnTasa = new SoftButton(null);
         btnTasa.setText(String.format(Locale.US, LanguageManager.get("inventory.rate_btn"), CurrencyManager.getTasa()));
@@ -124,7 +119,6 @@ public class InventoryView extends JDialog {
             loadProducts("");
         });
 
-        ratePanel.add(cmbMoneda);
         ratePanel.add(btnTasa);
         headerPanel.add(lblTitle, BorderLayout.WEST);
         headerPanel.add(ratePanel, BorderLayout.EAST);
@@ -134,42 +128,51 @@ public class InventoryView extends JDialog {
     private void initCenterSection(JPanel parentPanel) {
         JPanel centerContainer = new JPanel(new BorderLayout());
         centerContainer.setOpaque(false);
-        centerContainer.setBorder(new EmptyBorder(10, 40, 40, 40));
+        centerContainer.setBorder(new EmptyBorder(10, 40, 30, 40));
 
-        JTextField txtSearch = new JTextField(30);
-        txtSearch.setToolTipText(LanguageManager.get("inventory.search_placeholder"));
-        txtSearch.setPreferredSize(new Dimension(400, 42));
-        txtSearch.setFont(new Font("Segoe UI", Font.PLAIN, 16));
-        txtSearch.setBackground(COLOR_TABLE_BG);
-        txtSearch.setForeground(COLOR_TEXTO);
+        JPanel searchBarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        searchBarPanel.setOpaque(false);
+        searchBarPanel.setBorder(new EmptyBorder(0, 0, 15, 0));
+
+        txtSearch = new JTextField(30);
+        txtSearch.setPreferredSize(new Dimension(380, 40));
+        txtSearch.setFont(new Font("Segoe UI", Font.PLAIN, 15));
+        txtSearch.setBackground(COLOR_INPUT_BG);
+        txtSearch.setForeground(Color.WHITE);
         txtSearch.setCaretColor(COLOR_GOLD);
-        txtSearch.setBorder(new LineBorder(new Color(60,60,60)));
+        txtSearch.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(new Color(80, 80, 80), 1),
+                new EmptyBorder(0, 10, 0, 10)
+        ));
         txtSearch.addKeyListener(new KeyAdapter() {
-            public void keyReleased(KeyEvent evt) { loadProducts(txtSearch.getText()); }
+            @Override public void keyReleased(KeyEvent e) { loadProducts(txtSearch.getText()); }
         });
 
-        JPanel searchPanel = new JPanel();
-        searchPanel.setOpaque(false);
-        searchPanel.add(txtSearch);
-        centerContainer.add(searchPanel, BorderLayout.NORTH);
+        SoftButton btnSearch = new SoftButton(null);
+        btnSearch.setText("🔍");
+        btnSearch.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 20));
+        btnSearch.setPreferredSize(new Dimension(55, 40));
+        btnSearch.addActionListener(e -> loadProducts(txtSearch.getText()));
 
-        String[] cols = {
-                LanguageManager.get("inventory.table.id"),
-                LanguageManager.get("inventory.table.code"),
-                LanguageManager.get("inventory.table.product"),
-                LanguageManager.get("inventory.table.category"),
-                LanguageManager.get("inventory.table.stock"),
-                LanguageManager.get("inventory.table.price"),
-                LanguageManager.get("inventory.table.supplier")
-        };
+        searchBarPanel.add(txtSearch);
+        searchBarPanel.add(btnSearch);
+        centerContainer.add(searchBarPanel, BorderLayout.NORTH);
 
+        String[] cols = { "ID", "CÓDIGO", "PRODUCTO", "CATEGORÍA", "STOCK", "PRECIO", "PROVEEDOR", "min_stock" };
         tableModel = new DefaultTableModel(cols, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
-            @Override public Class<?> getColumnClass(int c) { return (c == 0 || c == 4) ? Integer.class : String.class; }
+            @Override public Class<?> getColumnClass(int c) { return (c == 0 || c == 4 || c == 7) ? Integer.class : String.class; }
         };
 
         productTable = new JTable(tableModel);
         styleTable();
+
+        JScrollPane scrollPane = new JScrollPane(productTable);
+        scrollPane.setBorder(new LineBorder(COLOR_GOLD, 1));
+        scrollPane.getViewport().setBackground(new Color(30, 30, 30));
+        productTable.setPreferredScrollableViewportSize(new Dimension(productTable.getPreferredSize().width, 495));
+
+        centerContainer.add(scrollPane, BorderLayout.CENTER);
 
         productTable.addMouseListener(new MouseAdapter() {
             @Override
@@ -178,281 +181,438 @@ public class InventoryView extends JDialog {
                 int row = productTable.rowAtPoint(e.getPoint());
                 if (col == 4 && row != -1) {
                     Rectangle rect = productTable.getCellRect(row, col, false);
-                    int xRelativo = e.getX() - rect.x;
+                    int xRel = e.getX() - rect.x;
+                    int mid = rect.width / 2;
                     int id = (int) productTable.getValueAt(row, 0);
-                    if (xRelativo > 20 && xRelativo < 55) { productDAO.updateStockDelta(id, -1); e.consume(); }
-                    else if (xRelativo > 115 && xRelativo < 150) { productDAO.updateStockDelta(id, 1); e.consume(); }
-                    loadProducts("");
+                    int actualValue = (int) productTable.getValueAt(row, 4);
+                    if (xRel < (mid - 20)) {
+                        if (actualValue > 0) { actualValue--; updateStockQuickly(id, -1, row, actualValue); }
+                    } else if (xRel > (mid + 20)) {
+                        actualValue++; updateStockQuickly(id, 1, row, actualValue);
+                    }
                 }
             }
         });
 
-        JScrollPane scrollPane = new JScrollPane(productTable);
-        scrollPane.setBorder(new LineBorder(COLOR_GOLD, 1));
-        scrollPane.getViewport().setBackground(COLOR_TABLE_BG);
-        centerContainer.add(scrollPane, BorderLayout.CENTER);
         parentPanel.add(centerContainer, BorderLayout.CENTER);
     }
 
     private void styleTable() {
-        productTable.setRowHeight(50);
-        productTable.setBackground(COLOR_TABLE_BG);
+        productTable.setRowHeight(45);
+        productTable.setBackground(new Color(30, 30, 30));
         productTable.setForeground(COLOR_TEXTO);
-        productTable.setSelectionBackground(new Color(50, 50, 50));
+        productTable.setSelectionBackground(new Color(55, 55, 55));
         productTable.setSelectionForeground(COLOR_GOLD);
         productTable.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         productTable.setFocusable(false);
+        productTable.setShowVerticalLines(false);
+        productTable.setIntercellSpacing(new Dimension(0, 0));
+        productTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+
         JTableHeader header = productTable.getTableHeader();
-        header.setPreferredSize(new Dimension(0, 40));
-        header.setBackground(COLOR_HEADER_BG);
+        header.setPreferredSize(new Dimension(0, 45));
+        header.setBackground(new Color(15, 15, 15));
         header.setForeground(COLOR_GOLD);
-        header.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        DefaultTableCellRenderer center = new DefaultTableCellRenderer();
-        center.setHorizontalAlignment(JLabel.CENTER);
+        header.setFont(new Font("Segoe UI", Font.BOLD, 13));
+
+        TableColumnModel cm = productTable.getColumnModel();
+        cm.getColumn(0).setPreferredWidth(50);
+        cm.getColumn(1).setPreferredWidth(100);
+        cm.getColumn(2).setPreferredWidth(300);
+        cm.getColumn(3).setPreferredWidth(130);
+        cm.getColumn(4).setPreferredWidth(160);
+        cm.getColumn(5).setPreferredWidth(220);
+        cm.getColumn(6).setPreferredWidth(130);
+        cm.getColumn(7).setMinWidth(0); cm.getColumn(7).setMaxWidth(0);
+
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(JLabel.CENTER);
         for (int i = 0; i < productTable.getColumnCount(); i++) {
-            if (i != 2 && i != 4) productTable.getColumnModel().getColumn(i).setCellRenderer(center);
+            if (i != 2 && i != 4) cm.getColumn(i).setCellRenderer(centerRenderer);
         }
-        productTable.getColumnModel().getColumn(4).setCellRenderer(new PersistentStockRenderer());
+        cm.getColumn(4).setCellRenderer(new PersistentStockRenderer());
     }
 
-    private void loadProducts(String search) {
+    private void loadProducts(String query) {
         tableModel.setRowCount(0);
+        String symbol = CurrencyManager.getSymbol();
+        productTable.getColumnModel().getColumn(5).setHeaderValue("PRECIO (" + symbol + ")");
+        productTable.getTableHeader().repaint();
         if(btnTasa != null) btnTasa.setText(String.format(Locale.US, LanguageManager.get("inventory.rate_btn"), CurrencyManager.getTasa()));
-        String sql = "SELECT p.id, p.code, p.name, c.name AS category_name, p.current_stock, p.sale_price, s.company FROM products p " +
-                "LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN suppliers s ON p.supplier_id = s.id ";
-        if (search != null && !search.trim().isEmpty()) {
-            String kw = search.toLowerCase();
-            sql += "WHERE LOWER(p.name) LIKE '%"+kw+"%' OR LOWER(p.code) LIKE '%"+kw+"%' OR LOWER(s.company) LIKE '%"+kw+"%'";
+
+        List<Product> list;
+        if (filterLowStock) list = productDAO.getLowStockProducts();
+        else if (query != null && !query.isEmpty()) list = productDAO.searchProducts(query);
+        else list = productDAO.getAllProducts();
+
+        for (Product p : list) {
+            double price = p.getSalePrice();
+            int mode = CurrencyManager.getMode();
+            double displayPrice = (mode == 2) ? price * CurrencyManager.getTasa() :
+                    (mode == 1) ? CurrencyManager.convert(price) : price;
+            String cleanPrice = String.format("%,.2f", displayPrice);
+
+            tableModel.addRow(new Object[]{
+                    p.getId(), p.getCode(), p.getName(), "General",
+                    p.getCurrentStock(), cleanPrice, "S/P", p.getMinStock()
+            });
         }
-        try (Connection conn = Conexion.conectar(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
-            while (rs.next()) {
-                double precio = rs.getDouble("sale_price");
-                double tasa = CurrencyManager.getTasa();
-                String precioVis = (CurrencyManager.getMode() == 2) ? String.format("Bs. %,.2f", precio * tasa) : String.format("%,.2f  |  Bs. %,.2f", precio, precio * tasa);
-                tableModel.addRow(new Object[]{rs.getInt("id"), rs.getString("code"), rs.getString("name"), rs.getString("category_name"), rs.getInt("current_stock"), precioVis, rs.getString("company")});
-            }
-        } catch (Exception e) { e.printStackTrace(); }
     }
 
-    private void abrirGestionExistencias() {
-        int r = productTable.getSelectedRow();
-        if (r == -1) { JOptionPane.showMessageDialog(this, LanguageManager.get("inventory.msg.select"), "Aviso", JOptionPane.WARNING_MESSAGE); return; }
-        int id = (int) productTable.getValueAt(r, 0);
-        String nombre = (String) productTable.getValueAt(r, 2);
-        int stock = (int) productTable.getValueAt(r, 4);
-        new AuditStockDialog(this, id, nombre, stock).setVisible(true);
-        loadProducts("");
+    private void updateStockQuickly(int id, int delta, int row, int newVal) {
+        tableModel.setValueAt(newVal, row, 4);
+        new SwingWorker<Void, Void>() {
+            @Override protected Void doInBackground() { productDAO.updateStockDelta(id, delta); return null; }
+        }.execute();
     }
 
     private void editSelected() {
         int r = productTable.getSelectedRow();
-        if (r != -1) { Product p = productDAO.getProductById((int) productTable.getValueAt(r, 0)); new AddEditProductDialog(this, p).setVisible(true); loadProducts(""); }
+        if (r != -1) { new AddEditProductDialog(this, productDAO.getProductById((int) productTable.getValueAt(r, 0))).setVisible(true); loadProducts(""); }
     }
 
     private void deleteSelected() {
         int r = productTable.getSelectedRow();
         if (r != -1 && JOptionPane.showConfirmDialog(this, LanguageManager.get("inventory.msg.confirm_delete")) == JOptionPane.YES_OPTION) {
-            productDAO.delete((int) productTable.getValueAt(r, 0));
-            loadProducts("");
+            productDAO.delete((int) productTable.getValueAt(r, 0)); loadProducts("");
         }
     }
 
-    // --- RENDERIZADORES ---
-    class PersistentStockRenderer extends JPanel implements javax.swing.table.TableCellRenderer {
+    private void abrirGestionExistencias() {
+        int r = productTable.getSelectedRow();
+        if (r == -1) { JOptionPane.showMessageDialog(this, LanguageManager.get("inventory.msg.select"), "Aviso", JOptionPane.WARNING_MESSAGE); return; }
+        new AuditStockDialog(this, (int) productTable.getValueAt(r,0), (String) productTable.getValueAt(r,2), (int) productTable.getValueAt(r,4), (int) productTable.getValueAt(r,7)).setVisible(true);
+        loadProducts("");
+    }
+
+    class PersistentStockRenderer extends JPanel implements TableCellRenderer {
         private final JLabel btnM = new JLabel("−", SwingConstants.CENTER);
         private final JLabel btnP = new JLabel("+", SwingConstants.CENTER);
         private final JLabel val = new JLabel("", SwingConstants.CENTER);
         public PersistentStockRenderer() {
-            setLayout(new BorderLayout(10, 0)); setOpaque(true); setBorder(new EmptyBorder(12, 25, 12, 25));
-            btnM.setFont(new Font("Arial", Font.BOLD, 22)); btnM.setForeground(COLOR_FUCSIA_NEON); btnM.setPreferredSize(new Dimension(25, 32));
-            btnP.setFont(new Font("Arial", Font.BOLD, 22)); btnP.setForeground(COLOR_VERDE_NEON); btnP.setPreferredSize(new Dimension(25, 32));
+            setLayout(new FlowLayout(FlowLayout.CENTER, 15, 5)); setOpaque(true);
+            btnM.setFont(new Font("Arial", Font.BOLD, 22)); btnM.setForeground(COLOR_FUCSIA_NEON);
+            btnP.setFont(new Font("Arial", Font.BOLD, 22)); btnP.setForeground(COLOR_VERDE_NEON);
             val.setFont(new Font("Segoe UI", Font.BOLD, 16)); val.setForeground(Color.WHITE);
-            add(btnM, BorderLayout.WEST); add(val, BorderLayout.CENTER); add(btnP, BorderLayout.EAST);
+            val.setPreferredSize(new Dimension(45, 30)); add(btnM); add(val); add(btnP);
         }
-        @Override public Component getTableCellRendererComponent(JTable t, Object v, boolean isSel, boolean hasFocus, int r, int c) {
-            int stock = (v instanceof Integer) ? (int) v : 0;
-            val.setText(String.valueOf(stock));
-            val.setIcon(new StockSphere(stock == 0 ? Color.RED : stock <= 5 ? Color.ORANGE : COLOR_VERDE_NEON));
-            setBackground(isSel ? new Color(50, 50, 50) : t.getBackground());
+        @Override public Component getTableCellRendererComponent(JTable t, Object v, boolean isSel, boolean hasF, int r, int c) {
+            val.setText(String.valueOf(v));
+            int min = (int) tableModel.getValueAt(r, 7);
+            val.setForeground((int)v <= min ? COLOR_ROJO_ALERTA : Color.WHITE);
+            setBackground(isSel ? new Color(50, 50, 50) : new Color(30, 30, 30));
             return this;
         }
     }
 
-    class StockSphere implements Icon {
-        private final Color color;
-        public StockSphere(Color c) { this.color = c; }
-        @Override public void paintIcon(Component c, Graphics g, int x, int y) { Graphics2D g2 = (Graphics2D) g.create(); g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON); g2.setColor(color); g2.fillOval(x, y + 4, 12, 12); g2.dispose(); }
-        @Override public int getIconWidth() { return 15; }
-        @Override public int getIconHeight() { return 20; }
-    }
-
-    // --- DIÁLOGO DE AUDITORÍA (Traducido) ---
+    // --- DIÁLOGO DE AUDITORÍA: PROFESSIONAL GLASS EDITION ---
     class AuditStockDialog extends JDialog {
         private boolean esEntrada = true;
         private final JLabel lblResultado;
         private final JTextField txtCantidad;
+        private final JTextField txtMinAlert;
         private final JTextArea txtObs;
-        private final Control3DBtn btnIn, btnOut;
+        private final StyledToggleButton btnIn, btnOut;
 
-        public AuditStockDialog(JDialog parent, int id, String nombre, int stockActual) {
+        public AuditStockDialog(JDialog parent, int id, String nombre, int stockActual, int minStockActual) {
             super(parent, LanguageManager.get("audit.dialog.title"), true);
-            setSize(440, 580);
+            // AJUSTE DE TAMAÑO: 700px de alto para que el textArea respire
+            setSize(1050, 700);
             setLocationRelativeTo(parent);
-            setLayout(new BorderLayout());
-            getContentPane().setBackground(new Color(18, 18, 18));
+            setUndecorated(true);
 
-            JPanel pnlHeader = new JPanel(new GridLayout(2, 1));
-            pnlHeader.setOpaque(false);
-            pnlHeader.setBorder(new EmptyBorder(30, 20, 15, 20));
+            // 1. FONDO PRINCIPAL
+            try {
+                JPanel bgPanel = new ImagePanel("/images/bg_audit.png");
+                bgPanel.setLayout(new BorderLayout());
+                bgPanel.setBorder(new LineBorder(COLOR_GOLD, 2));
+                setContentPane(bgPanel);
+            } catch (Exception e) {
+                JPanel solidBg = new JPanel(new BorderLayout());
+                solidBg.setBackground(COLOR_BG_DIALOG);
+                solidBg.setBorder(new LineBorder(COLOR_GOLD, 2));
+                setContentPane(solidBg);
+            }
 
-            JLabel lblProd = new JLabel(nombre.toUpperCase(), SwingConstants.CENTER);
-            lblProd.setFont(new Font("Segoe UI Semibold", Font.BOLD, 24));
-            lblProd.setForeground(Color.WHITE);
+            // 2. PANEL DE CRISTAL (CONTENEDOR CENTRAL SEMI-TRANSPARENTE)
+            JPanel glassPanel = new JPanel(new BorderLayout()) {
+                @Override
+                protected void paintComponent(Graphics g) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    // Negro al 75% de opacidad para mejorar lectura
+                    g2.setColor(new Color(0, 0, 0, 190));
+                    g2.fillRoundRect(30, 30, getWidth()-60, getHeight()-60, 40, 40);
+                    g2.dispose();
+                }
+            };
+            glassPanel.setOpaque(false);
+            glassPanel.setBorder(new EmptyBorder(50, 60, 50, 60));
 
-            // "EXISTENCIA ACTUAL: 10"
-            JLabel lblActual = new JLabel(String.format(LanguageManager.get("audit.dialog.current"), stockActual), SwingConstants.CENTER);
-            lblActual.setFont(new Font("Segoe UI", Font.PLAIN, 16));
-            lblActual.setForeground(new Color(150, 150, 150));
+            // --- HEADER (Dentro del Cristal) ---
+            JPanel headerContainer = new JPanel(new BorderLayout());
+            headerContainer.setOpaque(false);
 
-            pnlHeader.add(lblProd);
-            pnlHeader.add(lblActual);
+            JLabel lblTitle = new JLabel("GESTIÓN DE EXISTENCIAS", SwingConstants.CENTER);
+            lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 32));
+            lblTitle.setForeground(COLOR_GOLD);
+            headerContainer.add(lblTitle, BorderLayout.NORTH);
 
-            JPanel pnlCentro = new JPanel();
-            pnlCentro.setLayout(new BoxLayout(pnlCentro, BoxLayout.Y_AXIS));
-            pnlCentro.setOpaque(false);
-            pnlCentro.setBorder(new EmptyBorder(0, 50, 0, 50));
+            // Info Producto
+            JPanel infoBlock = new JPanel(new GridLayout(1, 2, 20, 0));
+            infoBlock.setOpaque(false);
+            infoBlock.setBorder(new EmptyBorder(25, 0, 20, 0));
 
-            JPanel pnlOp3D = new JPanel(new GridLayout(1, 2, 5, 0));
-            pnlOp3D.setOpaque(false);
-            pnlOp3D.setMaximumSize(new Dimension(240, 60));
+            infoBlock.add(crearInfoBox("PRODUCTO SELECCIONADO", nombre.toUpperCase(), Color.WHITE, SwingConstants.LEFT));
+            infoBlock.add(crearInfoBox("STOCK EN ALMACÉN", String.valueOf(stockActual), COLOR_GOLD, SwingConstants.RIGHT));
 
-            btnIn = new Control3DBtn(LanguageManager.get("audit.dialog.in"), COLOR_VERDE_NEON);
-            btnOut = new Control3DBtn(LanguageManager.get("audit.dialog.out"), Color.GRAY);
-            btnIn.setSelected(true);
+            headerContainer.add(infoBlock, BorderLayout.SOUTH);
+            glassPanel.add(headerContainer, BorderLayout.NORTH);
+
+            // --- FORMULARIO CENTRAL ---
+            JPanel formPanel = new JPanel(new GridBagLayout());
+            formPanel.setOpaque(false);
+            GridBagConstraints gbc = new GridBagConstraints();
+            gbc.insets = new Insets(8, 20, 8, 20); // Un poco menos de espacio vertical
+            gbc.fill = GridBagConstraints.HORIZONTAL;
+
+            // Fila 1: TIPO DE OPERACIÓN
+            gbc.gridy = 0; gbc.gridx = 0; gbc.gridwidth = 2;
+            formPanel.add(crearLabel("TIPO DE OPERACIÓN"), gbc);
+
+            gbc.gridy = 1;
+            JPanel pnlToggle = new JPanel(new GridLayout(1, 2, 40, 0));
+            pnlToggle.setOpaque(false);
+            pnlToggle.setPreferredSize(new Dimension(0, 80));
+
+            btnIn = new StyledToggleButton("ENTRADA (COMPRA/PRODUCCIÓN)", "⬇", COLOR_VERDE_NEON);
+            btnOut = new StyledToggleButton("SALIDA (VENTA/MERMA)", "⬆", COLOR_FUCSIA_NEON);
 
             btnIn.addActionListener(e -> setOp(true, stockActual));
             btnOut.addActionListener(e -> setOp(false, stockActual));
 
-            pnlOp3D.add(btnIn);
-            pnlOp3D.add(btnOut);
+            pnlToggle.add(btnIn); pnlToggle.add(btnOut);
+            formPanel.add(pnlToggle, gbc);
 
-            txtCantidad = new JTextField();
-            txtCantidad.setFont(new Font("Segoe UI", Font.BOLD, 42));
-            txtCantidad.setHorizontalAlignment(JTextField.CENTER);
-            txtCantidad.setBackground(new Color(28, 28, 28));
-            txtCantidad.setForeground(Color.WHITE);
-            txtCantidad.setCaretColor(COLOR_VERDE_NEON);
-            txtCantidad.setMaximumSize(new Dimension(240, 90));
-            txtCantidad.setBorder(BorderFactory.createMatteBorder(0, 1, 1, 1, new Color(60, 60, 60)));
+            // Fila 2: Etiquetas Cantidad
+            gbc.gridy = 2; gbc.gridwidth = 1; gbc.gridx = 0;
+            formPanel.add(crearLabel("UNIDADES A MOVER"), gbc);
+            gbc.gridx = 1;
+            formPanel.add(crearLabel("STOCK MÍNIMO (ALERTA)"), gbc);
 
-            lblResultado = new JLabel(String.format(LanguageManager.get("audit.dialog.projection"), stockActual), SwingConstants.CENTER);
-            lblResultado.setFont(new Font("Segoe UI", Font.BOLD, 18));
-            lblResultado.setForeground(Color.ORANGE);
-            lblResultado.setAlignmentX(Component.CENTER_ALIGNMENT);
-            lblResultado.setBorder(new EmptyBorder(20, 0, 20, 0));
+            // Fila 3: CONTROLES
+            gbc.gridy = 3; gbc.gridx = 0;
+            txtCantidad = crearInput(COLOR_VERDE_NEON);
+            formPanel.add(txtCantidad, gbc);
 
-            txtObs = new JTextArea(3, 20);
-            txtObs.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-            txtObs.setBackground(new Color(25, 25, 25));
-            txtObs.setForeground(new Color(220, 220, 220));
-            txtObs.setLineWrap(true);
-            txtObs.setWrapStyleWord(true);
-            JScrollPane scrollObs = new JScrollPane(txtObs);
-            scrollObs.setBorder(BorderFactory.createTitledBorder(new LineBorder(new Color(45, 45, 45)), LanguageManager.get("audit.table.reason"), 0, 0, null, Color.GRAY));
-            scrollObs.setMaximumSize(new Dimension(320, 100));
+            gbc.gridx = 1;
+            txtMinAlert = crearInput(COLOR_ROJO_ALERTA);
+            txtMinAlert.setText(String.valueOf(minStockActual));
+            formPanel.add(crearControlAlertaUnificado(txtMinAlert), gbc);
 
-            pnlCentro.add(pnlOp3D);
-            pnlCentro.add(txtCantidad);
-            pnlCentro.add(lblResultado);
-            pnlCentro.add(scrollObs);
+            // Fila 4: PROYECCIÓN
+            gbc.gridy = 4; gbc.gridx = 0; gbc.gridwidth = 2;
+            lblResultado = new JLabel("PROYECCIÓN FINAL: " + stockActual, SwingConstants.CENTER);
+            lblResultado.setFont(new Font("Segoe UI", Font.BOLD, 28));
+            lblResultado.setForeground(COLOR_VERDE_NEON);
+            lblResultado.setBorder(new EmptyBorder(15, 0, 15, 0));
+            formPanel.add(lblResultado, gbc);
 
-            txtCantidad.addKeyListener(new KeyAdapter() {
-                public void keyReleased(KeyEvent e) { calc(stockActual); }
+            // Fila 5: MOTIVO
+            gbc.gridy = 5;
+            formPanel.add(crearLabel("MOTIVO DE LA OPERACIÓN (OBLIGATORIO):"), gbc);
+
+            gbc.gridy = 6;
+            // *** AQUÍ ESTÁ EL AJUSTE IMPORTANTE ***
+            txtObs = new JTextArea(5, 20); // 5 Filas visibles
+            txtObs.setFont(new Font("Segoe UI", Font.PLAIN, 15));
+            txtObs.setBackground(new Color(20, 20, 20));
+            txtObs.setForeground(Color.WHITE);
+            txtObs.setLineWrap(true); txtObs.setWrapStyleWord(true);
+            txtObs.setCaretColor(COLOR_GOLD);
+            JScrollPane spObs = new JScrollPane(txtObs);
+            spObs.setBorder(new LineBorder(new Color(100,100,100)));
+            spObs.setPreferredSize(new Dimension(0, 110)); // 110px de altura (mucho más cómodo)
+            formPanel.add(spObs, gbc);
+
+            glassPanel.add(formPanel, BorderLayout.CENTER);
+            add(glassPanel, BorderLayout.CENTER);
+
+            // --- SIDEBAR (Fuera del Cristal) ---
+            JPanel sidebar = new JPanel(new GridLayout(3, 1, 0, 25));
+            sidebar.setOpaque(false);
+            sidebar.setBorder(new EmptyBorder(80, 10, 80, 30));
+            sidebar.setPreferredSize(new Dimension(240, 0));
+
+            SoftButton btnSave = crearBotonLateral("💾", "GUARDAR CAMBIOS", COLOR_VERDE_NEON);
+            btnSave.addActionListener(e -> guardar(id, stockActual));
+
+            SoftButton btnClear = crearBotonLateral("🔄", "RESTAURAR", Color.WHITE);
+            btnClear.addActionListener(e -> {
+                txtCantidad.setText(""); txtObs.setText("");
+                txtMinAlert.setText(String.valueOf(minStockActual));
+                setOp(true, stockActual);
             });
 
-            JPanel pnlSouth = new JPanel();
-            pnlSouth.setOpaque(false);
-            pnlSouth.setBorder(new EmptyBorder(25, 0, 35, 0));
+            SoftButton btnBack = crearBotonLateral("⬅", "CANCELAR", COLOR_GOLD);
+            btnBack.addActionListener(e -> dispose());
 
-            JButton btnSave = new JButton(LanguageManager.get("audit.dialog.update"));
-            btnSave.setPreferredSize(new Dimension(320, 55));
-            btnSave.setFont(new Font("Segoe UI", Font.BOLD, 16));
-            btnSave.setBackground(new Color(220, 0, 115));
-            btnSave.setForeground(Color.WHITE);
-            btnSave.setFocusPainted(false);
-            btnSave.setBorder(BorderFactory.createEmptyBorder());
-            btnSave.setCursor(new Cursor(Cursor.HAND_CURSOR));
+            sidebar.add(btnSave); sidebar.add(btnClear); sidebar.add(btnBack);
+            add(sidebar, BorderLayout.EAST);
 
-            btnSave.addActionListener(e -> {
-                String obsStr = txtObs.getText().trim();
-                try {
-                    int c = Integer.parseInt(txtCantidad.getText());
-                    if(c <= 0) { JOptionPane.showMessageDialog(this, "Número debe ser positivo."); return; }
-                    int delta = esEntrada ? c : -c;
-                    if(productDAO.auditStock(id, delta, obsStr)) {
-                        dispose();
-                    } else {
-                        JOptionPane.showMessageDialog(this, "Error al actualizar.");
-                    }
-                } catch(Exception ex) { JOptionPane.showMessageDialog(this, "Cantidad inválida."); }
-            });
-            pnlSouth.add(btnSave);
+            // Listeners
+            txtCantidad.addKeyListener(new KeyAdapter() { public void keyReleased(KeyEvent e) { calc(stockActual); } });
+            txtMinAlert.addKeyListener(new KeyAdapter() { public void keyReleased(KeyEvent e) { calc(stockActual); } });
+            setOp(true, stockActual);
+        }
 
-            add(pnlHeader, BorderLayout.NORTH);
-            add(pnlCentro, BorderLayout.CENTER);
-            add(pnlSouth, BorderLayout.SOUTH);
+        // --- COMPONENTES VISUALES ---
+
+        private JPanel crearControlAlertaUnificado(JTextField field) {
+            JPanel p = new JPanel(new BorderLayout(0, 0));
+            p.setOpaque(false);
+            p.setBorder(new LineBorder(new Color(80,80,80), 1));
+
+            SoftButton btnMinus = new SoftButton(null);
+            btnMinus.setText("−");
+            btnMinus.setFont(new Font("Arial", Font.BOLD, 28));
+            btnMinus.setForeground(COLOR_ROJO_ALERTA);
+            btnMinus.setPreferredSize(new Dimension(65, 50));
+            btnMinus.setBackground(new Color(40,40,40)); // SOLIDO
+            btnMinus.setOpaque(true);
+            btnMinus.addActionListener(e -> adjustVal(field, -1));
+
+            SoftButton btnPlus = new SoftButton(null);
+            btnPlus.setText("+");
+            btnPlus.setFont(new Font("Arial", Font.BOLD, 28));
+            btnPlus.setForeground(COLOR_VERDE_NEON);
+            btnPlus.setPreferredSize(new Dimension(65, 50));
+            btnPlus.setBackground(new Color(40,40,40)); // SOLIDO
+            btnPlus.setOpaque(true);
+            btnPlus.addActionListener(e -> adjustVal(field, 1));
+
+            field.setHorizontalAlignment(JTextField.CENTER);
+            field.setBackground(new Color(20,20,20));
+            field.setForeground(Color.WHITE);
+            field.setFont(new Font("Segoe UI", Font.BOLD, 28));
+            field.setBorder(null);
+            field.setPreferredSize(new Dimension(0, 50));
+            field.setEditable(false);
+
+            p.add(btnMinus, BorderLayout.WEST);
+            p.add(field, BorderLayout.CENTER);
+            p.add(btnPlus, BorderLayout.EAST);
+            return p;
+        }
+
+        private JPanel crearInfoBox(String titulo, String valor, Color colorVal, int align) {
+            JPanel p = new JPanel(new BorderLayout()); p.setOpaque(false);
+            JLabel lt = new JLabel(titulo, align); lt.setFont(new Font("Segoe UI", Font.BOLD, 13)); lt.setForeground(COLOR_LABEL);
+            JLabel lv = new JLabel(valor, align); lv.setFont(new Font("Segoe UI", Font.BOLD, 26)); lv.setForeground(colorVal);
+            p.add(lt, BorderLayout.NORTH); p.add(lv, BorderLayout.CENTER);
+            return p;
+        }
+
+        private JLabel crearLabel(String t) {
+            JLabel l = new JLabel(t); l.setFont(new Font("Segoe UI", Font.BOLD, 12)); l.setForeground(COLOR_LABEL);
+            l.setBorder(new EmptyBorder(0,0,8,0));
+            return l;
+        }
+
+        private JTextField crearInput(Color c) {
+            JTextField t = new JTextField(); t.setFont(new Font("Segoe UI", Font.BOLD, 28));
+            t.setHorizontalAlignment(JTextField.CENTER); t.setBackground(new Color(20,20,20));
+            t.setForeground(c); t.setCaretColor(c);
+            t.setBorder(new LineBorder(new Color(80,80,80)));
+            t.setPreferredSize(new Dimension(0, 50));
+            t.addFocusListener(new FocusAdapter() { public void focusGained(FocusEvent e) { t.setBorder(new LineBorder(c, 2)); t.selectAll(); } public void focusLost(FocusEvent e) { t.setBorder(new LineBorder(new Color(80,80,80))); } });
+            return t;
+        }
+
+        private SoftButton crearBotonLateral(String icon, String text, Color c) {
+            SoftButton btn = new SoftButton(null); btn.setLayout(new BorderLayout());
+            JLabel lI = new JLabel(icon, SwingConstants.CENTER); lI.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 40)); lI.setForeground(c);
+            JLabel lT = new JLabel(text, SwingConstants.CENTER); lT.setFont(new Font("Segoe UI", Font.BOLD, 13)); lT.setForeground(c);
+            btn.add(lI, BorderLayout.CENTER); btn.add(lT, BorderLayout.SOUTH); btn.setBorder(new EmptyBorder(10,10,10,10));
+            return btn;
+        }
+
+        private void adjustVal(JTextField f, int d) {
+            try {
+                int v = Integer.parseInt(f.getText());
+                if(v+d >= 0) {
+                    f.setText(String.valueOf(v+d));
+                    calc(Integer.parseInt(f.getText()));
+                    for(KeyListener k : f.getKeyListeners()) k.keyReleased(null);
+                }
+            } catch(Exception e){}
         }
 
         private void setOp(boolean in, int act) {
-            esEntrada = in;
-            btnIn.setSelected(in);
-            btnIn.setBaseColor(in ? COLOR_VERDE_NEON : Color.GRAY);
-            btnOut.setSelected(!in);
-            btnOut.setBaseColor(!in ? COLOR_FUCSIA_NEON : Color.GRAY);
+            esEntrada = in; btnIn.setSelected(in); btnOut.setSelected(!in);
+            Color activeColor = in ? COLOR_VERDE_NEON : COLOR_FUCSIA_NEON;
+            txtCantidad.setForeground(activeColor); txtCantidad.setCaretColor(activeColor);
             calc(act);
         }
 
         private void calc(int act) {
             try {
-                int n = Integer.parseInt(txtCantidad.getText());
-                int proj = esEntrada ? act + n : act - n;
-                lblResultado.setText(String.format(LanguageManager.get("audit.dialog.projection"), proj));
-            } catch(Exception e) {
-                lblResultado.setText(String.format(LanguageManager.get("audit.dialog.projection"), act));
-            }
+                int n = txtCantidad.getText().isEmpty() ? 0 : Integer.parseInt(txtCantidad.getText());
+                int min = txtMinAlert.getText().isEmpty() ? 0 : Integer.parseInt(txtMinAlert.getText());
+                int res = esEntrada ? act + n : act - n;
+                lblResultado.setText("PROYECCIÓN FINAL: " + res);
+                if (res <= min) lblResultado.setForeground(COLOR_ROJO_ALERTA);
+                else lblResultado.setForeground(esEntrada ? COLOR_VERDE_NEON : COLOR_FUCSIA_NEON);
+            } catch(Exception e) { lblResultado.setText("PROYECCIÓN: -"); lblResultado.setForeground(Color.GRAY); }
+        }
+
+        private void guardar(int id, int stockActual) {
+            try {
+                int c = txtCantidad.getText().isEmpty() ? 0 : Integer.parseInt(txtCantidad.getText());
+                int newMin = Integer.parseInt(txtMinAlert.getText());
+                int delta = esEntrada ? c : -c;
+                if (c <= 0 && txtObs.getText().isEmpty()) { JOptionPane.showMessageDialog(this, "Indique una cantidad o motivo.", "Aviso", JOptionPane.WARNING_MESSAGE); return; }
+                if (c > 0) productDAO.auditStock(id, delta, txtObs.getText().isEmpty() ? "AJUSTE INVENTARIO" : txtObs.getText());
+                productDAO.updateMinStock(id, newMin);
+                dispose();
+            } catch(Exception ex) { JOptionPane.showMessageDialog(this, "Error de datos.", "Error", JOptionPane.ERROR_MESSAGE); }
         }
     }
 
-    class Control3DBtn extends JButton {
-        private Color baseColor;
+    // --- BOTÓN TOGGLE "GLASS" PARA OPERACIONES ---
+    class StyledToggleButton extends SoftButton {
+        private final Color baseColor;
         private boolean isSelected = false;
-        public Control3DBtn(String t, Color c) {
-            super(t);
-            this.baseColor = c;
-            setContentAreaFilled(false);
-            setFocusPainted(false);
-            setBorderPainted(false);
-            setFont(new Font("Segoe UI", Font.BOLD, 12));
-            setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        public StyledToggleButton(String text, String icon, Color c) {
+            super(null); this.baseColor = c; setLayout(new BorderLayout());
+            JLabel lIcon = new JLabel(icon, SwingConstants.CENTER); lIcon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 32));
+            JLabel lText = new JLabel(text, SwingConstants.CENTER); lText.setFont(new Font("Segoe UI", Font.BOLD, 13));
+            add(lIcon, BorderLayout.CENTER); add(lText, BorderLayout.SOUTH); setBorder(new EmptyBorder(10,10,10,10)); setSelected(false);
         }
-        public void setBaseColor(Color c) { this.baseColor = c; repaint(); }
-        public void setSelected(boolean s) { this.isSelected = s; repaint(); }
+
+        public void setSelected(boolean s) {
+            this.isSelected = s;
+            for(Component c : getComponents()) c.setForeground(s ? baseColor : Color.GRAY);
+            repaint();
+        }
+
         @Override protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            if (getModel().isPressed()) g2.translate(0, 2);
-            if (isSelected) {
-                GradientPaint gp = new GradientPaint(0, 0, baseColor, 0, getHeight(), baseColor.darker());
-                g2.setPaint(gp);
+
+            if(isSelected) {
+                g2.setColor(new Color(baseColor.getRed(), baseColor.getGreen(), baseColor.getBlue(), 20));
+                g2.fillRoundRect(0,0,getWidth(),getHeight(), 15, 15);
+                g2.setColor(baseColor);
+                g2.setStroke(new BasicStroke(2));
+                g2.drawRoundRect(1,1,getWidth()-2,getHeight()-2, 15, 15);
             } else {
-                g2.setColor(new Color(40, 40, 40));
+                g2.setColor(new Color(30,30,30));
+                g2.fillRoundRect(0,0,getWidth(),getHeight(), 15, 15);
+                g2.setColor(new Color(60,60,60));
+                g2.drawRoundRect(1,1,getWidth()-2,getHeight()-2, 15, 15);
             }
-            g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
-            g2.setColor(isSelected ? Color.BLACK : Color.WHITE);
-            FontMetrics fm = g2.getFontMetrics();
-            int x = (getWidth() - fm.stringWidth(getText())) / 2;
-            int y = (getHeight() + fm.getAscent() - fm.getDescent()) / 2;
-            g2.drawString(getText(), x, y);
             g2.dispose();
         }
     }

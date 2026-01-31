@@ -2,12 +2,8 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: UNEG - SICONI
  * ARCHIVO: SalesView.java
- * VERSIÓN: 43.2 (Scope Hotfix)
- * FECHA: January 30, 2026 - 10:30 AM
- *
- * CORRECCIÓN:
- * 1. Movido el método 'toggleInvoice' fuera del scope local para ser accesible
- *    por el método 'clearForm'.
+ * VERSIÓN: 44.0 (Clean Final Fix)
+ * FECHA: January 30, 2026
  * -----------------------------------------------------------------------------
  */
 
@@ -255,7 +251,7 @@ public class SalesView extends JPanel {
 
         chkInvoice.addActionListener(e -> {
             boolean en = chkInvoice.isSelected();
-            toggleInvoice(en); // Llamada al método corregido
+            toggleInvoice(en);
             if(en) {
                 txtInvoice.setText(saleController.getNextInvoiceNumber());
                 txtControl.setText(saleController.getNextControlNumber());
@@ -335,7 +331,8 @@ public class SalesView extends JPanel {
         pOleds.add(createLabeledInput("NOTAS DE TALLER / MEDIDAS", sO, 0), gR);
 
         DatePickerSettings dsDel = createDateSettings(false);
-        dateDelivery = new DatePicker(dsDel);
+        dateDelivery = new DatePicker(dsDel); styleDatePicker(dateDelivery);
+        // Fecha calculada en constructor
         gR.gridy=4; pOleds.add(createLabeledInput("FECHA ENTREGA", dateDelivery, 0), gR);
 
         pMid.add(pOleds);
@@ -373,7 +370,6 @@ public class SalesView extends JPanel {
 
     // --- UTILS ---
 
-    // --- HOTFIX: MÉTODO MOVIDO A NIVEL DE CLASE ---
     private void toggleInvoice(boolean enable) {
         txtInvoice.setEnabled(enable);
         txtControl.setEnabled(enable);
@@ -396,20 +392,24 @@ public class SalesView extends JPanel {
         txtAbono.setText(String.format(Locale.US, "%.2f", amountToPay));
     }
 
+    // --- REQUERIMIENTO 7: GESTIÓN DE EXCEPCIÓN DE STOCK ---
     private void addToCart() {
         if(cmbProducts.getSelectedIndex() <= 0) return;
-        Product p = productList.get(cmbProducts.getSelectedIndex()-1);
-        int q = Integer.parseInt(txtQuantity.getText());
 
-        if (p.getStock() < q) {
-            LuxuryMessage.show("Stock Insuficiente", "Solo quedan " + p.getStock() + " unidades.", true);
-            return;
+        Product p = productList.get(cmbProducts.getSelectedIndex()-1);
+        int cantidadPedida = Integer.parseInt(txtQuantity.getText());
+
+        // VALIDACIÓN DE REQUERIMIENTO
+        if (p.getCurrentStock() < cantidadPedida) {
+            LuxuryMessage.show("STOCK INSUFICIENTE",
+                    "No se puede vender esta cantidad.\nSolo quedan " + p.getCurrentStock() + " unidades de " + p.getName() + ".", true);
+            return; // Bloquea la acción
         }
 
         double pr = Double.parseDouble(txtPrice.getText().replace(",","."));
         String sz = (String) cmbSize.getSelectedItem();
-        tableModel.addRow(new Object[]{p.getName(), sz, q, String.format("%.2f", pr), String.format("%.2f", pr*q)});
-        cartDetails.add(new SaleDetail("0", String.valueOf(p.getId()), p.getName()+" ["+sz+"]", q, pr));
+        tableModel.addRow(new Object[]{p.getName(), sz, cantidadPedida, String.format("%.2f", pr), String.format("%.2f", pr*cantidadPedida)});
+        cartDetails.add(new SaleDetail("0", String.valueOf(p.getId()), p.getName()+" ["+sz+"]", cantidadPedida, pr));
         updateCalculations();
     }
 

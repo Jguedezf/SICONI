@@ -2,10 +2,10 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
  * ARCHIVO: DashboardView.java
- * VERSIÓN: 3.3.0 (Size Adjustment - 1000x730)
+ * VERSIÓN: 3.2.1 (Window Width Expansion & Responsive Fix)
  * DESCRIPCIÓN:
- * 1. Ventana de ventas con tamaño optimizado (1000x730).
- * 2. Mantiene bordes nativos y funcionalidad completa.
+ * 1. Ventana de ventas ensanchada a 1280x750 para corregir cortes visuales.
+ * 2. Ajuste de layout para asegurar que los paneles internos se expandan.
  * -----------------------------------------------------------------------------
  */
 
@@ -147,7 +147,7 @@ public class DashboardView extends JFrame {
         JPanel grid = new JPanel(new GridLayout(2, 3, 25, 25));
         grid.setOpaque(false);
 
-        // --- 1. NUEVO PEDIDO (TAMAÑO AJUSTADO) ---
+        // --- 1. NUEVO PEDIDO (ANCHO AUMENTADO Y LAYOUT MEJORADO) ---
         grid.add(createBigButton(LanguageManager.get("dashboard.btn.newOrder"), LanguageManager.get("dashboard.btn.newOrder.sub"), "/images/orders.png", "🛒", e -> {
             ClientManagementDialog selector = new ClientManagementDialog(this, true);
             selector.setVisible(true);
@@ -156,14 +156,14 @@ public class DashboardView extends JFrame {
             if (clienteSeleccionado != null) {
                 JDialog frameVentas = new JDialog(this, "SICONI - NUEVO PEDIDO", true);
 
-                // --- MODIFICACIÓN DE TAMAÑO ---
+                // --- MODIFICACIÓN DE TAMAÑO PARA PANTALLA ANCHA ---
                 frameVentas.setUndecorated(false);
-                frameVentas.setSize(1250, 730); // 1250 ancho x 730 alto
+                frameVentas.setSize(1280, 750); // Ancho aumentado a 1280px para evitar cortes
                 frameVentas.setLocationRelativeTo(this);
 
                 ImagePanel background = new ImagePanel("/images/bg3.png");
-                background.setLayout(new BorderLayout());
-                background.add(new SalesView(clienteSeleccionado));
+                background.setLayout(new BorderLayout()); // Asegura que SalesView ocupe todo el espacio
+                background.add(new SalesView(clienteSeleccionado), BorderLayout.CENTER);
 
                 frameVentas.setContentPane(background);
                 frameVentas.setVisible(true);
@@ -172,7 +172,7 @@ public class DashboardView extends JFrame {
             }
         }));
 
-        // 2. INVENTARIO
+        // ... (El resto de los botones se mantienen igual) ...
         grid.add(createBigButton(LanguageManager.get("dashboard.btn.inventory"), LanguageManager.get("dashboard.btn.inventory.sub"), "/images/inventory.png", "📦", e -> {
             setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
             new InventoryView(this).setVisible(true);
@@ -180,24 +180,20 @@ public class DashboardView extends JFrame {
             updateStockAlert();
         }));
 
-        // 3. TALLER
         grid.add(createBigButton(LanguageManager.get("dashboard.btn.workshop"), LanguageManager.get("dashboard.btn.workshop.sub"), "/images/workshop.png", "✂️", e -> {
             new OrderManagementView(this).setVisible(true);
         }));
 
-        // 4. CLIENTES
         grid.add(createBigButton(LanguageManager.get("dashboard.btn.clients"), LanguageManager.get("dashboard.btn.clients.sub"), "/images/client.png", "👥", e -> {
             new ClientManagementDialog(this, false).setVisible(true);
         }));
 
-        // 5. REPORTES
         grid.add(createBigButton(LanguageManager.get("dashboard.btn.reports"), LanguageManager.get("dashboard.btn.reports.sub"), "/images/reports.png", "📊", e -> {
             setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
             new ReportsView(this).setVisible(true);
             setCursor(Cursor.getDefaultCursor());
         }));
 
-        // 6. SALIR
         JButton btnExit = createBigButton(LanguageManager.get("dashboard.btn.exit"), LanguageManager.get("dashboard.btn.exit.sub"), "/images/logout.png", "🚪", null);
         btnExit.addMouseListener(new MouseAdapter() {
             public void mouseEntered(MouseEvent e) { btnExit.putClientProperty("hoverColor", new Color(220, 20, 60)); btnExit.putClientProperty("hover", true); btnExit.repaint(); SoundManager.getInstance().playHover(); }

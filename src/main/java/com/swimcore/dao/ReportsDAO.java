@@ -3,6 +3,7 @@
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
  * ARCHIVO: ReportsDAO.java
  * VERSIÓN: 1.2.0 (Product Profitability Logic)
+ * FECHA: Enero 2026
  * DESCRIPCIÓN: Data Access Object para reportes. Se añade lógica para
  * calcular la rentabilidad neta por producto en un rango de fechas.
  * -----------------------------------------------------------------------------
