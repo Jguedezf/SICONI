@@ -191,20 +191,39 @@ public class ProductDAO {
 
     public List<Vector<Object>> getHistoryByDateRange(java.util.Date from, java.util.Date to) {
         List<Vector<Object>> data = new ArrayList<>();
-        String sql = "SELECT m.id, m.date, p.code, p.name, m.type, m.quantity, m.observation FROM inventory_movements m " +
-                "LEFT JOIN products p ON m.product_id = p.id WHERE m.date BETWEEN ? AND ? ORDER BY m.date DESC";
-        try (Connection conn = Conexion.conectar(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+        // MEJORA SQL: Ordenamos por fecha DESC y luego por ID DESC para desempatar segundos idénticos
+        String sql = "SELECT m.id, m.date, p.code, p.name, m.type, m.quantity, m.observation " +
+                "FROM inventory_movements m " +
+                "LEFT JOIN products p ON m.product_id = p.id " +
+                "WHERE m.date BETWEEN ? AND ? " +
+                "ORDER BY m.date DESC, m.id DESC";
+
+        try (Connection conn = Conexion.conectar();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            // Formato estándar para bases de datos SQL
             java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             pstmt.setString(1, sdf.format(from));
             pstmt.setString(2, sdf.format(to));
+
             ResultSet rs = pstmt.executeQuery();
+
             while (rs.next()) {
                 Vector<Object> row = new Vector<>();
-                row.add(rs.getInt(1)); row.add(rs.getString(2)); row.add(rs.getString(3));
-                row.add(rs.getString(4)); row.add(rs.getString(5)); row.add(rs.getInt(6)); row.add(rs.getString(7));
+                row.add(rs.getInt(1));          // ID
+                row.add(rs.getString(2));       // Fecha
+                row.add(rs.getString(3));       // Código
+                row.add(rs.getString(4));       // Nombre Producto
+                row.add(rs.getString(5));       // Tipo (Entrada/Salida)
+                row.add(rs.getInt(6));          // Cantidad
+                row.add(rs.getString(7));       // Observación
                 data.add(row);
             }
-        } catch (SQLException e) {}
+        } catch (SQLException e) {
+            System.err.println("❌ Error crítico consultando historial: " + e.getMessage());
+            e.printStackTrace();
+        }
         return data;
     }
 

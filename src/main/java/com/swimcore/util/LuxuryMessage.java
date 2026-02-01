@@ -1,84 +1,160 @@
 /*
  * -----------------------------------------------------------------------------
- * INSTITUCIÓN: UNEG - SICONI
  * ARCHIVO: LuxuryMessage.java
- * VERSIÓN: 3.0.0 (Elegant Toast Bar)
- * DESCRIPCIÓN: Notificación horizontal compacta, estilo barra moderna.
- * Fondo oscuro, borde dorado, todo en una línea.
+ * VERSIÓN: 6.0 (FIX FINAL: Logo Corporativo + Compatibilidad Total)
  * -----------------------------------------------------------------------------
  */
-
 package com.swimcore.util;
 
 import com.swimcore.view.components.SoftButton;
 import javax.swing.*;
-import javax.swing.border.LineBorder;
+import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.geom.RoundRectangle2D;
+import java.net.URL;
 
 public class LuxuryMessage extends JDialog {
 
-    public LuxuryMessage(String title, String message, boolean isError) {
+    private static final Color BG_DARK = new Color(28, 28, 28);
+    private static final Color GOLD = new Color(212, 175, 55);
+    private static final Color ERROR_RED = new Color(220, 50, 50);
+    private static final Color TEXT_WHITE = new Color(230, 230, 230);
+
+    // Constructor privado
+    private LuxuryMessage(Window parent, String title, String message, boolean isError) {
+        super(parent, ModalityType.APPLICATION_MODAL);
         setUndecorated(true);
-        // Hacemos la ventana ancha y baja (Estilo Notificación)
-        setSize(550, 90);
-        setLocationRelativeTo(null);
-        setModal(true);
+        // Fondo transparente para que el redondeado se vea suave
+        setBackground(new Color(0,0,0,0));
 
-        // Forma redondeada
-        setShape(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 20, 20));
+        Color accentColor = isError ? ERROR_RED : GOLD;
 
-        // Panel Principal con Fondo Oscuro (Simulando 8K dark)
-        JPanel mainPanel = new JPanel(new BorderLayout(15, 0)) {
+        // PANEL PRINCIPAL (DIBUJO MANUAL PARA BORDES SUAVES)
+        JPanel mainPanel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                Graphics2D g2 = (Graphics2D) g;
+                Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                // Degradado Negro a Gris muy oscuro
-                GradientPaint gp = new GradientPaint(0, 0, new Color(20, 20, 20), 0, getHeight(), new Color(45, 45, 45));
-                g2.setPaint(gp);
-                g2.fillRect(0, 0, getWidth(), getHeight());
 
-                // Borde Dorado dibujado manualmente
-                g2.setColor(new Color(212, 175, 55));
-                g2.setStroke(new BasicStroke(2));
-                g2.drawRoundRect(1, 1, getWidth()-2, getHeight()-2, 20, 20);
+                // Fondo oscuro
+                g2.setColor(BG_DARK);
+                g2.fillRoundRect(2, 2, getWidth()-4, getHeight()-4, 25, 25);
+
+                // Borde Neón/Dorado fino
+                g2.setColor(accentColor);
+                g2.setStroke(new BasicStroke(1.5f));
+                g2.drawRoundRect(2, 2, getWidth()-4, getHeight()-4, 25, 25);
+
+                g2.dispose();
             }
         };
-        mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        mainPanel.setOpaque(false);
+        mainPanel.setBorder(new EmptyBorder(20, 25, 20, 25));
+        mainPanel.setLayout(new BorderLayout(20, 10));
 
-        // 1. ICONO (Izquierda)
-        JLabel lblIcon = new JLabel(isError ? "❌" : "✨"); // Puedes cambiar por imagen si prefieres
-        lblIcon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 32));
-        mainPanel.add(lblIcon, BorderLayout.WEST);
+        // --- ICONO ---
+        JLabel iconLabel = new JLabel();
 
-        // 2. TEXTO (Centro - Una sola línea)
-        JLabel lblMsg = new JLabel(message.toUpperCase());
-        lblMsg.setFont(new Font("Segoe UI", Font.BOLD, 16));
-        lblMsg.setForeground(new Color(240, 240, 240));
-        lblMsg.setHorizontalAlignment(SwingConstants.CENTER);
-        mainPanel.add(lblMsg, BorderLayout.CENTER);
+        // LÓGICA DE ICONOS CORREGIDA:
+        if (isError) {
+            // Error: Usamos Emoji Rojo (Limpio y directo)
+            iconLabel.setText("❌");
+            iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 50));
+            iconLabel.setForeground(ERROR_RED);
+        } else {
+            // Éxito: Usamos TU LOGO (logo.png)
+            ImageIcon icon = loadIcon("logo.png", 60);
+            if (icon != null) {
+                iconLabel.setIcon(icon);
+            } else {
+                // Fallback si no encuentra el logo: Check Dorado
+                iconLabel.setText("✅");
+                iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 50));
+                iconLabel.setForeground(GOLD);
+            }
+        }
+        iconLabel.setVerticalAlignment(SwingConstants.TOP);
 
-        // 3. BOTÓN (Derecha - Pequeño y sutil)
+        // --- CONTENIDO ---
+        JPanel centerPanel = new JPanel(new BorderLayout(0, 10));
+        centerPanel.setOpaque(false);
+
+        JLabel lblTitle = new JLabel(title.toUpperCase());
+        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        lblTitle.setForeground(accentColor);
+
+        JTextArea txtMsg = new JTextArea(message);
+        txtMsg.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        txtMsg.setForeground(TEXT_WHITE);
+        txtMsg.setOpaque(false);
+        txtMsg.setWrapStyleWord(true);
+        txtMsg.setLineWrap(true);
+        txtMsg.setEditable(false);
+        txtMsg.setFocusable(false);
+        txtMsg.setSize(new Dimension(350, 10));
+        txtMsg.setBorder(null);
+
+        centerPanel.add(lblTitle, BorderLayout.NORTH);
+        centerPanel.add(txtMsg, BorderLayout.CENTER);
+
+        // --- BOTÓN ---
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        btnPanel.setOpaque(false);
+
         SoftButton btnOk = new SoftButton(null);
-        btnOk.setText("OK");
-        btnOk.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        btnOk.setForeground(isError ? Color.RED : new Color(212, 175, 55));
-        btnOk.setPreferredSize(new Dimension(80, 40));
+        btnOk.setText("ACEPTAR");
+        btnOk.setPreferredSize(new Dimension(110, 35));
+        btnOk.setForeground(Color.BLACK);
+        btnOk.setBackground(accentColor);
+        btnOk.setFont(new Font("Segoe UI", Font.BOLD, 13));
         btnOk.addActionListener(e -> dispose());
 
-        // Panel para el botón para que no se estire
-        JPanel pBtn = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        pBtn.setOpaque(false);
-        pBtn.add(btnOk);
+        btnPanel.add(btnOk);
 
-        mainPanel.add(pBtn, BorderLayout.EAST);
+        // ARMADO
+        mainPanel.add(iconLabel, BorderLayout.WEST);
+        mainPanel.add(centerPanel, BorderLayout.CENTER);
+        mainPanel.add(btnPanel, BorderLayout.SOUTH);
 
         setContentPane(mainPanel);
+        pack(); // Ajuste automático
+
+        int w = Math.max(400, Math.min(getWidth(), 600));
+        int h = getHeight();
+        setSize(w, h);
+
+        if (parent != null) setLocationRelativeTo(parent);
+        else setLocationRelativeTo(null);
     }
 
-    public static void show(String title, String message, boolean isError) {
-        new LuxuryMessage(title, message, isError).setVisible(true);
+    // CARGA DE IMAGEN CORREGIDA (Busca en /images/ directamente)
+    private ImageIcon loadIcon(String name, int size) {
+        try {
+            // CAMBIO CLAVE: Quitamos "icons/" para que busque en la raíz de imagenes
+            URL url = getClass().getResource("/images/" + name);
+            if (url != null) {
+                // Usamos java.awt.Image explícitamente para evitar conflictos
+                return new ImageIcon(new ImageIcon(url).getImage().getScaledInstance(size, size, java.awt.Image.SCALE_SMOOTH));
+            }
+        } catch (Exception e) {}
+        return null;
+    }
+
+    // =================================================================================
+    // MÉTODOS ESTÁTICOS (SOBRECARGA PARA COMPATIBILIDAD)
+    // =================================================================================
+
+    /** MODO 1: Con padre (ej: this) - Recomendado */
+    public static void show(Component parentComponent, String title, String msg, boolean isError) {
+        Window window = SwingUtilities.getWindowAncestor(parentComponent);
+        if (window == null && parentComponent instanceof Window) {
+            window = (Window) parentComponent;
+        }
+        new LuxuryMessage(window, title, msg, isError).setVisible(true);
+    }
+
+    /** MODO 2: Sin padre - ARREGLA ERRORES EN CÓDIGO VIEJO */
+    public static void show(String title, String msg, boolean isError) {
+        new LuxuryMessage(null, title, msg, isError).setVisible(true);
     }
 }
