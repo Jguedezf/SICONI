@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-package com.swimcore.view;
+        package com.swimcore.view;
 
 import com.swimcore.dao.ProductDAO;
 import com.swimcore.model.Product;

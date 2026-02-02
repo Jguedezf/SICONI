@@ -2,21 +2,17 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
  * ARCHIVO: ReportsView.java
- * VERSIÓN: 2.7.0 (Tabbed View & Profitability Report)
- * DESCRIPCIÓN TÉCNICA:
- * Módulo de Reportes rediseñado con una interfaz de pestañas para una mejor
- * organización. Se añade una nueva sección para el análisis de rentabilidad
- * por producto.
+ * VERSIÓN: 3.0.0 (Luxury Fix: Calendars + Real Data Integration)
  * -----------------------------------------------------------------------------
  */
 
 package com.swimcore.view;
 
 import com.github.lgooddatepicker.components.DatePicker;
-import com.github.lgooddatepicker.components.DatePickerSettings;
-import com.github.lgooddatepicker.components.DatePickerSettings.DateArea;
-import com.swimcore.dao.ReportsDAO;
+import com.swimcore.dao.SaleDAO; // CAMBIO: Usamos SaleDAO
 import com.swimcore.util.CurrencyManager;
+import com.swimcore.util.LuxuryCalendar; // IMPORTANTE: Tu clase Luxury
+import com.swimcore.util.LuxuryMessage; // Mensajes bonitos
 import com.swimcore.util.SoundManager;
 import com.swimcore.view.components.KPI_Card;
 import com.swimcore.view.components.SoftButton;
@@ -46,7 +42,7 @@ import java.util.Map;
 
 public class ReportsView extends JDialog {
 
-    private final ReportsDAO reportsDAO = new ReportsDAO();
+    private final SaleDAO saleDAO = new SaleDAO(); // Usamos SaleDAO para la data
     private DatePicker dateFrom, dateTo;
     private JComboBox<String> currencySelector;
     private JPanel kpiPanel;
@@ -103,7 +99,9 @@ public class ReportsView extends JDialog {
         headerPanel.add(createLabel("Desde:"), gbc);
 
         gbc.gridx = 1;
-        dateFrom = new DatePicker(createDatePickerSettings());
+        // MODIFICACIÓN: Usar LuxuryCalendar en lugar de createDatePickerSettings
+        dateFrom = new DatePicker();
+        LuxuryCalendar.applyTo(dateFrom);
         dateFrom.setDate(LocalDate.now().minusMonths(1));
         headerPanel.add(dateFrom, gbc);
 
@@ -111,7 +109,9 @@ public class ReportsView extends JDialog {
         headerPanel.add(createLabel("Hasta:"), gbc);
 
         gbc.gridx = 3;
-        dateTo = new DatePicker(createDatePickerSettings());
+        // MODIFICACIÓN: Usar LuxuryCalendar
+        dateTo = new DatePicker();
+        LuxuryCalendar.applyTo(dateTo);
         dateTo.setDateToToday();
         headerPanel.add(dateTo, gbc);
 
@@ -189,7 +189,6 @@ public class ReportsView extends JDialog {
         profitabilityTable.getTableHeader().setForeground(LUX_GOLD);
         profitabilityTable.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 12));
 
-        // Renderizador para alinear números a la derecha
         DefaultTableCellRenderer rightRenderer = new DefaultTableCellRenderer();
         rightRenderer.setHorizontalAlignment(JLabel.RIGHT);
         for(int i = 1; i < columns.length; i++) {
@@ -207,9 +206,15 @@ public class ReportsView extends JDialog {
         Date startDate = Date.from(dateFrom.getDate().atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date endDate = Date.from(dateTo.getDate().atTime(LocalTime.MAX).atZone(ZoneId.systemDefault()).toInstant());
 
-        updateKPIs(reportsDAO.getFinancialSummary(startDate, endDate));
-        updateChart(reportsDAO.getTopSellingProducts(startDate, endDate, 5));
-        updateProfitabilityTable(reportsDAO.getProductProfitability(startDate, endDate));
+        if (startDate.after(endDate)) {
+            LuxuryMessage.show(this, "ERROR FECHAS", "La fecha inicial no puede ser mayor a la final.", true);
+            return;
+        }
+
+        // CONEXIÓN CON SaleDAO
+        updateKPIs(saleDAO.getFinancialReport(startDate, endDate));
+        updateChart(saleDAO.getTopSellingProducts(startDate, endDate));
+        updateProfitabilityTable(saleDAO.getProductProfitability(startDate, endDate));
     }
 
     private void updateKPIs(Map<String, Double> summary) {
@@ -236,8 +241,8 @@ public class ReportsView extends JDialog {
 
         for (Object[] row : data) {
             profitabilityTableModel.addRow(new Object[]{
-                    row[0], // Nombre del producto
-                    row[1], // Unidades vendidas
+                    row[0],
+                    row[1],
                     String.format("%s %,.2f", symbol, (double)row[2] * rate),
                     String.format("%s %,.2f", symbol, (double)row[3] * rate),
                     String.format("%s %,.2f", symbol, (double)row[4] * rate)
@@ -247,8 +252,13 @@ public class ReportsView extends JDialog {
 
     private void updateChart(List<Object[]> topProducts) {
         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
-        for (Object[] product : topProducts) {
-            dataset.addValue((Integer) product[1], "Unidades Vendidas", (String) product[0]);
+
+        if (topProducts.isEmpty()) {
+            dataset.addValue(0, "Sin Datos", "Sin Ventas");
+        } else {
+            for (Object[] product : topProducts) {
+                dataset.addValue((Integer) product[1], "Unidades Vendidas", (String) product[0]);
+            }
         }
 
         JFreeChart barChart = ChartFactory.createBarChart(
@@ -281,17 +291,6 @@ public class ReportsView extends JDialog {
         rangeAxis.setStandardTickUnits(NumberAxis.createIntegerTickUnits());
 
         chartPanel.setChart(barChart);
-    }
-
-    private DatePickerSettings createDatePickerSettings() {
-        DatePickerSettings settings = new DatePickerSettings();
-        settings.setColor(DateArea.BackgroundOverallCalendarPanel, new Color(40,40,40));
-        settings.setColor(DateArea.BackgroundMonthAndYearMenuLabels, LUX_GOLD);
-        settings.setColor(DateArea.TextMonthAndYearMenuLabels, Color.BLACK);
-        settings.setColor(DateArea.CalendarBackgroundSelectedDate, COLOR_FUCSIA);
-        settings.setColor(DateArea.BackgroundTodayLabel, LUX_GOLD);
-        settings.setColor(DateArea.TextTodayLabel, Color.BLACK);
-        return settings;
     }
 
     private JLabel createLabel(String text) {

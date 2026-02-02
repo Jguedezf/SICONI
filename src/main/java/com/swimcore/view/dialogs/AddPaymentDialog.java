@@ -2,9 +2,7 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: UNEG - SICONI
  * ARCHIVO: AddPaymentDialog.java
- * VERSIÓN: 1.0.0 (Initial Release)
- * DESCRIPCIÓN: Diálogo modal para registrar un nuevo pago (abono o pago final)
- * a un pedido existente.
+ * VERSIÓN: 5.0.0 (FINAL FIX: Focus & Colors)
  * -----------------------------------------------------------------------------
  */
 
@@ -12,13 +10,18 @@ package com.swimcore.view.dialogs;
 
 import com.swimcore.dao.PaymentDAO;
 import com.swimcore.model.Payment;
+import com.swimcore.util.ImagePanel;
 import com.swimcore.util.SoundManager;
 import com.swimcore.view.components.SoftButton;
 
 import javax.swing.*;
+import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
+import javax.swing.border.MatteBorder;
 import java.awt.*;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -37,29 +40,52 @@ public class AddPaymentDialog extends JDialog {
     private JTextArea txtNotes;
     private JLabel lblBalance;
 
-    // --- PALETA DE COLORES LUXURY ---
-    private final Color COLOR_BG = new Color(25, 25, 25);
-    private final Color COLOR_INPUT = new Color(45, 45, 45);
+    // --- PALETA LUXURY SICONI ---
+    private final Color COLOR_BG_DARK = new Color(18, 18, 18);
     private final Color COLOR_GOLD = new Color(212, 175, 55);
-    private final Color COLOR_GREEN = new Color(0, 200, 83);
+    private final Color COLOR_INPUT_BG = new Color(10, 10, 10); // Casi negro
+    private final Color COLOR_TEXT_WHITE = new Color(240, 240, 240);
+    private final Color COLOR_RED_ALERT = new Color(255, 0, 0); // ROJO PURO
+    private final Color COLOR_GREEN_NEON = new Color(57, 255, 20);
 
     public AddPaymentDialog(Dialog owner, String saleId) {
-        super(owner, "Registrar Pago para Pedido: " + saleId, true);
+        super(owner, "SICONI - Registrar Pago", true);
         this.saleId = saleId;
         this.paymentDAO = new PaymentDAO();
 
-        setSize(450, 550);
+        // TAMAÑO OPTIMIZADO (Menos alto)
+        setSize(500, 620);
         setLocationRelativeTo(owner);
         setUndecorated(true);
+
         getRootPane().setBorder(new LineBorder(COLOR_GOLD, 2));
-        getContentPane().setBackground(COLOR_BG);
+
+        try {
+            setContentPane(new ImagePanel("/images/bg_modal_luxury.png"));
+        } catch (Exception e) {
+            getContentPane().setBackground(COLOR_BG_DARK);
+        }
+
         setLayout(new BorderLayout());
 
-        loadInitialData(); // Cargar el saldo pendiente antes de construir la UI
+        loadInitialData();
 
         add(createHeader(), BorderLayout.NORTH);
         add(createForm(), BorderLayout.CENTER);
         add(createFooter(), BorderLayout.SOUTH);
+
+        // --- TRUCO ANTI-AZUL REFORZADO ---
+        // Usamos invokeLater para asegurar que corra AL FINAL de la carga visual
+        this.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowOpened(WindowEvent e) {
+                SwingUtilities.invokeLater(() -> {
+                    txtAmount.requestFocusInWindow();
+                    // Mueve el cursor al final para que NO esté sombreado
+                    txtAmount.setCaretPosition(txtAmount.getText().length());
+                });
+            }
+        });
     }
 
     private void loadInitialData() {
@@ -70,84 +96,112 @@ public class AddPaymentDialog extends JDialog {
             if (rs.next()) {
                 this.balanceDue = rs.getDouble("balance_due_usd");
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Error al cargar datos del pedido.", "Error", JOptionPane.ERROR_MESSAGE);
-        }
+        } catch (Exception e) { e.printStackTrace(); }
     }
 
     private JPanel createHeader() {
-        JPanel header = new JPanel(new BorderLayout());
+        JPanel header = new JPanel(new BorderLayout(0, 10));
         header.setOpaque(false);
-        header.setBorder(new EmptyBorder(20, 20, 10, 20));
+        header.setBorder(new EmptyBorder(25, 20, 5, 20));
 
         JLabel title = new JLabel("REGISTRAR PAGO", SwingConstants.CENTER);
-        title.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        title.setFont(new Font("Segoe UI", Font.BOLD, 26));
         title.setForeground(COLOR_GOLD);
 
-        lblBalance = new JLabel(String.format("Saldo Pendiente: $%.2f", this.balanceDue), SwingConstants.CENTER);
-        lblBalance.setFont(new Font("Segoe UI", Font.BOLD, 16));
-        lblBalance.setForeground(Color.RED);
+        JPanel balancePanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        balancePanel.setOpaque(false);
+        JLabel lblText = new JLabel("DEUDA ACTUAL: ");
+        lblText.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        lblText.setForeground(Color.LIGHT_GRAY);
+
+        lblBalance = new JLabel(String.format("$%.2f", this.balanceDue));
+        lblBalance.setFont(new Font("Segoe UI", Font.BOLD, 26));
+        lblBalance.setForeground(COLOR_RED_ALERT); // ROJO PURO
+
+        balancePanel.add(lblText);
+        balancePanel.add(lblBalance);
 
         header.add(title, BorderLayout.NORTH);
-        header.add(lblBalance, BorderLayout.CENTER);
+        header.add(balancePanel, BorderLayout.CENTER);
+
         return header;
     }
 
     private JPanel createForm() {
         JPanel formPanel = new JPanel(new GridBagLayout());
         formPanel.setOpaque(false);
-        formPanel.setBorder(new EmptyBorder(20, 30, 20, 30));
+        formPanel.setBorder(new EmptyBorder(5, 40, 5, 40));
+
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(8, 5, 8, 5);
+        gbc.insets = new Insets(10, 0, 5, 0);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1.0;
         gbc.gridx = 0;
         gbc.gridy = GridBagConstraints.RELATIVE;
 
-        // Monto
+        // 1. MONTO (INPUT GRANDE Y OSCURO)
         formPanel.add(createLabel("MONTO A ABONAR ($):"), gbc);
-        txtAmount = createTextField();
-        txtAmount.setFont(new Font("Segoe UI", Font.BOLD, 24));
-        txtAmount.setHorizontalAlignment(JTextField.CENTER);
-        txtAmount.setText(String.format("%.2f", this.balanceDue)); // Sugiere pagar el total
+        txtAmount = new JTextField();
+        styleBigInput(txtAmount);
+        txtAmount.setText(String.format("%.2f", this.balanceDue));
         formPanel.add(txtAmount, gbc);
 
-        // Método de Pago
+        // 2. MÉTODO
         formPanel.add(createLabel("MÉTODO DE PAGO:"), gbc);
-        cmbMethod = new JComboBox<>(new String[]{"PAGO MÓVIL", "TRANSFERENCIA", "ZELLE", "EFECTIVO", "OTRO"});
+        cmbMethod = new JComboBox<>(new String[]{"PAGO MÓVIL", "TRANSFERENCIA", "ZELLE", "EFECTIVO ($)", "EFECTIVO (Bs)", "OTRO"});
         styleComboBox(cmbMethod);
         formPanel.add(cmbMethod, gbc);
 
-        // Referencia
-        formPanel.add(createLabel("N° DE REFERENCIA:"), gbc);
-        txtReference = createTextField();
+        // 3. REFERENCIA
+        formPanel.add(createLabel("REFERENCIA / RECIBO:"), gbc);
+        txtReference = new JTextField();
+        styleNormalInput(txtReference);
         formPanel.add(txtReference, gbc);
 
-        // Notas
-        formPanel.add(createLabel("NOTAS (OPCIONAL):"), gbc);
-        txtNotes = new JTextArea(3, 20);
+        // 4. NOTAS (ALTO FORZADO)
+        formPanel.add(createLabel("NOTAS O DETALLES:"), gbc);
+        txtNotes = new JTextArea(5, 20);
         styleTextArea(txtNotes);
-        formPanel.add(new JScrollPane(txtNotes), gbc);
+
+        JScrollPane scrollNotes = new JScrollPane(txtNotes);
+        scrollNotes.setBorder(new LineBorder(new Color(60,60,60)));
+        scrollNotes.setPreferredSize(new Dimension(0, 90)); // ALTO FORZADO
+        scrollNotes.setMinimumSize(new Dimension(0, 90));
+
+        gbc.weighty = 1.0;
+        gbc.fill = GridBagConstraints.BOTH;
+        formPanel.add(scrollNotes, gbc);
 
         return formPanel;
     }
 
     private JPanel createFooter() {
-        JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0));
+        JPanel footer = new JPanel(new GridLayout(1, 2, 20, 0));
         footer.setOpaque(false);
-        footer.setBorder(new EmptyBorder(10, 20, 20, 20));
+        footer.setBorder(new EmptyBorder(10, 40, 30, 40));
 
+        // Botón Cancelar (FONDO NEGRO)
         SoftButton btnCancel = new SoftButton(null);
         btnCancel.setText("CANCELAR");
-        btnCancel.setPreferredSize(new Dimension(140, 50));
+        btnCancel.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        btnCancel.setForeground(Color.WHITE);
+        btnCancel.setBackground(Color.BLACK);
+        btnCancel.setPreferredSize(new Dimension(0, 55));
+        btnCancel.setContentAreaFilled(false);
+        btnCancel.setOpaque(false);
+        btnCancel.setBorder(new LineBorder(new Color(150, 40, 40), 2)); // Borde Rojo
         btnCancel.addActionListener(e -> { SoundManager.getInstance().playClick(); dispose(); });
 
+        // Botón Guardar (FONDO NEGRO + TEXTO NEON)
         SoftButton btnSave = new SoftButton(null);
-        btnSave.setText("GUARDAR PAGO");
-        btnSave.setPreferredSize(new Dimension(180, 50));
-        btnSave.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        btnSave.setForeground(COLOR_GREEN);
+        btnSave.setText("PROCESAR PAGO");
+        btnSave.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        btnSave.setForeground(COLOR_GREEN_NEON);
+        btnSave.setBackground(Color.BLACK);
+        btnSave.setPreferredSize(new Dimension(0, 55));
+        btnSave.setContentAreaFilled(false);
+        btnSave.setOpaque(false);
+        btnSave.setBorder(new LineBorder(COLOR_GREEN_NEON, 2)); // Borde Verde
         btnSave.addActionListener(e -> savePayment());
 
         footer.add(btnCancel);
@@ -160,16 +214,24 @@ public class AddPaymentDialog extends JDialog {
         try {
             amount = Double.parseDouble(txtAmount.getText().replace(',', '.'));
             if (amount <= 0) {
-                JOptionPane.showMessageDialog(this, "El monto debe ser un número positivo.", "Dato Inválido", JOptionPane.WARNING_MESSAGE);
+                JOptionPane.showMessageDialog(this, "El monto debe ser positivo.", "Error", JOptionPane.WARNING_MESSAGE);
                 return;
             }
+            if (amount > this.balanceDue + 0.99) {
+                int confirm = JOptionPane.showConfirmDialog(this,
+                        "El monto supera la deuda. ¿Registrar como saldo a favor?",
+                        "Exceso", JOptionPane.YES_NO_OPTION);
+                if (confirm != JOptionPane.YES_OPTION) return;
+            }
         } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this, "Por favor, ingrese un monto numérico válido.", "Dato Inválido", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Monto inválido.", "Error", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
         String method = (String) cmbMethod.getSelectedItem();
         String reference = txtReference.getText().trim();
+        if(reference.isEmpty()) reference = "S/R";
+
         String notes = txtNotes.getText().trim();
         String currentDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
 
@@ -177,46 +239,64 @@ public class AddPaymentDialog extends JDialog {
 
         if (paymentDAO.savePaymentAndUpdateSale(newPayment)) {
             SoundManager.getInstance().playClick();
-            JOptionPane.showMessageDialog(this, "¡Pago registrado exitosamente!", "Éxito", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "¡PAGO REGISTRADO CON ÉXITO!", "SICONI", JOptionPane.INFORMATION_MESSAGE);
             dispose();
         } else {
             SoundManager.getInstance().playError();
-            JOptionPane.showMessageDialog(this, "Ocurrió un error al guardar el pago en la base de datos.", "Error de Persistencia", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Error de base de datos.", "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
-    // --- HELPERS DE ESTILO ---
+    // --- ESTILOS ---
+
     private JLabel createLabel(String text) {
         JLabel label = new JLabel(text);
-        label.setForeground(Color.GRAY);
-        label.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        label.setForeground(COLOR_GOLD);
+        label.setFont(new Font("Segoe UI", Font.BOLD, 13));
         return label;
     }
 
-    private JTextField createTextField() {
-        JTextField tf = new JTextField();
-        tf.setBackground(COLOR_INPUT);
-        tf.setForeground(Color.WHITE);
+    private void styleBigInput(JTextField tf) {
+        tf.setBackground(COLOR_INPUT_BG);
+        tf.setForeground(COLOR_GREEN_NEON);
+        tf.setCaretColor(Color.WHITE); // Cursor blanco visible
+        tf.setFont(new Font("Segoe UI", Font.BOLD, 36));
+        tf.setHorizontalAlignment(JTextField.CENTER);
+        tf.setPreferredSize(new Dimension(0, 60));
+        tf.setBorder(new CompoundBorder(
+                new MatteBorder(0, 0, 2, 0, COLOR_GOLD),
+                new EmptyBorder(5, 10, 5, 10)
+        ));
+    }
+
+    private void styleNormalInput(JTextField tf) {
+        tf.setBackground(COLOR_INPUT_BG);
+        tf.setForeground(COLOR_TEXT_WHITE);
         tf.setCaretColor(COLOR_GOLD);
-        tf.setBorder(new EmptyBorder(8, 8, 8, 8));
-        tf.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        return tf;
+        tf.setFont(new Font("Segoe UI", Font.PLAIN, 15));
+        tf.setPreferredSize(new Dimension(0, 40));
+        tf.setBorder(new CompoundBorder(
+                new MatteBorder(0, 0, 1, 0, Color.GRAY),
+                new EmptyBorder(5, 10, 5, 10)
+        ));
     }
 
     private void styleComboBox(JComboBox<String> cb) {
-        cb.setBackground(COLOR_INPUT);
-        cb.setForeground(Color.WHITE);
-        cb.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        cb.setBackground(COLOR_INPUT_BG);
+        cb.setForeground(COLOR_TEXT_WHITE);
+        cb.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        cb.setBorder(new LineBorder(Color.DARK_GRAY));
         cb.setPreferredSize(new Dimension(0, 40));
+        ((JComponent) cb.getRenderer()).setOpaque(true);
     }
 
     private void styleTextArea(JTextArea ta) {
-        ta.setBackground(COLOR_INPUT);
-        ta.setForeground(Color.WHITE);
+        ta.setBackground(COLOR_INPUT_BG);
+        ta.setForeground(COLOR_TEXT_WHITE);
         ta.setCaretColor(COLOR_GOLD);
-        ta.setBorder(new EmptyBorder(8, 8, 8, 8));
         ta.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         ta.setLineWrap(true);
         ta.setWrapStyleWord(true);
+        ta.setBorder(new EmptyBorder(10, 10, 10, 10));
     }
 }
