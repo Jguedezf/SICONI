@@ -52,7 +52,7 @@ public class SupplierManagementDialog extends JDialog {
         // Altura ajustada para evitar cortes en pantallas estándar
         setSize(1250, 680);
         setLocationRelativeTo(parent);
-        setUndecorated(true);
+
 
         try {
             JPanel bgPanel = new ImagePanel("/images/bg_audit.png");

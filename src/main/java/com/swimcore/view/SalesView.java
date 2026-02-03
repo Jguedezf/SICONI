@@ -722,7 +722,7 @@ public class SalesView extends JPanel {
     private class ReceiptOptionDialog extends JDialog {
         public ReceiptOptionDialog(Frame parent, String orderId) {
             super(parent, true);
-            setUndecorated(true);
+
             setSize(450, 220);
             setLocationRelativeTo(parent);
 

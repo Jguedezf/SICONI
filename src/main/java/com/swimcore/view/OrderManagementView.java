@@ -74,7 +74,7 @@ public class OrderManagementView extends JDialog {
         super(owner, LanguageManager.get("workshop.title"), true);
         setSize(1280, 720);
         setLocationRelativeTo(owner);
-        setUndecorated(true);
+
 
         try {
             setContentPane(new ImagePanel("/images/bg_taller.png"));

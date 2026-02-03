@@ -1,12 +1,11 @@
 /*
  * -----------------------------------------------------------------------------
  * ARCHIVO: SaleDAO.java
- * VERSIÓN: 2.5.0 (Analytics Engine Added)
- * FECHA: January 30, 2026
+ * VERSIÓN: 2.5.0 (Original Restored - Reports Compatible)
  * -----------------------------------------------------------------------------
  */
 
-        package com.swimcore.dao;
+package com.swimcore.dao;
 
 import com.swimcore.model.Sale;
 import com.swimcore.model.SaleDetail;
@@ -141,7 +140,7 @@ public class SaleDAO {
     }
 
     // ========================================================================
-    // MÉTODOS DE ANALÍTICA (AGREGADOS PARA EL MÓDULO DE REPORTES)
+    // MÉTODOS DE ANALÍTICA (COMPATIBLES CON REPORTSVIEW)
     // ========================================================================
 
     public Map<String, Double> getFinancialReport(Date startDate, Date endDate) {
@@ -183,6 +182,7 @@ public class SaleDAO {
         } catch (SQLException e) { e.printStackTrace(); }
         return topList;
     }
+
     // --- NUEVO: MÉTODO PARA ELIMINAR PEDIDO (CRUD COMPLETO) ---
     public boolean deleteSale(String saleId) {
         String sqlDetails = "DELETE FROM sale_details WHERE sale_id = ?";
@@ -252,6 +252,5 @@ public class SaleDAO {
             }
         } catch (SQLException e) { e.printStackTrace(); }
         return data;
-
     }
 }

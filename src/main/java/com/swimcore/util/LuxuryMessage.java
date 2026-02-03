@@ -23,7 +23,7 @@ public class LuxuryMessage extends JDialog {
     // Constructor privado
     private LuxuryMessage(Window parent, String title, String message, boolean isError) {
         super(parent, ModalityType.APPLICATION_MODAL);
-        setUndecorated(true);
+
         // Fondo transparente para que el redondeado se vea suave
         setBackground(new Color(0,0,0,0));
 

@@ -60,7 +60,7 @@ public class ClientCheckInDialog extends JDialog {
 
         setSize(600, 720); // Altura ajustada para el contenido extra
         setLocationRelativeTo(parent);
-        setUndecorated(true);
+
         getRootPane().setBorder(new LineBorder(COL_GOLD, 2));
         getContentPane().setBackground(COL_BG);
         setLayout(new BorderLayout());

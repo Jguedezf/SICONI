@@ -1,3 +1,11 @@
+/*
+ * -----------------------------------------------------------------------------
+ * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
+ * ARCHIVO: Conexion.java
+ * VERSIÓN: 3.0.0 (TURBO: WAL Mode + Cache Tuning + Foreign Keys)
+ * -----------------------------------------------------------------------------
+ */
+
 package com.swimcore.dao;
 
 import java.sql.Connection;
@@ -6,36 +14,45 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 /**
- * Gestor centralizado de conexión SQLite (Patrón Singleton).
- * Sincronizado para trabajar con el Main de Johanna Guedez.
+ * Gestor centralizado de conexión SQLite (Patrón Singleton OPTIMIZADO).
+ * Incluye modo WAL y Caché para máxima velocidad en SICONI.
  */
 public class Conexion {
 
-    // Cambiamos a una única constante para la URL
     private static final String URL = "jdbc:sqlite:siconi.db";
     private static Connection con = null;
 
-    // Constructor privado para evitar instancias con 'new'
+    // Constructor privado
     private Conexion() {}
 
     public static synchronized Connection conectar() {
-        // Silencia logs innecesarios
+        // Silencia logs de drivers externos
         System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "off");
 
         try {
             if (con == null || con.isClosed()) {
                 con = DriverManager.getConnection(URL);
 
-                // IMPORTANTE: Activar Foreign Keys en SQLite (por defecto vienen apagadas)
+                // --- OPTIMIZACIÓN DE RENDIMIENTO (EL "MODO TURBO") ---
                 try (Statement stmt = con.createStatement()) {
+                    // 1. Integridad Referencial (Obligatorio)
                     stmt.execute("PRAGMA foreign_keys = ON;");
+
+                    // 2. Modo WAL (Write-Ahead Logging): Permite leer y escribir simultáneamente. ¡VELOCIDAD PURA!
+                    stmt.execute("PRAGMA journal_mode = WAL;");
+
+                    // 3. Synchronous NORMAL: Escribe en disco de forma segura pero sin frenar la UI.
+                    stmt.execute("PRAGMA synchronous = NORMAL;");
+
+                    // 4. Caché en Memoria: Aumentamos la memoria de trabajo para no leer tanto del disco lento.
+                    stmt.execute("PRAGMA cache_size = 10000;");
                 }
 
-                // Confirmación visual profesional
-                System.out.println("💾 SICONI: CONECTADA A BASE DE DATOS SQLITE [OK]");
+                System.out.println("🚀 SICONI: Base de Datos conectada en MODO ALTO RENDIMIENTO.");
             }
         } catch (SQLException e) {
-            System.err.println("❌ Fallo crítico de vinculación: " + e.getMessage());
+            System.err.println("❌ ERROR CRÍTICO DE CONEXIÓN: " + e.getMessage());
+            e.printStackTrace();
         }
         return con;
     }
@@ -44,7 +61,7 @@ public class Conexion {
         try {
             if (con != null && !con.isClosed()) {
                 con.close();
-                System.out.println("🔒 SICONI: Conexión cerrada con éxito.");
+                System.out.println("🔒 SICONI: Conexión cerrada.");
             }
         } catch (SQLException e) {
             e.printStackTrace();

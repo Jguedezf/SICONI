@@ -43,7 +43,7 @@ public class ReceiptPreviewDialog extends JDialog {
 
         setSize(500, 700);
         setLocationRelativeTo(owner);
-        setUndecorated(true);
+
         getRootPane().setBorder(new LineBorder(COLOR_GOLD, 2));
         getContentPane().setBackground(COLOR_BG_DARK);
         setLayout(new BorderLayout());

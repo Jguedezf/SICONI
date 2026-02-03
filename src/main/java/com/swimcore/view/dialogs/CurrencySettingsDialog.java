@@ -29,7 +29,7 @@ public class CurrencySettingsDialog extends JDialog {
         super(owner, "Configuración de Tasa de Cambio", true);
         setSize(400, 350);
         setLocationRelativeTo(owner);
-        setUndecorated(true);
+
         getRootPane().setBorder(BorderFactory.createLineBorder(new Color(220, 0, 115), 2));
 
         JPanel mainPanel = new JPanel(new BorderLayout(10, 10));

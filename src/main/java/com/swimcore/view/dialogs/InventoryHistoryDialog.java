@@ -57,7 +57,7 @@ public class InventoryHistoryDialog extends JDialog {
         super(parent, LanguageManager.get("audit.dialog.title"), ModalityType.APPLICATION_MODAL);
         setSize(1250, 750);
         setLocationRelativeTo(parent);
-        setUndecorated(true);
+
 
         try {
             JPanel bgPanel = new ImagePanel("/images/bg_audit.png");

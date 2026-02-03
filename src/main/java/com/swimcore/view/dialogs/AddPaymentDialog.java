@@ -56,7 +56,7 @@ public class AddPaymentDialog extends JDialog {
         // TAMAÑO OPTIMIZADO (Menos alto)
         setSize(500, 620);
         setLocationRelativeTo(owner);
-        setUndecorated(true);
+
 
         getRootPane().setBorder(new LineBorder(COLOR_GOLD, 2));
 

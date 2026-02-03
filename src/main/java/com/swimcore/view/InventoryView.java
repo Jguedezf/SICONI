@@ -375,7 +375,7 @@ public class InventoryView extends JDialog {
             super(parent, LanguageManager.get("audit.dialog.title"), true);
             setSize(1050, 700);
             setLocationRelativeTo(parent);
-            setUndecorated(true);
+
 
             try {
                 JPanel bgPanel = new ImagePanel("/images/bg_audit.png");

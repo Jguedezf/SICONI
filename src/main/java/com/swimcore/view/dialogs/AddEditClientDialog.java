@@ -85,7 +85,7 @@ public class AddEditClientDialog extends JDialog {
 
         setSize(1150, 680);
         setLocationRelativeTo(owner);
-        setUndecorated(true);
+
         getRootPane().setBorder(new LineBorder(COLOR_GOLD, 2));
 
         // PANEL DE FONDO PRINCIPAL

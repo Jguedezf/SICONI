@@ -55,7 +55,7 @@ public class ClientManagementDialog extends JDialog {
 
         setSize(1150, 700); // Ancho para que quepa todo
         setLocationRelativeTo(owner);
-        setUndecorated(true);
+
         getRootPane().setBorder(BorderFactory.createLineBorder(COLOR_GOLD, 2));
 
         JPanel backgroundPanel = new ImagePanel("/images/bg2.png");
