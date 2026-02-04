@@ -1,13 +1,11 @@
 /*
  * -----------------------------------------------------------------------------
- * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
+ * INSTITUCIÓN: UNEG - SICONI
  * ARCHIVO: ClientController.java
- * VERSIÓN: 2.3.1 (generateNextCode Hotfix)
- * DESCRIPCIÓN: Controlador actualizado. Ahora expone el método para generar
- * el siguiente código de cliente, resolviendo el error de compilación.
+ * VERSIÓN: 3.2.1 (SICONI Integration Verified)
+ * FECHA: 04 de Febrero de 2026 - 04:40 PM
  * -----------------------------------------------------------------------------
  */
-
 package com.swimcore.controller;
 
 import com.swimcore.dao.ClientDAO;
@@ -23,29 +21,23 @@ public class ClientController {
     }
 
     public boolean saveClient(Client client) {
-        // REGLA DE NEGOCIO 1: NOMBRE OBLIGATORIO
         if (client.getFullName() == null || client.getFullName().trim().isEmpty()) {
             System.err.println("Validación Fallida: El nombre es obligatorio.");
             return false;
         }
 
-        // REGLA DE NEGOCIO 2: GENERACIÓN DE ID
         if (client.getCode() == null || client.getCode().trim().isEmpty()) {
-            String newCode = clientDAO.generateNextCode();
-            client.setCode(newCode);
+            client.setCode(clientDAO.generateNextCode());
         }
 
         return clientDAO.saveClient(client);
     }
 
-    // --- EXPONER MÉTODO PARA GENERAR EL SIGUIENTE CÓDIGO (SOLUCIÓN AL ERROR) ---
     public String generateNextCode() {
         return clientDAO.generateNextCode();
     }
 
-    // --- MÉTODO PARA EDITAR ---
     public boolean updateClient(Client client) {
-        // Validación: Debe tener código para saber a quién editar
         if (client.getCode() == null || client.getCode().trim().isEmpty()) {
             return false;
         }
@@ -65,6 +57,7 @@ public class ClientController {
 
     public Client findClientByDNI(String term) {
         if (term == null || term.trim().isEmpty()) return null;
-        return clientDAO.getClientByIdNumber(term);
+        String cleanTerm = term.replace(".", "").trim();
+        return clientDAO.getClientByIdNumber(cleanTerm);
     }
 }

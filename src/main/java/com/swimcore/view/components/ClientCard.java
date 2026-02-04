@@ -2,9 +2,7 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
  * ARCHIVO: ClientCard.java
- * VERSIÓN: 2.1.0 (Persistent Selection State)
- * DESCRIPCIÓN: Se añade un estado de selección para que el borde se
- * mantenga visible incluso después de mover el mouse.
+ * VERSIÓN: 5.0.0 (Colores por Tipo + Nombre Ajustado)
  * -----------------------------------------------------------------------------
  */
 
@@ -19,83 +17,77 @@ import java.awt.event.MouseEvent;
 
 public class ClientCard extends JPanel {
 
-    private final Color COLOR_CARD_BG = new Color(45, 45, 45);
-    private final Border BORDER_DEFAULT = BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(80, 80, 80)),
-            BorderFactory.createEmptyBorder(5, 10, 5, 5)
-    );
-    private final Border BORDER_HOVER = BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(220, 0, 115), 2),
-            BorderFactory.createEmptyBorder(5, 10, 5, 5)
-    );
-    private final Border BORDER_SELECTED = BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(212, 175, 55), 3),
-            BorderFactory.createEmptyBorder(5, 10, 5, 5)
-    );
-
+    private final Color COLOR_CARD_BG = new Color(35, 35, 35);
     private final boolean isSelected;
 
     public ClientCard(Client client, boolean isSelected) {
         this.isSelected = isSelected;
         setLayout(new BorderLayout(10, 10));
         setBackground(COLOR_CARD_BG);
-        setPreferredSize(new Dimension(240, 110));
+        setPreferredSize(new Dimension(250, 110));
 
-        setBorder(isSelected ? BORDER_SELECTED : BORDER_DEFAULT);
+        // COLORES SEGÚN TIPO
+        Color typeColor;
+        String type = client.getIdType() != null ? client.getIdType().toUpperCase() : "V";
+        if (type.equals("J")) typeColor = new Color(255, 215, 0); // Dorado
+        else if (type.equals("E")) typeColor = new Color(0, 200, 200); // Cian
+        else typeColor = new Color(30, 144, 255); // Azul V
 
-        JLabel iconLabel = new JLabel("👤");
-        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 40));
-        iconLabel.setForeground(Color.GRAY);
+        // BORDES
+        Border defaultBorder = BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(typeColor, 1),
+                BorderFactory.createEmptyBorder(5, 10, 5, 5)
+        );
+        Border selectedBorder = BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(255, 215, 0), 3),
+                BorderFactory.createEmptyBorder(3, 8, 3, 3)
+        );
+        setBorder(isSelected ? selectedBorder : defaultBorder);
+
+        // ICONO
+        JLabel iconLabel = new JLabel(type.equals("J") ? "🏢" : "👤");
+        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 38));
+        iconLabel.setForeground(typeColor);
         add(iconLabel, BorderLayout.WEST);
 
+        // TEXTO
         JPanel textPanel = new JPanel();
         textPanel.setOpaque(false);
         textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
 
-        JLabel lblAthlete = new JLabel(client.getAthleteName());
-        lblAthlete.setFont(new Font("Segoe UI", Font.BOLD, 16));
-        lblAthlete.setForeground(Color.WHITE);
+        // NOMBRE CON HTML WRAP
+        String htmlName = String.format("<html><div style='width: 125px;'>%s</div></html>", client.getFullName());
+        JLabel lblName = new JLabel(htmlName);
+        lblName.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        lblName.setForeground(Color.WHITE);
 
-        String clubInfo = (client.getClub() != null && !client.getClub().isEmpty()) ? client.getClub() : "Sin Club";
-        JLabel lblClub = new JLabel(clubInfo);
-        lblClub.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        lblClub.setForeground(new Color(200, 160, 50));
+        textPanel.add(lblName);
 
-        JLabel lblRep = new JLabel("Rep: " + client.getFullName());
-        lblRep.setFont(new Font("Segoe UI", Font.ITALIC, 11));
-        lblRep.setForeground(Color.GRAY);
-
-        textPanel.add(lblAthlete);
-        textPanel.add(lblClub);
-        textPanel.add(Box.createVerticalGlue());
-        textPanel.add(lblRep);
-        add(textPanel, BorderLayout.CENTER);
-
-        JPanel rightPanel = new JPanel(new BorderLayout());
-        rightPanel.setOpaque(false);
-
-        JLabel lblCode = new JLabel(client.getCode());
-        lblCode.setFont(new Font("Consolas", Font.BOLD, 12));
-        lblCode.setForeground(Color.CYAN);
-
-        if (client.isVip()) {
-            lblCode.setText("★ " + client.getCode());
-            lblCode.setForeground(new Color(255, 215, 0));
+        // CLUB (Solo si existe)
+        String club = client.getClub();
+        if (club != null && !club.isEmpty() && !club.equalsIgnoreCase("Sin Club")) {
+            textPanel.add(Box.createVerticalStrut(5));
+            JLabel lblClub = new JLabel(club);
+            lblClub.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+            lblClub.setForeground(typeColor);
+            textPanel.add(lblClub);
         }
 
+        add(textPanel, BorderLayout.CENTER);
+
+        // CODIGO
+        JPanel rightPanel = new JPanel(new BorderLayout());
+        rightPanel.setOpaque(false);
+        JLabel lblCode = new JLabel(client.getCode());
+        lblCode.setFont(new Font("Consolas", Font.BOLD, 12));
+        lblCode.setForeground(Color.GRAY);
         rightPanel.add(lblCode, BorderLayout.NORTH);
         add(rightPanel, BorderLayout.EAST);
 
         setCursor(new Cursor(Cursor.HAND_CURSOR));
         addMouseListener(new MouseAdapter() {
-            public void mouseEntered(MouseEvent e) {
-                if (!isSelected) {
-                    setBorder(BORDER_HOVER);
-                }
-            }
-            public void mouseExited(MouseEvent e) {
-                setBorder(isSelected ? BORDER_SELECTED : BORDER_DEFAULT);
-            }
+            public void mouseEntered(MouseEvent e) { if (!isSelected) setBackground(new Color(50, 50, 50)); }
+            public void mouseExited(MouseEvent e) { if (!isSelected) setBackground(COLOR_CARD_BG); }
         });
     }
 }

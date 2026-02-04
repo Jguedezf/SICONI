@@ -557,7 +557,7 @@ public class OrderManagementView extends JDialog {
         }
     }
 
-    // --- NUEVO: MÉTODO PARA IMPRIMIR RECIBO ---
+    // --- NUEVO: METODO PARA IMPRIMIR RECIBO ---
     private void openPrintReceiptDialog() {
         if (selectedSaleId == null) {
             JOptionPane.showMessageDialog(this, "Seleccione un pedido para imprimir.", "Aviso", JOptionPane.WARNING_MESSAGE);

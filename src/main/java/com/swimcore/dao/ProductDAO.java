@@ -54,7 +54,7 @@ public class ProductDAO {
     }
 
     /**
-     * MÉTODO DE AUDITORÍA (Transaccional).
+     * METODO DE AUDITORÍA (Transaccional).
      * Registra movimientos de entrada/salida en el historial inmutable.
      */
     public boolean auditStock(int productId, int quantity, String observation) {

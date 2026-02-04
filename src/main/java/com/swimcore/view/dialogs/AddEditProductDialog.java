@@ -2,7 +2,8 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
  * ARCHIVO: AddEditProductDialog.java
- * VERSIÓN: 15.0.0 (Luxury Background + Optimized)
+ * VERSIÓN: 14.0.0 (Big Icons + Fucsia/Gold Theme)
+ * FECHA: Enero 2026
  * -----------------------------------------------------------------------------
  */
 
@@ -35,40 +36,31 @@ public class AddEditProductDialog extends JDialog {
     // PALETA LUXURY SICONI
     private final Color COLOR_GOLD = new Color(212, 175, 55);
     private final Color COLOR_VERDE_NEON = new Color(0, 255, 128);
-    private final Color COLOR_FUCSIA_NEON = new Color(255, 0, 127);
-    private final Color COLOR_BG_CAPSULE = new Color(25, 25, 25, 230); // Ligeramente más transparente
+    private final Color COLOR_FUCSIA_NEON = new Color(255, 0, 127); // Fucsia protagonista
+    private final Color COLOR_BG_CAPSULE = new Color(25, 25, 25, 240);
     private final Color COLOR_INPUT_BG = new Color(30, 30, 30);
 
     public AddEditProductDialog(Window parent, Product product) {
-        super(parent, "SICONI - GESTIÓN DE PRODUCTO", ModalityType.APPLICATION_MODAL);
+        super(parent, "SICONI - PRODUCT MASTER CONTROL", ModalityType.APPLICATION_MODAL);
         this.productToEdit = product;
         setupNomenclature();
 
-        setSize(1150, 720);
+        // Tamaño ajustado para evitar cortes
+        setSize(1150, 700);
         setLocationRelativeTo(parent);
-
+        setUndecorated(true);
 
         try {
-            // INTENTO DE CARGAR FONDO ESPECÍFICO
             JPanel bg = new ImagePanel("/images/bg_registro.png");
-            // Si falla, usa el fondo genérico
             if (bg == null) bg = new ImagePanel("/images/bg2.png");
-
             bg.setLayout(new BorderLayout());
             bg.setBorder(new LineBorder(COLOR_GOLD, 2));
             setContentPane(bg);
-        } catch (Exception e) {
-            getContentPane().setBackground(new Color(15, 15, 15));
-            ((JComponent)getContentPane()).setBorder(new LineBorder(COLOR_GOLD, 2));
-        }
+        } catch (Exception e) { getContentPane().setBackground(new Color(10, 10, 10)); }
 
         initUI();
-
-        // Carga diferida de datos para abrir rápido
-        SwingUtilities.invokeLater(() -> {
-            if (productToEdit != null) llenarCampos();
-            else { resetForm(); generarCodigo(); }
-        });
+        if (productToEdit != null) llenarCampos();
+        else { resetForm(); generarCodigo(); }
     }
 
     private void setupNomenclature() {
@@ -82,9 +74,9 @@ public class AddEditProductDialog extends JDialog {
         // HEADER
         JPanel header = new JPanel(new BorderLayout());
         header.setOpaque(false);
-        header.setBorder(new EmptyBorder(30, 50, 10, 50));
+        header.setBorder(new EmptyBorder(25, 50, 10, 50));
 
-        JLabel lblTitle = new JLabel((productToEdit == null ? "REGISTRO MAESTRO DE PRODUCTO" : "EDICIÓN DE ARTÍCULO").toUpperCase(), SwingConstants.CENTER);
+        JLabel lblTitle = new JLabel((productToEdit == null ? "REGISTRO MAESTRO DE PRODUCTO" : "GESTIÓN DE ARTÍCULO").toUpperCase(), SwingConstants.CENTER);
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 32));
         lblTitle.setForeground(COLOR_GOLD);
         header.add(lblTitle, BorderLayout.CENTER);
@@ -95,16 +87,14 @@ public class AddEditProductDialog extends JDialog {
         body.setOpaque(false);
         body.setBorder(new EmptyBorder(10, 40, 40, 20));
 
-        // FORMULARIO CON FONDO SEMI-TRANSPARENTE
+        // FORMULARIO
         JPanel formGrid = new JPanel(new GridBagLayout());
         formGrid.setBackground(COLOR_BG_CAPSULE);
-        formGrid.setBorder(new CompoundBorder(
-                new LineBorder(new Color(100, 80, 20), 1),
-                new EmptyBorder(20, 20, 20, 20)
-        ));
+        // Borde dorado sutil
+        formGrid.setBorder(new LineBorder(new Color(100, 80, 20), 1));
 
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(10, 15, 10, 15);
+        gbc.insets = new Insets(8, 15, 8, 15);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
         // Fila 0
@@ -122,7 +112,7 @@ public class AddEditProductDialog extends JDialog {
         formGrid.add(cmbCategory, gbc);
 
         gbc.gridx = 1;
-        txtCode = crearInput(false, 20, COLOR_GOLD);
+        txtCode = crearInput(false, 20, COLOR_GOLD); // Código en Dorado
         formGrid.add(txtCode, gbc);
 
         // Fila 2
@@ -147,10 +137,11 @@ public class AddEditProductDialog extends JDialog {
         gbc.gridy = 6; gbc.gridx = 0; formGrid.add(crearLabel("EXISTENCIA ACTUAL:"), gbc);
         gbc.gridx = 1; formGrid.add(crearLabel("ALERTA MÍNIMA (RED ZONE):"), gbc);
 
-        // Fila 7
+        // Fila 7 (Controles numéricos)
         gbc.gridy = 7; gbc.gridx = 0;
         formGrid.add(crearNumericSelector(txtStock = crearInput(true, 32, COLOR_VERDE_NEON), COLOR_VERDE_NEON), gbc);
         gbc.gridx = 1;
+        // Alerta en Fucsia/Rojo para destacar
         formGrid.add(crearNumericSelector(txtMinStock = crearInput(true, 32, COLOR_FUCSIA_NEON), COLOR_FUCSIA_NEON), gbc);
 
         // Fila 8
@@ -169,6 +160,7 @@ public class AddEditProductDialog extends JDialog {
         JScrollPane sp = new JScrollPane(txtDesc);
         sp.setPreferredSize(new Dimension(650, 80));
         sp.setBorder(new LineBorder(new Color(80,80,80)));
+        // Focus listener para el borde del scroll
         txtDesc.addFocusListener(new FocusAdapter() {
             public void focusGained(FocusEvent e) { sp.setBorder(new LineBorder(COLOR_GOLD, 1)); }
             public void focusLost(FocusEvent e) { sp.setBorder(new LineBorder(new Color(80,80,80))); }
@@ -179,21 +171,24 @@ public class AddEditProductDialog extends JDialog {
         body.add(formGrid, BorderLayout.CENTER);
 
         // --- SIDEBAR CON ICONOS GIGANTES ---
-        JPanel sideButtons = new JPanel(new GridLayout(4, 1, 0, 20));
+        JPanel sideButtons = new JPanel(new GridLayout(4, 1, 0, 15));
         sideButtons.setOpaque(false);
-        sideButtons.setPreferredSize(new Dimension(220, 0));
-        sideButtons.setBorder(new EmptyBorder(20, 10, 20, 0));
+        sideButtons.setPreferredSize(new Dimension(200, 0));
 
+        // Botón Registrar (Icono grande)
         SoftButton btnSave = crearBigImgButton((productToEdit == null ? "REGISTRAR" : "ACTUALIZAR"), "btn_save.png", COLOR_VERDE_NEON);
         btnSave.addActionListener(e -> guardar());
 
+        // Botón Limpiar (AHORA EN FUCSIA, como pediste)
         SoftButton btnClear = crearBigImgButton("LIMPIAR", "btn_clean.png", COLOR_FUCSIA_NEON);
         btnClear.addActionListener(e -> resetForm());
 
+        // Botón Eliminar
         SoftButton btnDel = crearBigImgButton("ELIMINAR", "btn_delete.png", new Color(255, 50, 50));
         btnDel.setVisible(productToEdit != null);
         btnDel.addActionListener(e -> eliminar());
 
+        // Botón Volver
         SoftButton btnBack = crearBigImgButton("VOLVER", "btn_back.png", Color.WHITE);
         btnBack.addActionListener(e -> dispose());
 
@@ -206,16 +201,15 @@ public class AddEditProductDialog extends JDialog {
         add(body, BorderLayout.CENTER);
     }
 
+    // MÉTODO MAESTRO PARA ICONOS GIGANTES (110px) Y COLOR PERSONALIZADO
     private SoftButton crearBigImgButton(String texto, String imgName, Color textColor) {
         SoftButton btn = new SoftButton(null) {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(new Color(30, 30, 30));
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
-                g2.setColor(new Color(60, 60, 60));
-                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 20, 20);
+                g2.setColor(new Color(30, 30, 30)); // Fondo oscuro
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20); // Redondeado perfecto
                 g2.dispose();
                 super.paintComponent(g);
             }
@@ -227,20 +221,21 @@ public class AddEditProductDialog extends JDialog {
         try {
             URL url = getClass().getResource("/images/icons/" + imgName);
             if (url != null) {
-                ImageIcon icon = new ImageIcon(new ImageIcon(url).getImage().getScaledInstance(90, 90, Image.SCALE_SMOOTH));
+                // ESCALADO 110x110
+                ImageIcon icon = new ImageIcon(new ImageIcon(url).getImage().getScaledInstance(110, 110, Image.SCALE_SMOOTH));
                 lIcon.setIcon(icon);
             }
         } catch (Exception e) {}
 
         JLabel lblText = new JLabel(texto, SwingConstants.CENTER);
         lblText.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        // Usamos el color pasado como argumento (Fucsia para limpiar, Verde para guardar)
         lblText.setForeground(textColor);
-        lblText.setBorder(new EmptyBorder(0,0,10,0));
 
         btn.add(lIcon, BorderLayout.CENTER);
         btn.add(lblText, BorderLayout.SOUTH);
         btn.setBorder(new EmptyBorder(5,5,5,5));
-        btn.setOpaque(false);
+        btn.setOpaque(false); // CRUCIAL para evitar el cuadrado
         return btn;
     }
 
@@ -248,6 +243,7 @@ public class AddEditProductDialog extends JDialog {
         JPanel p = new JPanel(new BorderLayout(5, 0));
         p.setOpaque(false);
 
+        // Botones +/- más estilizados
         SoftButton btnMinus = createSmallButton("−", color);
         btnMinus.addActionListener(e -> { try { int v = Integer.parseInt(field.getText()); if(v > 0) field.setText(String.valueOf(v - 1)); } catch(Exception ex) {} });
 
@@ -296,7 +292,7 @@ public class AddEditProductDialog extends JDialog {
         f.setFont(new Font("Segoe UI", Font.BOLD, size));
         f.setEditable(ed);
         f.setBorder(new LineBorder(new Color(80,80,80)));
-        f.setPreferredSize(new Dimension(0, 45));
+        f.setPreferredSize(new Dimension(0, 45)); // Altura cómoda
         f.addFocusListener(new FocusAdapter() {
             public void focusGained(FocusEvent e) { f.setBorder(new LineBorder(COLOR_GOLD, 2)); f.selectAll(); }
             public void focusLost(FocusEvent e) { f.setBorder(new LineBorder(new Color(80,80,80))); }

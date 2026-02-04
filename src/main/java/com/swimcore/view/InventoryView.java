@@ -1,3 +1,4 @@
+
 /*
 INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
 ARCHIVO: InventoryView.java

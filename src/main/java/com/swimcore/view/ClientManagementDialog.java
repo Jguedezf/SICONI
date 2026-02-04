@@ -2,13 +2,12 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: UNEG - SICONI
  * ARCHIVO: ClientManagementDialog.java
- * VERSIÓN: 4.0.0 (Command Center UI)
- * FECHA: January 27, 2026 - 11:55PM
- * DESCRIPCIÓN: Rediseño completo a "Centro de Mando".
- * 1. Barra de búsqueda inteligente con lupa y filtro en tiempo real.
- * 2. Panel de acciones contextual (Editar/Eliminar solo al seleccionar).
- * 3. Lógica de visibilidad corregida para "Modo Selección" vs "Modo Gestión".
- * 4. Botón "Volver" reubicado en el footer para mejor UX.
+ * VERSIÓN: 8.0.0 (ANTI-FREEZE: Asynchronous Loading)
+ * DESCRIPCIÓN:
+ * 1. RENDIMIENTO: Toda la carga de datos (inicial y refresco) se hace en un hilo
+ *    secundario (SwingWorker), eliminando el "botón hundido" y la lentitud.
+ * 2. UX: Se muestra un mensaje de "Cargando..." y los botones se desactivan
+ *    mientras se conecta a la base de datos.
  * -----------------------------------------------------------------------------
  */
 
@@ -29,20 +28,21 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.*;
 import java.net.URL;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
 public class ClientManagementDialog extends JDialog {
 
-    private final ClientController controller;
-    private List<Client> allClients;
+    private ClientController controller; // Se inicializará en segundo plano
+    private List<Client> allClients = Collections.emptyList(); // Inicia como lista vacía
     private JPanel cardsPanel;
     private Client selectedClient = null;
     private final boolean isSelectionMode;
 
     private JTextField txtSearch;
     private JLabel lblTitle;
-    private SoftButton btnNew, btnEdit, btnDelete, btnConfirm;
+    private SoftButton btnNew, btnEdit, btnDelete, btnConfirm, btnBack;
 
     private final Color COLOR_GOLD = new Color(212, 175, 55);
     private final Color COLOR_FUCSIA = new Color(220, 0, 115);
@@ -50,10 +50,9 @@ public class ClientManagementDialog extends JDialog {
 
     public ClientManagementDialog(Frame owner, boolean isSelectionMode) {
         super(owner, LanguageManager.get("clients.title"), true);
-        this.controller = new ClientController();
         this.isSelectionMode = isSelectionMode;
 
-        setSize(1150, 700); // Ancho para que quepa todo
+        setSize(1150, 700);
         setLocationRelativeTo(owner);
 
         getRootPane().setBorder(BorderFactory.createLineBorder(COLOR_GOLD, 2));
@@ -68,16 +67,74 @@ public class ClientManagementDialog extends JDialog {
         add(createActionPanel(), BorderLayout.EAST);
         add(createFooter(), BorderLayout.SOUTH);
 
-        loadAllClients();
-        refreshClientCards(allClients);
-        updateButtonStates(); // Lógica centralizada para botones
+        // --- INICIAMOS LA CARGA ASÍNCRONA ---
+        loadAndRefreshClientsAsync();
     }
 
     public ClientManagementDialog(Frame owner) { this(owner, false); }
 
     public Client getSelectedClient() { return selectedClient; }
 
-    // --- CONSTRUCCIÓN DE LA INTERFAZ ---
+    // --- MÉTODO CLAVE: CARGA DE DATOS SIN CONGELAR LA UI ---
+    private void loadAndRefreshClientsAsync() {
+        // 1. Desactivar botones y mostrar "Cargando..."
+        setActionsEnabled(false);
+        showLoadingState();
+
+        // 2. Crear el hilo de trabajo
+        new SwingWorker<List<Client>, Void>() {
+            @Override
+            protected List<Client> doInBackground() throws Exception {
+                // Esto se ejecuta en un hilo secundario
+                if (controller == null) {
+                    controller = new ClientController(); // La primera vez, se conecta a la BD aquí
+                }
+                return controller.getAllClients(); // La consulta pesada se hace aquí
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    // Esto se ejecuta en el hilo principal cuando termina lo anterior
+                    allClients = get(); // Obtenemos la lista de clientes
+                    refreshClientCards(allClients); // Actualizamos las tarjetas
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    showErrorState("Error al cargar datos.");
+                } finally {
+                    // 3. Reactivar los botones
+                    setActionsEnabled(true);
+                    updateButtonStates();
+                }
+            }
+        }.execute();
+    }
+
+    private void showLoadingState() {
+        cardsPanel.removeAll();
+        JLabel loadingLabel = new JLabel("Cargando clientes...");
+        loadingLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        loadingLabel.setForeground(Color.GRAY);
+        cardsPanel.add(loadingLabel);
+        cardsPanel.revalidate();
+        cardsPanel.repaint();
+    }
+
+    private void showErrorState(String message) {
+        cardsPanel.removeAll();
+        JLabel errorLabel = new JLabel(message);
+        errorLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        errorLabel.setForeground(COLOR_FUCSIA);
+        cardsPanel.add(errorLabel);
+        cardsPanel.revalidate();
+        cardsPanel.repaint();
+    }
+
+    private void setActionsEnabled(boolean enabled) {
+        btnNew.setEnabled(enabled);
+        btnBack.setEnabled(enabled);
+        // Edit y Delete dependen de la selección, se manejan en updateButtonStates
+    }
 
     private JPanel createHeader() {
         JPanel headerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
@@ -97,18 +154,21 @@ public class ClientManagementDialog extends JDialog {
         mainPanel.setOpaque(false);
         mainPanel.setBorder(new EmptyBorder(10, 30, 20, 20));
 
-        // 1. Panel de Búsqueda (Nuevo y Mejorado)
         mainPanel.add(createSearchPanel(), BorderLayout.NORTH);
 
-        // 2. Panel de Tarjetas
-        cardsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 20, 20));
+        cardsPanel = new JPanel(new GridLayout(0, 3, 15, 15));
         cardsPanel.setOpaque(false);
+        cardsPanel.setBorder(new EmptyBorder(10, 10, 120, 10));
 
-        JScrollPane scrollPane = new JScrollPane(cardsPanel);
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.setOpaque(false);
+        wrapper.add(cardsPanel, BorderLayout.NORTH);
+
+        JScrollPane scrollPane = new JScrollPane(wrapper);
         scrollPane.setOpaque(false);
         scrollPane.getViewport().setOpaque(false);
         scrollPane.setBorder(null);
-        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(20);
         scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
         mainPanel.add(scrollPane, BorderLayout.CENTER);
@@ -175,13 +235,11 @@ public class ClientManagementDialog extends JDialog {
         actionPanel.setBorder(new EmptyBorder(30, 10, 20, 30));
         actionPanel.setPreferredSize(new Dimension(240, 0));
 
-        // 1. Nuevo Cliente
         btnNew = createActionButton(LanguageManager.get("clients.btn.new"), "/images/icons/icon_add_user_gold.png");
         btnNew.addActionListener(e -> openAddEditDialog(null));
         actionPanel.add(btnNew);
         actionPanel.add(Box.createVerticalStrut(15));
 
-        // 2. Editar Cliente
         btnEdit = createActionButton(LanguageManager.get("clients.btn.edit"), "/images/icons/icon_edit_gold.png");
         btnEdit.addActionListener(e -> {
             if (selectedClient != null) openAddEditDialog(selectedClient);
@@ -189,13 +247,11 @@ public class ClientManagementDialog extends JDialog {
         actionPanel.add(btnEdit);
         actionPanel.add(Box.createVerticalStrut(15));
 
-        // 3. Eliminar Cliente
         btnDelete = createActionButton(LanguageManager.get("clients.btn.delete"), "/images/icons/icon_delete_gold.png");
         btnDelete.addActionListener(e -> deleteSelectedClient());
         actionPanel.add(btnDelete);
         actionPanel.add(Box.createVerticalStrut(15));
 
-        // 4. Botón de Confirmar (solo para modo selección)
         btnConfirm = createActionButton(LanguageManager.get("clients.btn.confirm"), "/images/icons/icon_check_gold.png");
         btnConfirm.setForeground(COLOR_FUCSIA);
         btnConfirm.addActionListener(e -> {
@@ -203,7 +259,7 @@ public class ClientManagementDialog extends JDialog {
         });
         actionPanel.add(btnConfirm);
 
-        actionPanel.add(Box.createVerticalGlue()); // Empuja el resto hacia arriba
+        actionPanel.add(Box.createVerticalGlue());
         return actionPanel;
     }
 
@@ -212,7 +268,7 @@ public class ClientManagementDialog extends JDialog {
         footerPanel.setOpaque(false);
         footerPanel.setBorder(new EmptyBorder(0, 0, 20, 30));
 
-        SoftButton btnBack = createActionButton(LanguageManager.get("clients.btn.back"), "/images/icons/icon_cancel_gold.png");
+        btnBack = createActionButton(LanguageManager.get("clients.btn.back"), "/images/icons/icon_cancel_gold.png");
         btnBack.addActionListener(e -> {
             selectedClient = null;
             dispose();
@@ -242,8 +298,6 @@ public class ClientManagementDialog extends JDialog {
         return null;
     }
 
-    // --- LÓGICA DE LA APLICACIÓN ---
-
     private void updateButtonStates() {
         boolean clientIsSelected = (selectedClient != null);
 
@@ -266,20 +320,17 @@ public class ClientManagementDialog extends JDialog {
     private void onCardSelected(Client client) {
         this.selectedClient = client;
         updateButtonStates();
-        refreshClientCards(allClients); // Refresca para mostrar el borde seleccionado
+        refreshClientCards(allClients); // Refresca visualmente la selección
     }
 
+    // --- MÉTODO MODIFICADO ---
     private void openAddEditDialog(Client clientToEdit) {
-        new AddEditClientDialog((Frame) this.getOwner(), clientToEdit);
+        // La ventana AddEditClientDialog ya es rápida por sí misma
+        AddEditClientDialog dialog = new AddEditClientDialog((Frame) this.getOwner(), clientToEdit);
+        dialog.setVisible(true); // Se queda aquí hasta que se cierre
 
-        // Refrescar todo al volver
-        loadAllClients();
-        String currentSearch = txtSearch.getText();
-        if(!currentSearch.equals(PLACEHOLDER_TEXT) && !currentSearch.isEmpty()){
-            filterClients(currentSearch);
-        } else {
-            refreshClientCards(allClients);
-        }
+        // Al volver, recargamos la lista de forma asíncrona para no congelar
+        loadAndRefreshClientsAsync();
 
         selectedClient = null;
         updateButtonStates();
@@ -288,24 +339,17 @@ public class ClientManagementDialog extends JDialog {
     private void deleteSelectedClient() {
         if (selectedClient == null) return;
 
-        String msg = String.format(LanguageManager.get("clients.msg.delete.confirm"), selectedClient.getFullName());
-        int opt = JOptionPane.showConfirmDialog(this, msg, LanguageManager.get("clients.msg.delete.title"), JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        int opt = JOptionPane.showConfirmDialog(this, "¿Eliminar a " + selectedClient.getFullName() + "?", "Confirmar", JOptionPane.YES_NO_OPTION);
 
         if (opt == JOptionPane.YES_OPTION) {
             if (controller.deleteClient(selectedClient.getCode())) {
                 LuxuryMessage.show("Éxito", LanguageManager.get("clients.msg.delete.success"), false);
                 selectedClient = null;
-                loadAllClients();
-                filterClients(txtSearch.getText()); // Re-filtrar
-                updateButtonStates();
+                loadAndRefreshClientsAsync(); // Refresco asíncrono
             } else {
                 LuxuryMessage.show("Error", LanguageManager.get("clients.msg.delete.error"), true);
             }
         }
-    }
-
-    private void loadAllClients() {
-        this.allClients = controller.getAllClients();
     }
 
     private void filterClients(String query) {
@@ -316,9 +360,7 @@ public class ClientManagementDialog extends JDialog {
             List<Client> filteredList = allClients.stream()
                     .filter(client ->
                             client.getFullName().toLowerCase().contains(lowerCaseQuery) ||
-                                    client.getAthleteName().toLowerCase().contains(lowerCaseQuery) ||
-                                    (client.getCode() != null && client.getCode().toLowerCase().contains(lowerCaseQuery)) ||
-                                    (client.getIdNumber() != null && client.getIdNumber().contains(lowerCaseQuery))
+                                    client.getCode().toLowerCase().contains(lowerCaseQuery)
                     )
                     .collect(Collectors.toList());
             refreshClientCards(filteredList);
@@ -327,7 +369,7 @@ public class ClientManagementDialog extends JDialog {
 
     private void refreshClientCards(List<Client> clients) {
         cardsPanel.removeAll();
-        if (clients.isEmpty()) {
+        if (clients.isEmpty() && controller != null) { // Evita mostrar "no hay" mientras carga
             JLabel emptyLabel = new JLabel(LanguageManager.get("clients.msg.empty"));
             emptyLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
             emptyLabel.setForeground(Color.GRAY);
@@ -342,9 +384,9 @@ public class ClientManagementDialog extends JDialog {
                         onCardSelected(client);
                         if (e.getClickCount() == 2) {
                             if (isSelectionMode) {
-                                dispose(); // Selecciona y cierra
+                                dispose();
                             } else {
-                                openAddEditDialog(client); // Abre para editar
+                                openAddEditDialog(client);
                             }
                         }
                     }

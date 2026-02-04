@@ -1,34 +1,37 @@
+/*
+ * -----------------------------------------------------------------------------
+ * ARCHIVO: Client.java
+ * VERSIÓN: 3.3.0 (Sincronizado con Talla)
+ * FECHA: 04 de Febrero de 2026
+ * -----------------------------------------------------------------------------
+ */
 package com.swimcore.model;
 
 public class Client {
     private int id;
-    private String code, idType, idNumber, fullName, profession, phone, alternatePhone, email, instagram, address, athleteName, birthDate, club, category, measurements;
+    private String code, idType, idNumber, fullName, phone, email, instagram;
     private boolean isVip;
+    private String athleteName, birthDate, club, category, measurements, address, profession, alternatePhone;
+    private String size; // <--- CAMPO DE TALLA AGREGADO
 
     public Client() {}
 
     public Client(int id, String code, String idType, String idNumber, String fullName,
                   String phone, String email, String instagram, boolean isVip,
                   String athleteName, String birthDate, String club, String category,
-                  String measurements, String address, String profession, String alternatePhone) {
-        this.id = id;
-        this.code = code;
-        this.idType = idType;
-        this.idNumber = idNumber;
-        this.fullName = fullName;
-        this.phone = phone;
-        this.email = email;
-        this.instagram = instagram;
-        this.isVip = isVip;
-        this.athleteName = athleteName;
-        this.birthDate = birthDate;
-        this.club = club;
-        this.category = category;
-        this.measurements = measurements;
-        this.address = address;
-        this.profession = profession;
-        this.alternatePhone = alternatePhone;
+                  String measurements, String address, String profession, String alternatePhone, String size) {
+        this.id = id; this.code = code; this.idType = idType; this.idNumber = idNumber;
+        this.fullName = fullName; this.phone = phone; this.email = email;
+        this.instagram = instagram; this.isVip = isVip; this.athleteName = athleteName;
+        this.birthDate = birthDate; this.club = club; this.category = category;
+        this.measurements = measurements; this.address = address;
+        this.profession = profession; this.alternatePhone = alternatePhone;
+        this.size = size; // <--- INICIALIZADO
     }
+
+    // --- Getters y Setters ---
+    public String getSize() { return size; }
+    public void setSize(String size) { this.size = size; }
 
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
