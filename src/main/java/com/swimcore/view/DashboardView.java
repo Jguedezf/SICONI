@@ -2,14 +2,13 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
  * ARCHIVO: DashboardView.java
- * VERSIÓN: 3.2.1 (Window Width Expansion & Responsive Fix)
- * DESCRIPCIÓN:
- * 1. Ventana de ventas ensanchada a 1280x750 para corregir cortes visuales.
- * 2. Ajuste de layout para asegurar que los paneles internos se expandan.
+ * VERSIÓN: 3.3.5 (Transition Fix)
+ * DESCRIPCIÓN: Optimización de transiciones entre ventanas para evitar
+ * la sensación de bloqueo o "pantalla fantasma".
  * -----------------------------------------------------------------------------
  */
 
-        package com.swimcore.view;
+package com.swimcore.view;
 
 import com.swimcore.dao.ProductDAO;
 import com.swimcore.model.Product;
@@ -76,25 +75,23 @@ public class DashboardView extends JFrame {
             if (url != null) {
                 ImageIcon icon = new ImageIcon(new ImageIcon(url).getImage().getScaledInstance(150, -1, Image.SCALE_SMOOTH));
                 lblLogo.setIcon(icon);
-            } else {
-                lblLogo.setText("SICONI");
-                lblLogo.setFont(new Font("Segoe UI", Font.BOLD, 28));
-                lblLogo.setForeground(Color.WHITE);
             }
         } catch (Exception e) {}
 
         leftPanel.add(lblLogo);
         leftPanel.add(Box.createVerticalStrut(10));
 
-        alertCardStock = new AlertCard("⚠️", LanguageManager.get("dashboard.alert.calc"));
-        alertCardStock.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                SoundManager.getInstance().playClick();
-                InventoryView inventoryView = new InventoryView(DashboardView.this);
-                inventoryView.setVisible(true);
-            }
+        alertCardStock = new AlertCard("⚠️", LanguageManager.get("dashboard.alert.calc"), () -> {
+            SoundManager.getInstance().playClick();
+            setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR)); // Feedback visual
+            InventoryView inventoryView = new InventoryView(DashboardView.this);
+            try {
+                inventoryView.mostrarSoloBajoStock();
+            } catch (Exception ex) {}
+            inventoryView.setVisible(true);
+            setCursor(Cursor.getDefaultCursor());
         });
+
         leftPanel.add(alertCardStock);
 
         JPanel rateWidget = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
@@ -133,7 +130,8 @@ public class DashboardView extends JFrame {
                 try {
                     long lowStockCount = get();
                     if (lowStockCount > 0) {
-                        alertCardStock.setMessage(String.format(LanguageManager.get("dashboard.alert.msg"), lowStockCount));
+                        String msg = String.format("<b>%d</b> productos requieren atención", lowStockCount);
+                        alertCardStock.setMessage(msg);
                         alertCardStock.setVisible(true);
                     } else { alertCardStock.setVisible(false); }
                 } catch (Exception e) { alertCardStock.setVisible(false); }
@@ -147,37 +145,50 @@ public class DashboardView extends JFrame {
         JPanel grid = new JPanel(new GridLayout(2, 3, 25, 25));
         grid.setOpaque(false);
 
-        // --- 1. NUEVO PEDIDO (ANCHO AUMENTADO Y LAYOUT MEJORADO) ---
+        // --- 1. NUEVO PEDIDO (OPTIMIZADO) ---
         grid.add(createBigButton(LanguageManager.get("dashboard.btn.newOrder"), LanguageManager.get("dashboard.btn.newOrder.sub"), "/images/orders.png", "🛒", e -> {
-            ClientManagementDialog selector = new ClientManagementDialog(this, true);
-            selector.setVisible(true);
-            Client clienteSeleccionado = selector.getSelectedClient();
+            // Cambio cursor para indicar proceso
+            setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
-            if (clienteSeleccionado != null) {
-                JDialog frameVentas = new JDialog(this, "SICONI - NUEVO PEDIDO", true);
+            // Usamos invokeLater para que el botón termine su animación antes de abrir el diálogo
+            SwingUtilities.invokeLater(() -> {
+                ClientManagementDialog selector = new ClientManagementDialog(this, true);
+                selector.setVisible(true);
+                Client clienteSeleccionado = selector.getSelectedClient();
 
-                // --- MODIFICACIÓN DE TAMAÑO PARA PANTALLA ANCHA ---
-                frameVentas.setUndecorated(false);
-                frameVentas.setSize(1280, 750); // Ancho aumentado a 1280px para evitar cortes
-                frameVentas.setLocationRelativeTo(this);
+                if (clienteSeleccionado != null) {
+                    // AQUÍ ESTÁ EL ARREGLO:
+                    // Si el cliente fue seleccionado, forzamos la carga de la ventana de ventas
+                    // asegurando que el cursor siga esperando hasta que aparezca.
 
-                ImagePanel background = new ImagePanel("/images/bg3.png");
-                background.setLayout(new BorderLayout()); // Asegura que SalesView ocupe todo el espacio
-                background.add(new SalesView(clienteSeleccionado), BorderLayout.CENTER);
+                    JDialog frameVentas = new JDialog(this, "SICONI - NUEVO PEDIDO", true);
+                    frameVentas.setUndecorated(false);
+                    frameVentas.setSize(1280, 750);
+                    frameVentas.setLocationRelativeTo(this);
 
-                frameVentas.setContentPane(background);
-                frameVentas.setVisible(true);
+                    try {
+                        ImagePanel background = new ImagePanel("/images/bg3.png");
+                        background.setLayout(new BorderLayout());
+                        background.add(new SalesView(clienteSeleccionado), BorderLayout.CENTER);
+                        frameVentas.setContentPane(background);
+                    } catch (Exception ex) {
+                        frameVentas.add(new SalesView(clienteSeleccionado));
+                    }
 
-                updateStockAlert();
-            }
+                    frameVentas.setVisible(true);
+                    updateStockAlert();
+                }
+                setCursor(Cursor.getDefaultCursor());
+            });
         }));
 
-        // ... (El resto de los botones se mantienen igual) ...
         grid.add(createBigButton(LanguageManager.get("dashboard.btn.inventory"), LanguageManager.get("dashboard.btn.inventory.sub"), "/images/inventory.png", "📦", e -> {
             setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-            new InventoryView(this).setVisible(true);
-            setCursor(Cursor.getDefaultCursor());
-            updateStockAlert();
+            SwingUtilities.invokeLater(() -> {
+                new InventoryView(this).setVisible(true);
+                setCursor(Cursor.getDefaultCursor());
+                updateStockAlert();
+            });
         }));
 
         grid.add(createBigButton(LanguageManager.get("dashboard.btn.workshop"), LanguageManager.get("dashboard.btn.workshop.sub"), "/images/workshop.png", "✂️", e -> {
@@ -190,8 +201,10 @@ public class DashboardView extends JFrame {
 
         grid.add(createBigButton(LanguageManager.get("dashboard.btn.reports"), LanguageManager.get("dashboard.btn.reports.sub"), "/images/reports.png", "📊", e -> {
             setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-            new ReportsView(this).setVisible(true);
-            setCursor(Cursor.getDefaultCursor());
+            SwingUtilities.invokeLater(() -> {
+                new ReportsView(this).setVisible(true);
+                setCursor(Cursor.getDefaultCursor());
+            });
         }));
 
         JButton btnExit = createBigButton(LanguageManager.get("dashboard.btn.exit"), LanguageManager.get("dashboard.btn.exit.sub"), "/images/logout.png", "🚪", null);

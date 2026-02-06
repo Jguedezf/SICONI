@@ -2,44 +2,79 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: UNEG - SICONI
  * ARCHIVO: ReceiptPreviewDialog.java
- * VERSIÓN: 1.0.0 (LUXURY TICKET: Vista Previa + Impresión Real)
+ * VERSIÓN: 6.1.0 (TicketItem Visibility Fix)
+ * DESCRIPCIÓN: Recibo que recibe los datos directamente de la vista principal.
+ * Se corrige visibilidad de TicketItem para acceso externo.
  * -----------------------------------------------------------------------------
  */
 
 package com.swimcore.view.dialogs;
 
-import com.swimcore.dao.ClientDAO;
-import com.swimcore.model.Client;
-import com.swimcore.util.ImagePanel; // Usamos tu gestor de imágenes si aplica, o color sólido
 import com.swimcore.view.components.SoftButton;
 
 import javax.swing.*;
-import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
-import javax.swing.border.MatteBorder;
 import java.awt.*;
 import java.awt.print.*;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Locale;
+import java.io.File; // Necesario para File
+import java.awt.Desktop; // Necesario para Desktop.getDesktop().open()
 
 public class ReceiptPreviewDialog extends JDialog {
 
-    private final String saleId;
-    private JPanel ticketPanel; // El panel que se imprimirá (Papel Blanco)
+    // --- CLASE INTERNA PARA TRANSPORTAR LOS DETALLES ---
+    public static class TicketItem {
+        // !!! MODIFICACIÓN CLAVE: Hacer las variables públicas !!!
+        public String name;
+        public int qty;
+        public double subtotal;
+
+        public TicketItem(String name, int qty, double subtotal) {
+            this.name = name;
+            this.qty = qty;
+            this.subtotal = subtotal;
+        }
+    }
+
+    // --- DATOS DEL RECIBO ---
+    private final String saleCode;
+    private final String dateStr;
+    private final String clientName;
+    private final String clientPhone;
+    private final List<TicketItem> items;
+    private final double total;
+    private final double paid;
+    private final double balance;
+
+    private JPanel ticketPanel; // El panel que se imprimirá
 
     // --- PALETA LUXURY ---
     private final Color COLOR_BG_DARK = new Color(18, 18, 18);
     private final Color COLOR_GOLD = new Color(212, 175, 55);
 
-    public ReceiptPreviewDialog(Dialog owner, String saleId) {
-        super(owner, "Vista Previa del Recibo", true);
-        this.saleId = saleId;
+    /**
+     * CONSTRUCTOR NUEVO: Recibe TODOS los datos necesarios.
+     */
+    public ReceiptPreviewDialog(Window owner,
+                                String saleCode, String dateStr,
+                                String clientName, String clientPhone,
+                                List<TicketItem> items,
+                                double total, double paid, double balance) {
+
+        super(owner, "Vista Previa del Recibo", ModalityType.APPLICATION_MODAL);
+
+        // Asignamos los datos recibidos
+        this.saleCode = saleCode;
+        this.dateStr = dateStr;
+        this.clientName = (clientName == null || clientName.isEmpty()) ? "MOSTRADOR" : clientName;
+        this.clientPhone = (clientPhone == null) ? "" : clientPhone;
+        this.items = (items == null) ? new ArrayList<>() : items;
+        this.total = total;
+        this.paid = paid;
+        this.balance = balance;
 
         setSize(500, 700);
         setLocationRelativeTo(owner);
@@ -57,97 +92,73 @@ public class ReceiptPreviewDialog extends JDialog {
 
         // 2. EL TICKET (VISUAL)
         ticketPanel = createTicketVisual();
-        loadTicketData(); // Llenar con datos reales
 
-        // Scroll por si el ticket es muy largo
         JScrollPane scroll = new JScrollPane(ticketPanel);
         scroll.setBorder(null);
         scroll.getViewport().setBackground(COLOR_BG_DARK);
+
+        JPanel wrapper = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        wrapper.setBackground(COLOR_BG_DARK);
+        wrapper.add(ticketPanel);
+        scroll.setViewportView(wrapper);
+
         add(scroll, BorderLayout.CENTER);
 
-        // 3. BOTONES DE ACCIÓN
+        // 3. PINTAR DATOS (Directo de variables, CERO SQL)
+        renderTicketData();
+
+        // 4. BOTONES
         add(createFooter(), BorderLayout.SOUTH);
     }
 
     private JPanel createTicketVisual() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBackground(Color.WHITE); // PAPEL BLANCO
-        // Formato Ticket (Ancho fijo simulado con margen)
+        panel.setBackground(Color.WHITE);
         panel.setBorder(new EmptyBorder(20, 40, 20, 40));
+        panel.setPreferredSize(new Dimension(380, 500));
         return panel;
     }
 
-    private void loadTicketData() {
+    private void renderTicketData() {
         ticketPanel.removeAll();
 
         // --- A. CABECERA ---
         addTicketText("SICONI", 24, true, Color.BLACK);
         addTicketText("TALLER DE CONFECCIÓN", 12, false, Color.DARK_GRAY);
         addTicketText("Puerto Ordaz, Venezuela", 10, false, Color.GRAY);
-        addTicketText("Tlf: +58 414-1234567", 10, false, Color.GRAY);
+        addTicketText("R.I.F: V-14089807-1", 10, false, Color.GRAY);
         addSeparator();
 
-        // --- B. DATOS DEL PEDIDO ---
-        try (Connection conn = com.swimcore.dao.Conexion.conectar()) {
-            String sql = "SELECT * FROM sales WHERE id = ?";
-            PreparedStatement pst = conn.prepareStatement(sql);
-            pst.setString(1, saleId);
-            ResultSet rs = pst.executeQuery();
+        // --- B. DATOS GENERALES ---
+        addTicketLeftRight("RECIBO N°:", saleCode);
+        addTicketLeftRight("FECHA:", (dateStr.length() > 10 ? dateStr.substring(0, 10) : dateStr));
+        addSeparator();
 
-            if (rs.next()) {
-                String fecha = rs.getString("date");
-                int clientId = rs.getInt("client_id");
+        addTicketLeftRight("CLIENTE:", clientName);
+        if(!clientPhone.isEmpty()) addTicketLeftRight("TLF:", clientPhone);
+        addSeparator();
 
-                // Buscar Cliente
-                ClientDAO clientDao = new ClientDAO();
-                Client client = clientDao.getAllClients().stream()
-                        .filter(c -> c.getId() == clientId).findFirst().orElse(null);
+        // --- C. ÍTEMS (Iteramos la lista que recibimos) ---
+        addTicketText("DETALLE DE PEDIDO", 12, true, Color.BLACK);
+        addBox(5);
 
-                addTicketLeftRight("RECIBO N°:", saleId);
-                addTicketLeftRight("FECHA:", fecha.substring(0, 10));
-                addSeparator();
-
-                if (client != null) {
-                    addTicketLeftRight("CLIENTE:", client.getFullName());
-                    addTicketLeftRight("TLF:", client.getPhone());
-                }
-                addSeparator();
-
-                // --- C. ÍTEMS ---
-                addTicketText("DETALLE DE PEDIDO", 12, true, Color.BLACK);
-                addBox(5);
-
-                String sqlItems = "SELECT p.name, d.quantity, p.price_usd FROM sale_details d JOIN products p ON d.product_id = p.id WHERE d.sale_id = ?";
-                PreparedStatement pstItems = conn.prepareStatement(sqlItems);
-                pstItems.setString(1, saleId);
-                ResultSet rsItems = pstItems.executeQuery();
-
-                while (rsItems.next()) {
-                    String prodName = rsItems.getString("name");
-                    int qty = rsItems.getInt("quantity");
-                    double price = rsItems.getDouble("price_usd");
-                    double sub = qty * price;
-
-                    // Formato: "2 x Boxer Basico ($20.00)"
-                    addTicketItem(qty + " x " + prodName, String.format("$%.2f", sub));
-                }
-                addSeparator();
-
-                // --- D. TOTALES ---
-                double total = rs.getDouble("total_divisa");
-                double abonado = rs.getDouble("amount_paid_usd");
-                double resta = rs.getDouble("balance_due_usd");
-
-                addTicketTotal("TOTAL:", total, false);
-                addTicketTotal("ABONADO:", abonado, false);
-                addTicketTotal("RESTA:", resta, true); // Negrita para la deuda
+        if (items.isEmpty()) {
+            addTicketText("(Sin detalles)", 10, false, Color.GRAY);
+        } else {
+            for (TicketItem item : items) {
+                // Formato: "1 x Pantalon ($20.00)"
+                String precioFmt = String.format(Locale.US, "$%.2f", item.subtotal);
+                addTicketItem(item.qty + " x " + item.name, precioFmt);
             }
-
-        } catch (Exception e) {
-            addTicketText("ERROR AL CARGAR DATOS", 14, true, Color.RED);
-            e.printStackTrace();
         }
+
+        addSeparator();
+
+        // --- D. TOTALES ---
+        addTicketTotal("TOTAL:", total, false);
+        addTicketTotal("ABONADO:", paid, false);
+        addTicketTotal("RESTA:", balance, true);
 
         addSeparator();
         addTicketText("¡Gracias por su preferencia!", 12, true, Color.BLACK);
@@ -157,7 +168,7 @@ public class ReceiptPreviewDialog extends JDialog {
         ticketPanel.repaint();
     }
 
-    // --- HELPERS PARA DIBUJAR EL TICKET ---
+    // --- HELPERS VISUALES ---
 
     private void addTicketText(String text, int size, boolean bold, Color color) {
         JLabel l = new JLabel(text);
@@ -171,49 +182,32 @@ public class ReceiptPreviewDialog extends JDialog {
     private void addTicketLeftRight(String label, String value) {
         JPanel p = new JPanel(new BorderLayout());
         p.setBackground(Color.WHITE);
-        p.setMaximumSize(new Dimension(1000, 20));
-
-        JLabel l1 = new JLabel(label);
-        l1.setFont(new Font("Monospaced", Font.BOLD, 11));
-
-        JLabel l2 = new JLabel(value);
-        l2.setFont(new Font("Monospaced", Font.PLAIN, 11));
-
-        p.add(l1, BorderLayout.WEST);
-        p.add(l2, BorderLayout.EAST);
+        p.setMaximumSize(new Dimension(1000, 18));
+        JLabel l1 = new JLabel(label); l1.setFont(new Font("Monospaced", Font.BOLD, 11));
+        JLabel l2 = new JLabel(value); l2.setFont(new Font("Monospaced", Font.PLAIN, 11));
+        p.add(l1, BorderLayout.WEST); p.add(l2, BorderLayout.EAST);
         ticketPanel.add(p);
     }
 
     private void addTicketItem(String item, String price) {
         JPanel p = new JPanel(new BorderLayout());
         p.setBackground(Color.WHITE);
-        p.setMaximumSize(new Dimension(1000, 20));
-
-        JLabel l1 = new JLabel(item);
-        l1.setFont(new Font("Monospaced", Font.PLAIN, 10));
-
-        JLabel l2 = new JLabel(price);
-        l2.setFont(new Font("Monospaced", Font.PLAIN, 10));
-
-        p.add(l1, BorderLayout.WEST);
-        p.add(l2, BorderLayout.EAST);
+        p.setMaximumSize(new Dimension(1000, 16));
+        JLabel l1 = new JLabel(item); l1.setFont(new Font("Monospaced", Font.PLAIN, 10));
+        JLabel l2 = new JLabel(price); l2.setFont(new Font("Monospaced", Font.PLAIN, 10));
+        p.add(l1, BorderLayout.WEST); p.add(l2, BorderLayout.EAST);
         ticketPanel.add(p);
     }
 
     private void addTicketTotal(String label, double val, boolean highlight) {
         JPanel p = new JPanel(new BorderLayout());
         p.setBackground(Color.WHITE);
-        p.setMaximumSize(new Dimension(1000, 25));
-
-        JLabel l1 = new JLabel(label);
-        l1.setFont(new Font("Monospaced", Font.BOLD, 12));
-
-        JLabel l2 = new JLabel(String.format("$%.2f", val));
+        p.setMaximumSize(new Dimension(1000, 20));
+        JLabel l1 = new JLabel(label); l1.setFont(new Font("Monospaced", Font.BOLD, 12));
+        JLabel l2 = new JLabel(String.format(Locale.US, "$%.2f", val));
         l2.setFont(new Font("Monospaced", Font.BOLD, 14));
-        if(highlight) l2.setForeground(Color.RED);
-
-        p.add(l1, BorderLayout.WEST);
-        p.add(l2, BorderLayout.EAST);
+        if(highlight && val > 0.01) l2.setForeground(Color.RED);
+        p.add(l1, BorderLayout.WEST); p.add(l2, BorderLayout.EAST);
         ticketPanel.add(p);
     }
 
@@ -224,11 +218,9 @@ public class ReceiptPreviewDialog extends JDialog {
         ticketPanel.add(Box.createVerticalStrut(5));
     }
 
-    private void addBox(int height) {
-        ticketPanel.add(Box.createVerticalStrut(height));
-    }
+    private void addBox(int height) { ticketPanel.add(Box.createVerticalStrut(height)); }
 
-    // --- FOOTER Y LÓGICA DE IMPRESIÓN ---
+    // --- FOOTER E IMPRESIÓN ---
 
     private JPanel createFooter() {
         JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 20));
@@ -243,7 +235,7 @@ public class ReceiptPreviewDialog extends JDialog {
 
         SoftButton btnPrint = new SoftButton(null);
         btnPrint.setText("IMPRIMIR");
-        btnPrint.setBackground(new Color(57, 255, 20)); // VERDE NEON
+        btnPrint.setBackground(new Color(57, 255, 20));
         btnPrint.setForeground(Color.BLACK);
         btnPrint.setFont(new Font("Segoe UI", Font.BOLD, 14));
         btnPrint.setPreferredSize(new Dimension(120, 45));
@@ -256,33 +248,18 @@ public class ReceiptPreviewDialog extends JDialog {
 
     private void printJob() {
         PrinterJob job = PrinterJob.getPrinterJob();
-        job.setJobName("Recibo SICONI " + saleId);
-
+        job.setJobName("Recibo SICONI " + saleCode);
         job.setPrintable(new Printable() {
-            @Override
             public int print(Graphics pg, PageFormat pf, int pageNum) {
                 if (pageNum > 0) return Printable.NO_SUCH_PAGE;
-
                 Graphics2D g2 = (Graphics2D) pg;
                 g2.translate(pf.getImageableX(), pf.getImageableY());
-                // Escalar el panel para que quepa en la hoja
-                double scaleX = pf.getImageableWidth() / ticketPanel.getWidth();
-                // Usamos un factor de escala seguro, o 1.0 si es muy pequeño
-                if(scaleX < 1.0) g2.scale(scaleX, scaleX);
-
-                ticketPanel.paint(g2);
+                double scale = pf.getImageableWidth() / ticketPanel.getWidth();
+                if(scale < 1.0) g2.scale(scale, scale);
+                ticketPanel.printAll(g2);
                 return Printable.PAGE_EXISTS;
             }
         });
-
-        boolean doPrint = job.printDialog();
-        if (doPrint) {
-            try {
-                job.print();
-                dispose();
-            } catch (PrinterException e) {
-                JOptionPane.showMessageDialog(this, "Error de impresión: " + e.getMessage());
-            }
-        }
+        if (job.printDialog()) { try { job.print(); dispose(); } catch (PrinterException e) {} }
     }
 }

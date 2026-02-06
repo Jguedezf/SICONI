@@ -20,7 +20,7 @@
  * imagen a las dimensiones actuales del contenedor en tiempo real.
  * 2. Gestión de Recursos: Utiliza el ClassLoader para localizar activos gráficos
  * dentro del JAR o sistema de archivos de forma independiente del entorno.
- * 3. Sobreescritura del Pipeline Gráfico: Intercepta el método `paintComponent`
+ * 3. Sobreescritura del Pipeline Gráfico: Intercepta el metodo `paintComponent`
  * para inyectar la capa de imagen antes de que se dibujen los componentes hijos.
  *
  * PRINCIPIOS POO:

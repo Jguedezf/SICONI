@@ -93,7 +93,7 @@ public class ReportsDAO {
     }
 
     /**
-     * NUEVO MÉTODO: Calcula la rentabilidad de cada producto vendido en un rango de fechas.
+     * NUEVO METODO: Calcula la rentabilidad de cada producto vendido en un rango de fechas.
      */
     public List<Object[]> getProductProfitability(Date startDate, Date endDate) {
         List<Object[]> profitabilityData = new ArrayList<>();

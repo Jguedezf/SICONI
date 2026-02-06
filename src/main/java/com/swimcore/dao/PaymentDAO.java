@@ -120,7 +120,7 @@ public class PaymentDAO {
     }
 
     /**
-     * Método auxiliar para cambiar el estado de un pedido a "PAGADO" si su
+     * Metodo auxiliar para cambiar el estado de un pedido a "PAGADO" si su
      * saldo deudor llega a ser menor o igual a cero.
      *
      * @param conn La conexión activa de la transacción.

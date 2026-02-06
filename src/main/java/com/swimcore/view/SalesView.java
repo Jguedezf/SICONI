@@ -2,8 +2,10 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: UNEG - SICONI
  * ARCHIVO: SalesView.java
- * VERSIÓN: 63.0 (RIGHT PANEL OVERHAUL: Better Layout, Bigger Notes, Styled % Buttons)
- * FECHA: February 2026
+ * VERSIÓN: 69.0 (FIX: Constructor Mismatch Solved - Snapshot Strategy)
+ * FECHA: 04 de Febrero de 2026 - 09:00 PM
+ * DESCRIPCIÓN: Soluciona el error de compilación capturando los datos del pedido
+ * en variables temporales (Snapshot) para pasarlos al Recibo Pasivo.
  * -----------------------------------------------------------------------------
  */
 
@@ -22,6 +24,7 @@ import com.swimcore.util.CurrencyManager;
 import com.swimcore.util.LuxuryMessage;
 import com.swimcore.view.components.SoftButton;
 import com.swimcore.view.dialogs.CurrencySettingsDialog;
+import com.swimcore.view.dialogs.ReceiptPreviewDialog; // Conexión con el Ticket
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -40,6 +43,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.awt.Desktop;
 
 public class SalesView extends JPanel {
 
@@ -67,6 +71,14 @@ public class SalesView extends JPanel {
     private double totalAmount = 0.0;
     private double currentTasa = CurrencyManager.getTasa();
     private String lastOrderIdSaved = null;
+
+    // --- SNAPSHOT VARIABLES (PARA EL RECIBO PASIVO) ---
+    // Guardamos aquí los datos antes de borrar el formulario
+    private List<ReceiptPreviewDialog.TicketItem> lastItemsSnapshot = new ArrayList<>();
+    private String lastDateSnapshot = "";
+    private double lastTotalSnapshot = 0;
+    private double lastPaidSnapshot = 0;
+    private double lastBalanceSnapshot = 0;
 
     // COLORES LUXURY
     private static final Color COLOR_GOLD = new Color(212, 175, 55);
@@ -189,12 +201,11 @@ public class SalesView extends JPanel {
         return stack;
     }
 
-    // --- PANEL IZQUIERDO (INTACTO) ---
+    // --- PANEL IZQUIERDO ---
     private JPanel createLeftPanel() {
         JPanel p = new JPanel(new BorderLayout(0, 15));
         p.setOpaque(false);
 
-        // 1. Barra de Inputs (Arriba)
         JPanel bar = new JPanel(new GridBagLayout()); bar.setOpaque(false);
         GridBagConstraints gb = new GridBagConstraints(); gb.fill = 2; gb.insets = new Insets(0, 2, 0, 2);
 
@@ -245,7 +256,6 @@ public class SalesView extends JPanel {
 
         p.add(bar, BorderLayout.NORTH);
 
-        // 2. Tabla (Compacta 50% - 160px)
         table = new JTable(tableModel); styleTable(table);
         JScrollPane scroll = new JScrollPane(table);
         scroll.getViewport().setBackground(new Color(20,20,20));
@@ -254,14 +264,13 @@ public class SalesView extends JPanel {
 
         p.add(scroll, BorderLayout.CENTER);
 
-        // 3. Botones de Acción (ESTILO CUADRADO LUXURY)
         JPanel pActions = new JPanel(new GridLayout(1, 3, 15, 0));
         pActions.setOpaque(false);
         pActions.setBorder(new EmptyBorder(10, 0, 10, 0));
 
         pActions.add(createSquareIconButton("/images/icons/sq_back.png", "Salir", e -> SwingUtilities.getWindowAncestor(this).dispose()));
         pActions.add(createSquareIconButton("/images/icons/sq_clean.png", "Limpiar", e -> clearForm()));
-        pActions.add(createSquareIconButton("/images/icons/sq_delete.png", "Eliminar Ítem", e -> {
+        pActions.add(createSquareIconButton("/images/icons/sq_delete.png", "Eliminar", e -> {
             int r = table.getSelectedRow();
             if (r >= 0) removeFromCart(r);
             else LuxuryMessage.show("Aviso", "Seleccione un ítem de la tabla.", true);
@@ -272,7 +281,7 @@ public class SalesView extends JPanel {
         return p;
     }
 
-    // --- PANEL DERECHO (REDISEÑADO Y MEJORADO) ---
+    // --- PANEL DERECHO ---
     private JPanel createRightPanel() {
         JPanel p = new JPanel(new BorderLayout(0, 10)) {
             @Override protected void paintComponent(Graphics g) {
@@ -286,7 +295,6 @@ public class SalesView extends JPanel {
         p.setOpaque(false);
         p.setBorder(new EmptyBorder(10, 10, 10, 10));
 
-        // 1. Inputs Superiores (Factura/Control)
         JPanel pTop = new JPanel(new GridBagLayout()); pTop.setOpaque(false);
         GridBagConstraints gTop = new GridBagConstraints(); gTop.fill = 2; gTop.insets = new Insets(0, 5, 0, 5);
 
@@ -317,10 +325,8 @@ public class SalesView extends JPanel {
 
         p.add(pTop, BorderLayout.NORTH);
 
-        // 2. Panel Central Dividido (Formulario Pagos vs Resumen/Notas)
         JPanel pMid = new JPanel(new GridLayout(1, 2, 15, 0)); pMid.setOpaque(false);
 
-        // A) Formulario Izquierdo (Pagos)
         JPanel pForm = new JPanel(new GridBagLayout()); pForm.setOpaque(false);
         pForm.setBorder(createTitledBorder("CIERRE DE OPERACIÓN"));
         GridBagConstraints gL = new GridBagConstraints(); gL.fill = 2; gL.insets = new Insets(4, 2, 4, 2); gL.weightx = 1.0;
@@ -328,7 +334,6 @@ public class SalesView extends JPanel {
         txtAbono = new JTextField("0.00"); styleField(txtAbono); txtAbono.getDocument().addDocumentListener(new DocH());
         txtDiscount = new JTextField("0"); styleField(txtDiscount); txtDiscount.getDocument().addDocumentListener(new DocH());
 
-        // Botones de % Mejorados (Estilo Chip)
         btnPay50 = new SoftButton(null); btnPay50.setText("50%"); btnPay50.setPreferredSize(new Dimension(60, 25));
         btnPay50.setFont(new Font("Segoe UI", Font.BOLD, 11)); btnPay50.setForeground(Color.CYAN);
         btnPay50.setBackground(new Color(0, 50, 50));
@@ -362,7 +367,6 @@ public class SalesView extends JPanel {
 
         pMid.add(pForm);
 
-        // B) Columna Derecha (OLEDs + Notas Expandidas)
         JPanel pOleds = new JPanel(new GridBagLayout()); pOleds.setOpaque(false);
         GridBagConstraints gR = new GridBagConstraints(); gR.fill=2; gR.insets=new Insets(0,0,8,0); gR.weightx=1; gR.gridx=0;
 
@@ -372,10 +376,8 @@ public class SalesView extends JPanel {
         gR.gridy=1; pOleds.add(createOled("TOTAL ABONADO", lblAbonado = new JLabel("$ 0.00"), lblAbonadoBs, Color.CYAN), gR);
         gR.gridy=2; pOleds.add(createOled("RESTA PAGAR", lblResta = new JLabel("$ 0.00"), lblRestaBs, Color.ORANGE), gR);
 
-        // AQUÍ EL CAMBIO CLAVE: Notas más grandes
         txtObservations = new JTextArea(); styleTextArea(txtObservations);
         JScrollPane sO = new JScrollPane(txtObservations);
-        // Altura aumentada a 120px para llenar el vacío
         sO.setPreferredSize(new Dimension(0, 120));
         sO.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
 
@@ -390,7 +392,6 @@ public class SalesView extends JPanel {
 
         p.add(pMid, BorderLayout.CENTER);
 
-        // 3. Botones Finales (Sin texto, alineados abajo)
         JPanel pSaveActions = new JPanel(new GridLayout(1, 2, 10, 0));
         pSaveActions.setOpaque(false);
         pSaveActions.setBorder(new EmptyBorder(10, 0, 0, 0));
@@ -398,10 +399,7 @@ public class SalesView extends JPanel {
         btnReceipt = createSquareIconButton("/images/icons/sq_invoice.png", "Ver Comprobante", e -> handleReceiptAction());
         if(btnReceipt.getIcon() == null) btnReceipt = createSquareIconButton("/images/icons/icon_report.png", "Ver Comprobante", e -> handleReceiptAction());
 
-        btnReceipt.setEnabled(false);
-        btnReceipt.addPropertyChangeListener("enabled", evt -> {
-            btnReceipt.setForeground(btnReceipt.isEnabled() ? Color.WHITE : Color.GRAY);
-        });
+        btnReceipt.setVisible(false);
 
         pSaveActions.add(btnReceipt);
 
@@ -424,8 +422,9 @@ public class SalesView extends JPanel {
 
     private void handleReceiptAction() {
         if(lastOrderIdSaved == null) return;
-        new ReceiptOptionDialog((Frame)SwingUtilities.getWindowAncestor(this), lastOrderIdSaved).setVisible(true);
+        new ReceiptOptionDialog(null, lastOrderIdSaved).setVisible(true);
     }
+// Archivo: SalesView.java
 
     private void saveOrder() {
         if(cartDetails.isEmpty()){
@@ -433,23 +432,36 @@ public class SalesView extends JPanel {
             return;
         }
 
+        // Obtener ID limpio (solo números)
+        String rawId = lblOrderNum.getText().replace("# ", "").replace("PED-", "").trim();
+        String orderId = "PED-" + rawId; // Formato DB
+
+        // *** EDICIÓN 1: MENSAJE MÁS CLARO ANTES DE GUARDAR ***
         int confirm = JOptionPane.showConfirmDialog(this,
-                "¿Confirmar el procesamiento del pedido?", "SICONI", JOptionPane.YES_NO_OPTION);
+                "Está a punto de registrar el pedido " + orderId + ".\n" +
+                        "Si desea continuar con el guardado, seleccione Sí.",
+                "SICONI - Confirmar Registro",
+                JOptionPane.YES_NO_OPTION);
         if(confirm != JOptionPane.YES_OPTION) return;
 
-        double ab = Double.parseDouble(txtAbono.getText().replace(",","."));
-        String delDate = (dateDelivery.getDate() != null) ? dateDelivery.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "";
-        String payDate = (datePayment.getDate() != null) ? datePayment.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "";
+        // --- PREPARACIÓN DE DATOS (NO CAMBIA) ---
+        double ab = 0.0;
+        try {
+            if(!txtAbono.getText().isEmpty()) {
+                ab = Double.parseDouble(txtAbono.getText().replace(",","."));
+            }
+        } catch(NumberFormatException e) { ab = 0.0; }
 
-        String orderId = lblOrderNum.getText().replace("# ", "").trim();
+        String delDate = (dateDelivery.getDate() != null) ? dateDelivery.getDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) : LocalDate.now().toString();
+        String payDate = (datePayment.getDate() != null) ? datePayment.getDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) : LocalDate.now().toString();
 
-        Sale s = new Sale(orderId,
+        Sale s = new Sale(orderId, // ID Completo
                 new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()),
                 String.valueOf(currentClient.getId()),
                 totalAmount, ab, currentTasa,
                 (String)cmbPayMethod.getSelectedItem(),
                 txtRef.getText(),
-                "EN PRODUCCIÓN",
+                (ab >= totalAmount) ? "PAGADO" : (ab > 0 ? "ABONADO" : "PENDIENTE"),
                 txtObservations.getText());
 
         s.setBalanceDue(totalAmount - ab);
@@ -459,73 +471,117 @@ public class SalesView extends JPanel {
         s.setPaymentDate(payDate);
         s.setBank((String)cmbBank.getSelectedItem());
 
+        // CAPTURA DE DATOS (SNAPSHOT)
+        lastItemsSnapshot = new ArrayList<>();
+        for(SaleDetail detail : cartDetails) {
+            lastItemsSnapshot.add(new ReceiptPreviewDialog.TicketItem(detail.getProductName(), detail.getQuantity(), detail.getSubtotal()));
+        }
+        lastDateSnapshot = LocalDate.now().toString();
+        lastTotalSnapshot = totalAmount;
+        lastPaidSnapshot = ab;
+        lastBalanceSnapshot = totalAmount - ab;
+
+        // --- GUARDADO Y GESTIÓN DE RECIBO ---
         if(saleController.registerSale(s, cartDetails)){
             lastOrderIdSaved = orderId;
-            btnReceipt.setEnabled(true);
-            LuxuryMessage.show("SICONI", "¡Pedido guardado exitosamente!", false);
-            new ReceiptOptionDialog((Frame)SwingUtilities.getWindowAncestor(this), orderId).setVisible(true);
+
+            // Habilitamos el botón
+            btnReceipt.setVisible(true); // <--- ¡AQUÍ APARECE EL BOTÓN!
+
+            // ⛔ ELIMINAMOS EL LUXURY MESSAGE Y FUSIONAMOS ÉXITO + PREGUNTA ⛔
+
+            int manageReceipt = JOptionPane.showConfirmDialog(
+                    this,
+                    "¡PEDIDO REGISTRADO CON ÉXITO! (N° " + orderId + ")\n" +
+                            "¿Desea generar, ver o imprimir el comprobante de venta ahora?",
+                    "Gestión de Recibo Post-Venta",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.QUESTION_MESSAGE
+            );
+
+            // 3. Si dice SÍ, lanzamos el diálogo.
+            if (manageReceipt == JOptionPane.YES_OPTION) {
+                handleReceiptAction();
+            }
+
+            // 4. Limpiamos y deshabilitamos el botón para el siguiente pedido
             clearForm();
+
         } else {
-            LuxuryMessage.show("Error de Guardado", "No se pudo registrar el pedido en la base de datos.", true);
+            // Mantenemos este mensaje de error si la DB falla
+            LuxuryMessage.show("Error", "No se pudo guardar en la base de datos.", true);
         }
     }
+
+    // Archivo: SalesView.java
+// Archivo: SalesView.java
 
     private void runPrintSimulation(boolean openFile) {
-        JDialog d = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Imprimiendo...", true);
-        d.setUndecorated(true);
-        d.setSize(350, 120);
-        d.setLocationRelativeTo(this);
 
-        JPanel p = new JPanel(new BorderLayout());
-        p.setBackground(Color.BLACK);
-        p.setBorder(new LineBorder(COLOR_NEON, 2));
+        // --- PASO 1: RECUPERAR DATOS NECESARIOS ---
+        // Necesitamos el objeto Sale completo y los detalles para pasarlos al generador.
+        Sale tempSale = saleController.getSaleById(lastOrderIdSaved);
 
-        JLabel lStatus = new JLabel("Conectando con servicio de impresión...", SwingConstants.CENTER);
-        lStatus.setForeground(COLOR_NEON);
-        lStatus.setFont(new Font("Consolas", Font.BOLD, 14));
-
-        JProgressBar bar = new JProgressBar();
-        bar.setIndeterminate(true);
-        bar.setBackground(Color.BLACK);
-        bar.setForeground(COLOR_NEON);
-        bar.setBorderPainted(false);
-
-        p.add(lStatus, BorderLayout.CENTER);
-        p.add(bar, BorderLayout.SOUTH);
-        d.add(p);
-
-        Timer t1 = new Timer(800, e -> lStatus.setText("Generando documento PDF..."));
-        t1.setRepeats(false);
-
-        Timer t2 = new Timer(1800, e -> lStatus.setText("Enviando a cola de impresión..."));
-        t2.setRepeats(false);
-
-        Timer tEnd = new Timer(2500, e -> {
-            d.dispose();
-            if(openFile) openPDF(lastOrderIdSaved);
-            else openFolder();
-        });
-        tEnd.setRepeats(false);
-
-        t1.start(); t2.start(); tEnd.start();
-        d.setVisible(true);
-    }
-
-    private void openPDF(String id) {
-        try {
-            File pdf = new File("recibo_" + id + ".pdf");
-            if(pdf.exists()) Desktop.getDesktop().open(pdf);
-            else LuxuryMessage.show("Info", "El archivo PDF se generó en la carpeta del sistema.", false);
-        } catch(Exception ex){}
-    }
-
-    private void openFolder() {
-        try {
-            File currentDir = new File(".").getCanonicalFile();
-            Desktop.getDesktop().open(currentDir);
-        } catch(Exception ex) {
-            LuxuryMessage.show("Error", "No se pudo abrir la carpeta.", true);
+        if (tempSale == null) {
+            JOptionPane.showMessageDialog(this, "Error: No se encontró el pedido guardado (ID: " + lastOrderIdSaved + ").", "Error de Búsqueda", JOptionPane.ERROR_MESSAGE);
+            return;
         }
+
+        // Reconstruimos los detalles del snapshot para que coincidan con lo que espera el generador
+        List<SaleDetail> details = saleController.getDetailsFromSnapshot(lastItemsSnapshot, lastOrderIdSaved);
+
+        // --- PASO 2: GENERAR EL PDF EN DISCO ---
+        try {
+            // Llamada al generador: Pasamos los datos recuperados y 'false' para que NO se abra solo.
+            com.swimcore.util.ReceiptGenerator.generateReceipt(
+                    tempSale,
+                    details,
+                    currentClient, // Pasamos el cliente actual de la vista
+                    false // <-- SIEMPRE FALSE AQUÍ, la vista previa o el explorer se encargarán después.
+            );
+
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Error al generar el archivo PDF en disco. Revise la consola para más detalles. Error: " + ex.getMessage(), "Error de Generación", JOptionPane.ERROR_MESSAGE);
+            ex.printStackTrace();
+            return;
+        }
+        // ----------------------------------------------------
+
+        JDialog d = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Procesando", true);
+        d.setUndecorated(true); d.setSize(300, 100); d.setLocationRelativeTo(this);
+        JPanel p = new JPanel(new BorderLayout()); p.setBackground(Color.BLACK); p.setBorder(new LineBorder(COLOR_NEON));
+        JLabel l = new JLabel("Generando recibo...", SwingConstants.CENTER); l.setForeground(COLOR_NEON); l.setFont(new Font("Consolas",1,14));
+        p.add(l); d.add(p);
+
+        Timer t = new Timer(1000, e -> {
+            d.dispose();
+
+            if(openFile) {
+                // Si el usuario pidió ABRIR VISTA PREVIA (el diálogo blanco)
+                // Usamos los datos del snapshot para la vista previa.
+                new ReceiptPreviewDialog(
+                        (Frame)SwingUtilities.getWindowAncestor(this),
+                        lastOrderIdSaved, // El ID del pedido que acabamos de guardar
+                        lastDateSnapshot, // Fecha del snapshot (o la del sale)
+                        currentClient.getFullName(),
+                        currentClient.getPhone(),
+                        lastItemsSnapshot,
+                        lastTotalSnapshot,
+                        lastPaidSnapshot,
+                        lastBalanceSnapshot
+                ).setVisible(true);
+            } else {
+                // Si el usuario pidió VER EN CARPETA, abrimos la carpeta Recibos_SICONI
+                try {
+                    File receiptDir = new File(com.swimcore.util.ReceiptGenerator.FOLDER_PATH);
+                    Desktop.getDesktop().open(receiptDir);
+                } catch (Exception desktopEx) {
+                    JOptionPane.showMessageDialog(this, "No se pudo abrir la carpeta 'Recibos_SICONI'. Error: " + desktopEx.getMessage(), "Error de Sistema", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+        t.setRepeats(false); t.start();
+        d.setVisible(true);
     }
 
     private void clearForm() {
@@ -540,7 +596,7 @@ public class SalesView extends JPanel {
         cmbBank.setEnabled(false);
         chkInvoice.setSelected(false);
         toggleInvoice(false);
-        btnReceipt.setEnabled(false);
+        btnReceipt.setVisible(false); // <--- Se esconde para el siguiente cliente
         calcularFechaEntregaInteligente();
         generarConsecutivoPedido();
         updateCalculations();
@@ -700,7 +756,7 @@ public class SalesView extends JPanel {
         updateCalculations();
     }
 
-    // --- CLASES INTERNAS ---
+    // --- CLASES INTERNAS (STATUS DOT + RECEIPT DIALOG) ---
 
     private static class StatusDot implements Icon {
         private final Color color;
@@ -719,58 +775,113 @@ public class SalesView extends JPanel {
         @Override public int getIconHeight() { return size; }
     }
 
+    // --- CLASE INTERNA LIMPIA (Línea 782 en adelante) ---
+// --- NUEVA VENTANA GESTIÓN DE RECIBO (EDICIÓN LUXURY FASHION 3D) ---
+// --- NUEVA VENTANA GESTIÓN DE RECIBO (EDICIÓN FASHION 3D MATADORA V2) ---
     private class ReceiptOptionDialog extends JDialog {
-        public ReceiptOptionDialog(Frame parent, String orderId) {
-            super(parent, true);
+        private String orderId;
 
-            setSize(450, 220);
+        public ReceiptOptionDialog(Window parent, String orderId) {
+            super(parent);
+            this.orderId = orderId;
+            setModal(true);
+            setUndecorated(true);
+            setSize(450, 320);
             setLocationRelativeTo(parent);
 
-            JPanel p = new JPanel(new BorderLayout(0, 20));
-            p.setBackground(new Color(30,30,30));
-            p.setBorder(new CompoundBorder(new LineBorder(COLOR_GOLD, 2), new EmptyBorder(20,20,20,20)));
+            JPanel mainPanel = new JPanel() {
+                @Override protected void paintComponent(Graphics g) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    // Degradado de fondo Luxury
+                    GradientPaint gp = new GradientPaint(0, 0, new Color(20, 20, 20), 0, getHeight(), new Color(35, 35, 35));
+                    g2.setPaint(gp);
+                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 35, 35);
+                    // Borde de Oro Real SICONI
+                    g2.setColor(new Color(212, 175, 55));
+                    g2.setStroke(new BasicStroke(3));
+                    g2.drawRoundRect(1, 1, getWidth()-3, getHeight()-3, 35, 35);
+                    g2.dispose();
+                }
+            };
+            mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
+            mainPanel.setOpaque(false);
 
-            JLabel lblTitle = new JLabel("GESTIÓN DE RECIBO", SwingConstants.CENTER);
-            lblTitle.setForeground(COLOR_GOLD); lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
+            JLabel lblTitle = new JLabel("OPERACIÓN EXITOSA");
+            lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 22));
+            lblTitle.setForeground(new Color(212, 175, 55));
+            lblTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-            JLabel lblMsg = new JLabel("<html><div style='text-align: center;'>Pedido <b>" + orderId + "</b> procesado.<br>¿Cómo desea visualizar el comprobante?</div></html>", SwingConstants.CENTER);
-            lblMsg.setForeground(Color.WHITE); lblMsg.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+            JLabel lblOrder = new JLabel("ID Pedido: " + orderId);
+            lblOrder.setForeground(Color.LIGHT_GRAY);
+            lblOrder.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-            JPanel pBtns = new JPanel(new GridLayout(1, 2, 15, 0));
-            pBtns.setOpaque(false);
+            // --- BOTONES CON COLORES FORZADOS ---
 
+            // 1. Botón Abrir PDF (NEÓN INTENSO)
+            SoftButton btnPreview = new SoftButton(null);
+            btnPreview.setText("ABRIR COMPROBANTE PDF");
+            btnPreview.setBackground(new Color(57, 255, 20)); // Forzamos el Neón
+            btnPreview.setForeground(Color.BLACK); // Texto negro para contraste máximo
+            btnPreview.setOpaque(true);
+            btnPreview.setFont(new Font("Segoe UI", Font.BOLD, 14));
+            btnPreview.setMaximumSize(new Dimension(320, 55));
+            btnPreview.setAlignmentX(Component.CENTER_ALIGNMENT);
+            btnPreview.addActionListener(e -> {
+                try {
+                    com.swimcore.dao.SaleDAO sDAO = new com.swimcore.dao.SaleDAO();
+                    Sale sale = sDAO.getSaleById(orderId);
+                    List<SaleDetail> details = sDAO.getDetailsBySaleId(orderId);
+                    Client client = null;
+                    if (sale.getClientId() != null) {
+                        try {
+                            int idNum = Integer.parseInt(sale.getClientId().replaceAll("[^0-9]",""));
+                            client = new com.swimcore.dao.ClientDAO().getClientById(idNum);
+                        } catch (Exception ex) {
+                            client = new com.swimcore.dao.ClientDAO().getClientByCode(sale.getClientId());
+                        }
+                    }
+                    com.swimcore.util.ReceiptGenerator.generateReceipt(sale, details, client, true);
+                    this.dispose();
+                } catch(Exception ex) { ex.printStackTrace(); }
+            });
+
+            // 2. Botón Ver Carpeta (GRIS METÁLICO)
             SoftButton btnFolder = new SoftButton(null);
-            btnFolder.setText("📂 VER EN CARPETA");
-            btnFolder.setBackground(new Color(60,60,60));
+            btnFolder.setText("VER EN CARPETA DE RECIBOS");
+            btnFolder.setBackground(new Color(20, 20, 20)); // Negro Profundo
             btnFolder.setForeground(Color.WHITE);
-            btnFolder.addActionListener(e -> { dispose(); runPrintSimulation(false); });
+            btnFolder.setOpaque(true);
+            btnFolder.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            btnFolder.setMaximumSize(new Dimension(320, 45));
+            btnFolder.setAlignmentX(Component.CENTER_ALIGNMENT);
+            btnFolder.addActionListener(e -> {
+                try { Desktop.getDesktop().open(new File(com.swimcore.util.ReceiptGenerator.FOLDER_PATH)); }
+                catch(Exception ex){ ex.printStackTrace(); }
+            });
 
-            SoftButton btnOpen = new SoftButton(null);
-            btnOpen.setText("📄 ABRIR PDF");
-            btnOpen.setBackground(COLOR_NEON);
-            btnOpen.setForeground(Color.BLACK);
-            btnOpen.setFont(new Font("Segoe UI", Font.BOLD, 12));
-            btnOpen.addActionListener(e -> { dispose(); runPrintSimulation(true); });
+            // 3. Botón Continuar (Elegante)
+            JButton btnClose = new JButton("CONTINUAR");
+            btnClose.setForeground(Color.GRAY);
+            btnClose.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            btnClose.setContentAreaFilled(false);
+            btnClose.setBorderPainted(false);
+            btnClose.setFocusPainted(false);
+            btnClose.setAlignmentX(Component.CENTER_ALIGNMENT);
+            btnClose.addActionListener(e -> this.dispose());
 
-            pBtns.add(btnFolder);
-            pBtns.add(btnOpen);
+            mainPanel.add(Box.createVerticalStrut(30));
+            mainPanel.add(lblTitle);
+            mainPanel.add(lblOrder);
+            mainPanel.add(Box.createVerticalStrut(40));
+            mainPanel.add(btnPreview);
+            mainPanel.add(Box.createVerticalStrut(15));
+            mainPanel.add(btnFolder);
+            mainPanel.add(Box.createVerticalStrut(30));
+            mainPanel.add(btnClose);
 
-            SoftButton btnClose = new SoftButton(null);
-            btnClose.setText("CERRAR");
-            btnClose.setPreferredSize(new Dimension(80, 30));
-            btnClose.setBackground(new Color(100,0,0));
-            btnClose.setForeground(Color.WHITE);
-            btnClose.addActionListener(e -> dispose());
-
-            JPanel pBottom = new JPanel(new BorderLayout(0, 10)); pBottom.setOpaque(false);
-            pBottom.add(pBtns, BorderLayout.CENTER);
-            pBottom.add(btnClose, BorderLayout.SOUTH);
-
-            p.add(lblTitle, BorderLayout.NORTH);
-            p.add(lblMsg, BorderLayout.CENTER);
-            p.add(pBottom, BorderLayout.SOUTH);
-
-            setContentPane(p);
+            setContentPane(mainPanel);
+            setBackground(new Color(0,0,0,0));
         }
     }
 

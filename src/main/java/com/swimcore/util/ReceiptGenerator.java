@@ -2,98 +2,125 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: UNEG - SICONI
  * ARCHIVO: ReceiptGenerator.java
- * DESCRIPCIÓN: Generador de Recibos PDF (Formato Ticket / Carta).
- * VERSIÓN: 1.0.0 (Dayana Guedez Style)
+ * VERSIÓN: 1.2.0 (FIXED: Font Ambiguity & Variable Scope)
+ * FECHA: 04 de Febrero de 2026 - 11:10 PM (Venezuela)
+ * DESCRIPCIÓN: Generador de Recibos PDF e Impresión Física.
+ *              Se resolvieron conflictos de librerías Font y variables nulas.
  * -----------------------------------------------------------------------------
  */
 
 package com.swimcore.util;
 
-import com.itextpdf.text.*;
+// --- IMPORTS ESPECÍFICOS PARA EVITAR AMBIGÜEDAD ---
+import com.itextpdf.text.Document;
+import com.itextpdf.text.Element;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.Phrase;
 import com.itextpdf.text.pdf.PdfPCell;
 import com.itextpdf.text.pdf.PdfPTable;
 import com.itextpdf.text.pdf.PdfWriter;
+import com.itextpdf.text.Rectangle;
+
 import com.swimcore.model.Client;
 import com.swimcore.model.Sale;
 import com.swimcore.model.SaleDetail;
+import com.swimcore.view.components.SoftButton;
 
-import java.awt.Desktop;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.print.*;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 public class ReceiptGenerator {
 
-    private static final String FOLDER_PATH = "Recibos_SICONI";
-    private static final Font FONT_TITLE = new Font(Font.FontFamily.HELVETICA, 18, Font.BOLD);
-    private static final Font FONT_SUBTITLE = new Font(Font.FontFamily.HELVETICA, 12, Font.BOLD);
-    private static final Font FONT_BODY = new Font(Font.FontFamily.HELVETICA, 10, Font.NORMAL);
-    private static final Font FONT_SMALL = new Font(Font.FontFamily.HELVETICA, 8, Font.ITALIC);
+    public static final String FOLDER_PATH = "Recibos_SICONI";
 
-    public static void generateReceipt(Sale sale, List<SaleDetail> details, Client client) {
+    // Usamos nombres completos para evitar el error de ambigüedad
+    private static final com.itextpdf.text.Font PDF_FONT_TITLE = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 18, com.itextpdf.text.Font.BOLD);
+    private static final com.itextpdf.text.Font PDF_FONT_SUBTITLE = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 12, com.itextpdf.text.Font.BOLD);
+    private static final com.itextpdf.text.Font PDF_FONT_BODY = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 10, com.itextpdf.text.Font.NORMAL);
+    private static final com.itextpdf.text.Font PDF_FONT_SMALL = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 8, com.itextpdf.text.Font.ITALIC);
+
+    // Variables para soporte de impresión Swing
+    private JPanel ticketPanel;
+    private String saleCode;
+
+    // Constructor para cuando se usa como componente de impresión
+    public ReceiptGenerator(JPanel ticketPanel, String saleCode) {
+        this.ticketPanel = ticketPanel;
+        this.saleCode = saleCode;
+    }
+
+    public static void generateReceipt(Sale sale, List<SaleDetail> details, Client client, boolean openFile) {
         try {
-            // 1. Crear carpeta si no existe
             File folder = new File(FOLDER_PATH);
             if (!folder.exists()) folder.mkdir();
 
-            // 2. Nombre del archivo (Ej: PED-174001_Cliente.pdf)
-            String fileName = FOLDER_PATH + "/" + sale.getId() + "_" + (client != null ? client.getFullName() : "Cliente") + ".pdf";
+            String safeClientName = (client != null ? client.getFullName() : "Cliente")
+                    .replaceAll("[^a-zA-Z0-9.-]", "_");
+            String fileName = FOLDER_PATH + "/" + sale.getId() + "_" + safeClientName + ".pdf";
+
             Document document = new Document();
             PdfWriter.getInstance(document, new FileOutputStream(fileName));
             document.open();
 
             // --- ENCABEZADO ---
-            Paragraph title = new Paragraph("DAYANA GUEDEZ SWIMWEAR", FONT_TITLE);
+            Paragraph title = new Paragraph("SICONI", PDF_FONT_TITLE);
             title.setAlignment(Element.ALIGN_CENTER);
             document.add(title);
 
-            Paragraph slogan = new Paragraph("Confección de Trajes de Baño y Ropa Deportiva", FONT_SMALL);
+            Paragraph slogan = new Paragraph("TALLER DE CONFECCIÓN", PDF_FONT_SUBTITLE);
             slogan.setAlignment(Element.ALIGN_CENTER);
             document.add(slogan);
 
-            document.add(new Paragraph(" ")); // Espacio
+            document.add(new Paragraph("Puerto Ordaz, Venezuela", PDF_FONT_BODY));
+            document.add(new Paragraph("R.I.F: V-14089807-1", PDF_FONT_BODY));
             document.add(new Paragraph(" "));
 
-            // --- DATOS DEL PEDIDO ---
+            // --- DATOS GENERALES ---
             PdfPTable infoTable = new PdfPTable(2);
             infoTable.setWidthPercentage(100);
 
-            infoTable.addCell(getCell("Nro Control: " + sale.getId(), FONT_SUBTITLE, false));
-            infoTable.addCell(getCell("Fecha: " + sale.getDate(), FONT_BODY, true));
+            infoTable.addCell(getPdfCell("Nro Control: " + sale.getId(), PDF_FONT_SUBTITLE, false));
+
+            // Corrección de variable dateStr no definida
+            String displayDate = (sale.getDate() != null && sale.getDate().length() > 10)
+                    ? sale.getDate().substring(0, 10)
+                    : new SimpleDateFormat("dd/MM/yyyy").format(new Date());
+
+            infoTable.addCell(getPdfCell("Fecha: " + displayDate, PDF_FONT_BODY, true));
 
             if (client != null) {
-                infoTable.addCell(getCell("Cliente: " + client.getFullName(), FONT_BODY, false));
-                infoTable.addCell(getCell("Cédula/RIF: " + client.getIdNumber(), FONT_BODY, true));
-                // Datos del Atleta (Importante para el taller)
-                infoTable.addCell(getCell("ATLETA: " + client.getAthleteName(), FONT_BODY, false));
-                infoTable.addCell(getCell("CLUB: " + client.getClub(), FONT_BODY, true));
+                infoTable.addCell(getPdfCell("Cliente: " + client.getFullName(), PDF_FONT_BODY, false));
+                infoTable.addCell(getPdfCell("Cédula/RIF: " + client.getIdNumber(), PDF_FONT_BODY, true));
             } else {
-                infoTable.addCell(getCell("Cliente: CONTADO / MOSTRADOR", FONT_BODY, false));
-                infoTable.addCell(getCell("", FONT_BODY, true));
+                infoTable.addCell(getPdfCell("Cliente: CONTADO / MOSTRADOR", PDF_FONT_BODY, false));
+                infoTable.addCell(getPdfCell("", PDF_FONT_BODY, true));
             }
-
             document.add(infoTable);
             document.add(new Paragraph(" "));
 
             // --- TABLA DE PRODUCTOS ---
-            PdfPTable table = new PdfPTable(4); // Cant, Desc, Unit, Total
+            PdfPTable table = new PdfPTable(4);
             table.setWidthPercentage(100);
             table.setWidths(new float[]{1, 4, 2, 2});
 
-            // Encabezados
-            table.addCell(getCell("CANT", FONT_SUBTITLE, true));
-            table.addCell(getCell("DESCRIPCIÓN / TALLA", FONT_SUBTITLE, false));
-            table.addCell(getCell("PRECIO", FONT_SUBTITLE, true));
-            table.addCell(getCell("TOTAL", FONT_SUBTITLE, true));
+            table.addCell(getPdfCell("CANT", PDF_FONT_SUBTITLE, true));
+            table.addCell(getPdfCell("DESCRIPCIÓN / TALLA", PDF_FONT_SUBTITLE, false));
+            table.addCell(getPdfCell("PRECIO", PDF_FONT_SUBTITLE, true));
+            table.addCell(getPdfCell("TOTAL", PDF_FONT_SUBTITLE, true));
 
-            // Filas
             for (SaleDetail d : details) {
-                table.addCell(getCell(String.valueOf(d.getQuantity()), FONT_BODY, true));
-                table.addCell(getCell(d.getProductName(), FONT_BODY, false)); // Aquí sale el Modelo + Talla
-                table.addCell(getCell(String.format("$%.2f", d.getUnitPrice()), FONT_BODY, true));
-                table.addCell(getCell(String.format("$%.2f", d.getSubtotal()), FONT_BODY, true));
+                table.addCell(getPdfCell(String.valueOf(d.getQuantity()), PDF_FONT_BODY, true));
+                table.addCell(getPdfCell(d.getProductName(), PDF_FONT_BODY, false));
+                double unitPrice = (d.getQuantity() > 0) ? (d.getSubtotal() / d.getQuantity()) : 0;
+                table.addCell(getPdfCell(String.format("$%.2f", unitPrice), PDF_FONT_BODY, true));
+                table.addCell(getPdfCell(String.format("$%.2f", d.getSubtotal()), PDF_FONT_BODY, true));
             }
             document.add(table);
 
@@ -103,28 +130,19 @@ public class ReceiptGenerator {
             totalTable.setWidthPercentage(40);
             totalTable.setHorizontalAlignment(Element.ALIGN_RIGHT);
 
-            totalTable.addCell(getCell("TOTAL:", FONT_SUBTITLE, false));
-            totalTable.addCell(getCell(String.format("$ %.2f", sale.getTotalAmountUSD()), FONT_SUBTITLE, true));
+            totalTable.addCell(getPdfCell("TOTAL:", PDF_FONT_SUBTITLE, false));
+            totalTable.addCell(getPdfCell(String.format("$ %.2f", sale.getTotalAmountUSD()), PDF_FONT_SUBTITLE, true));
 
-            totalTable.addCell(getCell("ABONADO:", FONT_BODY, false));
-            totalTable.addCell(getCell(String.format("$ %.2f", sale.getAmountPaid()), FONT_BODY, true));
+            totalTable.addCell(getPdfCell("ABONADO:", PDF_FONT_BODY, false));
+            totalTable.addCell(getPdfCell(String.format("$ %.2f", sale.getAmountPaid()), PDF_FONT_BODY, true));
 
-            totalTable.addCell(getCell("RESTA:", FONT_TITLE, false));
-            totalTable.addCell(getCell(String.format("$ %.2f", sale.getBalanceDue()), FONT_TITLE, true));
+            totalTable.addCell(getPdfCell("RESTA:", PDF_FONT_TITLE, false));
+            totalTable.addCell(getPdfCell(String.format("$ %.2f", sale.getBalanceDue()), PDF_FONT_TITLE, true));
 
             document.add(totalTable);
-
-            // --- PIE DE PÁGINA ---
-            document.add(new Paragraph(" "));
-            document.add(new Paragraph("----------------------------------------------------------------", FONT_SMALL));
-            document.add(new Paragraph("ESTADO: " + sale.getStatus(), FONT_SUBTITLE));
-            document.add(new Paragraph("Observaciones: " + sale.getObservations().replace("\n", " / "), FONT_SMALL));
-            document.add(new Paragraph("Gracias por preferir a Dayana Guedez Swimwear!", FONT_SMALL));
-
             document.close();
 
-            // 4. Abrir automáticamente
-            if (Desktop.isDesktopSupported()) {
+            if (openFile && Desktop.isDesktopSupported()) {
                 Desktop.getDesktop().open(new File(fileName));
             }
 
@@ -133,12 +151,49 @@ public class ReceiptGenerator {
         }
     }
 
-    // Helper para celdas limpias
-    private static PdfPCell getCell(String text, Font font, boolean alignRight) {
+    private static PdfPCell getPdfCell(String text, com.itextpdf.text.Font font, boolean alignRight) {
         PdfPCell cell = new PdfPCell(new Phrase(text, font));
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setPadding(5);
         if (alignRight) cell.setHorizontalAlignment(Element.ALIGN_RIGHT);
         return cell;
+    }
+
+    // --- MÉTODOS PARA IMPRESIÓN FÍSICA (SWING) ---
+
+    public void addTicketText(String text, int size, boolean bold, Color color) {
+        if (ticketPanel == null) return;
+        JLabel l = new JLabel(text);
+        // Aquí usamos java.awt.Font explícitamente
+        l.setFont(new java.awt.Font("Monospaced", bold ? java.awt.Font.BOLD : java.awt.Font.PLAIN, size));
+        l.setForeground(color);
+        l.setAlignmentX(Component.CENTER_ALIGNMENT);
+        ticketPanel.add(l);
+        ticketPanel.add(Box.createVerticalStrut(2));
+    }
+
+    public void printJob() {
+        if (ticketPanel == null) return;
+        PrinterJob job = PrinterJob.getPrinterJob();
+        job.setJobName("Recibo SICONI " + saleCode);
+        job.setPrintable(new Printable() {
+            public int print(Graphics pg, PageFormat pf, int pageNum) {
+                if (pageNum > 0) return Printable.NO_SUCH_PAGE;
+                Graphics2D g2 = (Graphics2D) pg;
+                g2.translate(pf.getImageableX(), pf.getImageableY());
+                double scale = pf.getImageableWidth() / ticketPanel.getWidth();
+                if(scale < 1.0) g2.scale(scale, scale);
+                ticketPanel.printAll(g2);
+                return Printable.PAGE_EXISTS;
+            }
+        });
+
+        if (job.printDialog()) {
+            try {
+                job.print();
+            } catch (PrinterException e) {
+                e.printStackTrace();
+            }
+        }
     }
 }

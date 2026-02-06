@@ -2,7 +2,9 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: UNEG - SICONI
  * ARCHIVO: OrderManagementView.java
- * VERSIÓN: 14.0.0 (FINAL GOLD: Payment Logic + Receipt Printing Integrated)
+ * VERSIÓN: 14.1.1 (FIXED: Decimal Parsing Error)
+ * DESCRIPCIÓN: Se corrigió el error de formato que multiplicaba los montos
+ * al omitir el separador decimal durante el parseo del texto.
  * -----------------------------------------------------------------------------
  */
 
@@ -17,7 +19,8 @@ import com.swimcore.util.ImagePanel;
 import com.swimcore.util.LanguageManager;
 import com.swimcore.view.components.SoftButton;
 import com.swimcore.view.dialogs.AddPaymentDialog;
-import com.swimcore.view.dialogs.ReceiptPreviewDialog; // IMPORTANTE: Importamos el Recibo
+import com.swimcore.view.dialogs.ReceiptPreviewDialog;
+import com.swimcore.view.dialogs.ReceiptPreviewDialog.TicketItem;
 
 import javax.swing.*;
 import javax.swing.border.CompoundBorder;
@@ -37,6 +40,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
 
@@ -60,6 +64,7 @@ public class OrderManagementView extends JDialog {
 
     private List<Client> clientCache;
     private String selectedSaleId = null;
+    private String currentSaleDate = "";
 
     private final Color COLOR_GOLD = new Color(212, 175, 55);
     private final Color COLOR_GOLD_BRIGHT = new Color(255, 215, 0);
@@ -74,7 +79,6 @@ public class OrderManagementView extends JDialog {
         super(owner, LanguageManager.get("workshop.title"), true);
         setSize(1280, 720);
         setLocationRelativeTo(owner);
-
 
         try {
             setContentPane(new ImagePanel("/images/bg_taller.png"));
@@ -240,6 +244,7 @@ public class OrderManagementView extends JDialog {
         productsModel.setRowCount(0);
         paymentHistoryArea.setText("");
         lblStatus.setText("-");
+        currentSaleDate = "";
     }
 
     private void changeStatus(String newStatus) {
@@ -365,7 +370,6 @@ public class OrderManagementView extends JDialog {
 
         SoftButton btnPrintReceipt = createButton("IMPRIMIR RECIBO", Color.BLACK, "/images/icons/icon_print.png");
         btnPrintReceipt.setBackground(new Color(200, 200, 200));
-        // CONECTADO: AHORA LLAMA AL MÉTODO DE IMPRESIÓN
         btnPrintReceipt.addActionListener(e -> openPrintReceiptDialog());
 
         actionsPanel.add(btnAddPayment);
@@ -409,6 +413,8 @@ public class OrderManagementView extends JDialog {
 
             try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
                 if (rs.next()) {
+                    currentSaleDate = rs.getString("date");
+
                     int clientId = rs.getInt("client_id");
                     Client client = clientCache.stream().filter(c -> c.getId() == clientId).findFirst().orElse(null);
                     if (client != null) {
@@ -523,8 +529,6 @@ public class OrderManagementView extends JDialog {
         } catch (Exception e) { e.printStackTrace(); }
     }
 
-    // --- MÉTODOS PARA DIÁLOGOS (Pago e Impresión) ---
-
     private void openAddPaymentDialog() {
         if (selectedSaleId == null) {
             JOptionPane.showMessageDialog(this, "Seleccione un pedido.", "Aviso", JOptionPane.WARNING_MESSAGE);
@@ -557,14 +561,12 @@ public class OrderManagementView extends JDialog {
         }
     }
 
-    // --- NUEVO: METODO PARA IMPRIMIR RECIBO ---
     private void openPrintReceiptDialog() {
         if (selectedSaleId == null) {
             JOptionPane.showMessageDialog(this, "Seleccione un pedido para imprimir.", "Aviso", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
-        // 1. Efecto Oscuro
         JPanel glass = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -576,12 +578,72 @@ public class OrderManagementView extends JDialog {
         this.setGlassPane(glass);
         glass.setVisible(true);
 
-        // 2. Abrir Vista Previa (ReceiptPreviewDialog)
-        ReceiptPreviewDialog dialog = new ReceiptPreviewDialog(this, selectedSaleId);
+        String cliente = lblClientName.getText();
+        String tlf = lblClientContact.getText().replace("TLF:", "").trim();
+        String fecha = (currentSaleDate.isEmpty()) ? "Hoy" : currentSaleDate;
+
+        // RECOLECCIÓN CORREGIDA DE MONTOS
+        double total = parseMonto(lblTotalValue.getText());
+        double abonado = parseMonto(lblPaidValue.getText());
+        double resta = parseMonto(lblDueValue.getText());
+
+        List<TicketItem> listaItems = new ArrayList<>();
+        String sql = "SELECT d.quantity, d.subtotal, p.name " +
+                "FROM sale_details d LEFT JOIN products p ON d.product_id = p.id " +
+                "WHERE d.sale_id = ?";
+
+        try (Connection conn = com.swimcore.dao.Conexion.conectar();
+             PreparedStatement pst = conn.prepareStatement(sql)) {
+            pst.setString(1, selectedSaleId);
+            ResultSet rs = pst.executeQuery();
+            while(rs.next()){
+                String nombre = rs.getString("name");
+                if(nombre == null) nombre = "Artículo";
+                listaItems.add(new TicketItem(
+                        nombre,
+                        rs.getInt("quantity"),
+                        rs.getDouble("subtotal")
+                ));
+            }
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+
+        ReceiptPreviewDialog dialog = new ReceiptPreviewDialog(
+                this,
+                selectedSaleId,
+                fecha,
+                cliente,
+                tlf,
+                listaItems,
+                total, abonado, resta
+        );
         dialog.setVisible(true);
 
-        // 3. Quitar Oscuro
         glass.setVisible(false);
+    }
+
+    // MÉTODO REPARADO: Ahora maneja comas y puntos correctamente para evitar multiplicaciones
+    private double parseMonto(String text) {
+        if (text == null || text.isEmpty()) return 0.0;
+        try {
+            // Eliminamos el símbolo de dólar y espacios
+            String clean = text.replace("$", "").trim();
+
+            // Si el formato usa punto para miles y coma para decimales (ej: 1.234,56)
+            if (clean.contains(",") && clean.contains(".")) {
+                clean = clean.replace(".", "").replace(",", ".");
+            }
+            // Si solo tiene coma (ej. 88,00), la cambiamos por punto
+            else if (clean.contains(",")) {
+                clean = clean.replace(",", ".");
+            }
+
+            return Double.parseDouble(clean);
+        } catch (Exception e) {
+            System.err.println("Error parseando monto: " + text);
+            return 0.0;
+        }
     }
 
     private void styleTable() {

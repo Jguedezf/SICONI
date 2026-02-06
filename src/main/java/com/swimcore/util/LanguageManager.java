@@ -9,8 +9,8 @@
  *
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
- * FECHA: Enero 2026
- * VERSIÓN: 1.0.0 (Stable Release)
+ * FECHA: 05 de Febrero de 2026 - 12:20 PM
+ * VERSIÓN: 1.0.1 (Hotfix / Maintenance Release)
  *
  * DESCRIPCIÓN TÉCNICA:
  * Clase utilitaria encargada de la gestión de Internacionalización (i18n) del sistema.
@@ -30,6 +30,8 @@
  * detrás de un método estático simple `get()`.
  * - ENCAPSULAMIENTO: Protege las variables `currentLocale` y `bundle` mediante
  * modificadores de acceso privados.
+ * - POLIMORFISMO (Estático): Implementa sobrecarga de métodos en la función `get`
+ * para manejar valores por defecto.
  *
  * PATRONES DE DISEÑO:
  * - Singleton (Variación Estática): Proporciona un único punto de acceso global
@@ -85,7 +87,14 @@ public class LanguageManager {
     private static void loadBundle() {
         // ResourceBundle busca automáticamente en el classpath
         // el nombre base "messages" combinado con el locale actual.
-        bundle = ResourceBundle.getBundle("messages", currentLocale);
+        // Se añade control de errores por seguridad.
+        try {
+            bundle = ResourceBundle.getBundle("messages", currentLocale);
+        } catch (Exception e) {
+            System.err.println("SICONI WARNING: No se pudo cargar el idioma " + currentLocale);
+            // Fallback de seguridad a Locale por defecto del sistema si falla
+            bundle = ResourceBundle.getBundle("messages", Locale.getDefault());
+        }
     }
 
     /**
@@ -99,6 +108,25 @@ public class LanguageManager {
         } catch (Exception e) {
             // Gestión de fallos: Retorna la clave para identificar errores en la vista.
             return "Key not found: " + key;
+        }
+    }
+
+    /**
+     * SOBRECARGA DE METODO: Obtiene la traducción o usa un valor de respaldo.
+     * Soluciona el error de compilación cuando la vista envía un texto por defecto.
+     *
+     * @param key Identificador de la cadena.
+     * @param defaultValue Texto a mostrar si no se encuentra la traducción o el bundle falla.
+     * @return Texto traducido o valor por defecto.
+     */
+    public static String get(String key, String defaultValue) {
+        try {
+            if (bundle != null && bundle.containsKey(key)) {
+                return bundle.getString(key);
+            }
+            return defaultValue;
+        } catch (Exception e) {
+            return defaultValue;
         }
     }
 }

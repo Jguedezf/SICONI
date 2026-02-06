@@ -9,8 +9,9 @@
  *
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
- * FECHA: Enero 2026
- * VERSIÓN: 1.1.0 (Stable Release)
+ * FECHA: 06 de Febrero de 2026
+ * HORA: 12:05 PM (Hora de Venezuela)
+ * VERSIÓN: 2.5.0 (Admin Module Enabled)
  * -----------------------------------------------------------------------------
  */
 
@@ -21,24 +22,19 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Proveedor de servicios de datos para la entidad Usuario.
+ * Gestiona el CRUD completo y la validación de acceso (Login).
  */
 public class UserDAO {
 
-    /**
-     * Constructor.
-     * Garantiza que la infraestructura de tablas esté lista antes de cualquier operación.
-     */
     public UserDAO() {
         createTable();
     }
 
-    /**
-     * Rutina DDL (Data Definition Language).
-     * Crea la tabla 'users' con restricciones de integridad (PRIMARY KEY, UNIQUE, NOT NULL).
-     */
     private void createTable() {
         String sql = "CREATE TABLE IF NOT EXISTS users (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -50,15 +46,10 @@ public class UserDAO {
              Statement stmt = conn.createStatement()) {
             stmt.execute(sql);
         } catch (Exception e) {
-            // Log técnico simplificado para evitar inundar la consola de rojo
             System.err.println("SICONI: Verificando tabla de usuarios...");
         }
     }
 
-    /**
-     * Módulo de Autenticación (Login).
-     * Verifica las credenciales proporcionadas contra el almacén de datos.
-     */
     public User login(String username, String password) {
         String sql = "SELECT * FROM users WHERE username = ? AND password = ?";
         try (Connection conn = Conexion.conectar();
@@ -67,7 +58,6 @@ public class UserDAO {
             pstmt.setString(1, username);
             pstmt.setString(2, password);
 
-            // Try-with-resources para cerrar el ResultSet automáticamente y liberar la BD
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
                     return new User(
@@ -84,12 +74,8 @@ public class UserDAO {
         return null;
     }
 
-    /**
-     * Operación de Persistencia (Create).
-     * Almacena un nuevo registro de usuario en la base de datos.
-     */
-    public void saveUser(User user) {
-        // AJUSTE: 'INSERT OR IGNORE' para que no explote si el 'admin' ya existe al iniciar
+    // Registro de usuario (Retorna true si fue exitoso)
+    public boolean saveUser(User user) {
         String sql = "INSERT OR IGNORE INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)";
         try (Connection conn = Conexion.conectar();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -97,16 +83,13 @@ public class UserDAO {
             pstmt.setString(2, user.getPassword());
             pstmt.setString(3, user.getFullName());
             pstmt.setString(4, user.getRole());
-            pstmt.executeUpdate();
+            return pstmt.executeUpdate() > 0;
         } catch (Exception e) {
-            System.err.println("SICONI: Registro de usuario verificado.");
+            System.err.println("SICONI: Error registrando usuario.");
+            return false;
         }
     }
 
-    /**
-     * Búsqueda por Identificador (Read).
-     * Recupera la información de un usuario basado en su nombre de cuenta.
-     */
     public User findByUsername(String username) {
         String sql = "SELECT * FROM users WHERE username = ?";
         try (Connection conn = Conexion.conectar();
@@ -126,5 +109,57 @@ public class UserDAO {
             System.err.println("SICONI: Usuario no localizado.");
         }
         return null;
+    }
+
+    // --- FUNCIONES PARA GESTIÓN ADMINISTRATIVA ---
+
+    public boolean updateUser(User user) {
+        String sql = "UPDATE users SET password = ?, full_name = ?, role = ? WHERE username = ?";
+        try (Connection conn = Conexion.conectar();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, user.getPassword());
+            pstmt.setString(2, user.getFullName());
+            pstmt.setString(3, user.getRole());
+            pstmt.setString(4, user.getUsername());
+            return pstmt.executeUpdate() > 0;
+        } catch (Exception e) {
+            System.err.println("SICONI: Error actualizando usuario.");
+            return false;
+        }
+    }
+
+    public boolean deleteUser(String username) {
+        // Protección: No permitir borrar al admin principal
+        if ("admin".equalsIgnoreCase(username)) return false;
+
+        String sql = "DELETE FROM users WHERE username = ?";
+        try (Connection conn = Conexion.conectar();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            return pstmt.executeUpdate() > 0;
+        } catch (Exception e) {
+            System.err.println("SICONI: Error eliminando usuario.");
+            return false;
+        }
+    }
+
+    public List<User> getAllUsers() {
+        List<User> list = new ArrayList<>();
+        String sql = "SELECT * FROM users ORDER BY id ASC";
+        try (Connection conn = Conexion.conectar();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                list.add(new User(
+                        rs.getString("username"),
+                        rs.getString("password"),
+                        rs.getString("full_name"),
+                        rs.getString("role")
+                ));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
     }
 }

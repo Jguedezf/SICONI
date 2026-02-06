@@ -2,8 +2,9 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: UNEG - SICONI
  * ARCHIVO: ClientController.java
- * VERSIÓN: 3.2.1 (SICONI Integration Verified)
- * FECHA: 04 de Febrero de 2026 - 04:40 PM
+ * VERSIÓN: 3.2.2 (Certified for SICONI v8.0)
+ * FECHA: 05 de Febrero de 2026
+ * DESCRIPCIÓN: Controlador de Clientes. Lógica intacta y validada.
  * -----------------------------------------------------------------------------
  */
 package com.swimcore.controller;

@@ -1,9 +1,10 @@
 /*
  * -----------------------------------------------------------------------------
  * ARCHIVO: SaleController.java
- * VERSIÓN: 2.1.0 (Sequence Methods Bridge)
+ * VERSIÓN: 2.2.0 (Receipt Flow Fix & Snapshot Bridge)
  * CAMBIOS:
- * 1. Métodos públicos para obtener los próximos N° de Pedido/Factura/Control.
+ * 1. Eliminada la llamada automática a generación de PDF en registerSale.
+ * 2. Añadidos métodos de soporte para la SalesView (getSaleById, getDetailsFromSnapshot).
  * -----------------------------------------------------------------------------
  */
 
@@ -15,7 +16,9 @@ import com.swimcore.model.Client;
 import com.swimcore.model.Sale;
 import com.swimcore.model.SaleDetail;
 import com.swimcore.util.ReceiptGenerator;
+import com.swimcore.view.dialogs.ReceiptPreviewDialog; // Para el TicketItem
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -29,7 +32,7 @@ public class SaleController {
         this.clientDAO = new ClientDAO();
     }
 
-    // --- NUEVOS MÉTODOS PARA CONSECUTIVOS ---
+    // --- MÉTODOS DE CONSECUTIVOS (NO CAMBIAN) ---
 
     public int getNextOrderNumber() {
         return saleDAO.getTotalSaleCount() + 1;
@@ -64,9 +67,44 @@ public class SaleController {
     public boolean registerSale(Sale sale, List<SaleDetail> details) {
         if (sale == null || details == null || details.isEmpty()) return false;
         boolean success = saleDAO.registerSale(sale, details);
-        if (success) { generarReciboPDF(sale, details); }
+
+        // ⛔ SE ELIMINÓ LA LLAMADA AUTOMÁTICA DEL RECIBO AQUÍ
+
         return success;
     }
+
+    // --- MÉTODOS DE SOPORTE PARA RECEIPT FLOW ---
+
+    /**
+     * Recupera el objeto Sale completo por su ID (Necesario en SalesView para generar PDF).
+     * NOTA: Este método asume que SaleDAO tiene el método getSaleById(String saleId).
+     */
+    public Sale getSaleById(String saleId) {
+        return saleDAO.getSaleById(saleId);
+    }
+
+    /**
+     * Reconstruye la lista de SaleDetail a partir del Snapshot de datos de la Vista.
+     */
+    public List<SaleDetail> getDetailsFromSnapshot(List<ReceiptPreviewDialog.TicketItem> items, String saleId) {
+        List<SaleDetail> details = new ArrayList<>();
+        // No tenemos el product_id original, pero el generador solo necesita el nombre, cantidad y precio.
+        for (ReceiptPreviewDialog.TicketItem item : items) {
+            // Creamos un SaleDetail temporal (el productId se deja como "0" o similar si no es esencial)
+            SaleDetail d = new SaleDetail();
+            d.setSaleId(saleId);
+            d.setProductName(item.name);
+            d.setQuantity(item.qty);
+            d.setSubtotal(item.subtotal);
+            d.setUnitPrice(item.subtotal / item.qty);
+            // El product_id se deja vacío o en "0" ya que no lo tenemos del Snapshot
+            d.setProductId("0");
+            details.add(d);
+        }
+        return details;
+    }
+
+    // --- MÉTODOS ANALÍTICOS (NO CAMBIAN) ---
 
     public double getCustomerTotalSpending(String clientId) {
         return saleDAO.getAllSales().stream()
@@ -84,13 +122,16 @@ public class SaleController {
                 .count();
     }
 
+    // NOTA: Este método privado ya no se usa, pero lo dejamos si es necesario para otros módulos.
     private void generarReciboPDF(Sale sale, List<SaleDetail> details) {
         try {
             Client client = clientDAO.getAllClients().stream()
                     .filter(c -> String.valueOf(c.getId()).equals(sale.getClientId()))
                     .findFirst().orElse(null);
             if(client != null) {
-                ReceiptGenerator.generateReceipt(sale, details, client);
+                // Aquí se llama a la función anterior que abría el PDF automáticamente,
+                // pero ahora se reemplaza por la nueva lógica controlada.
+                ReceiptGenerator.generateReceipt(sale, details, client, false);
             }
         } catch (Exception e) { e.printStackTrace(); }
     }

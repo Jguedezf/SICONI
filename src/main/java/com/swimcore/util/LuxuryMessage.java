@@ -1,7 +1,14 @@
 /*
  * -----------------------------------------------------------------------------
+ * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
+ * CARRERA: Ingeniería en Informática
+ * ASIGNATURA: Programación III / Proyecto de Software
+ *
  * ARCHIVO: LuxuryMessage.java
- * VERSIÓN: 6.0 (FIX FINAL: Logo Corporativo + Compatibilidad Total)
+ * VERSIÓN: 6.1 (FINAL TOUCH: Verde Neón + Tamaño Botón)
+ * FECHA: 05 de Febrero de 2026 - 13:15 PM (VENEZUELA)
+ * DESCRIPCIÓN: Mensajes "Luxury" rediseñados con SoftButton y fondos
+ * personalizados. Ahora con el botón de acción principal en Verde Neón.
  * -----------------------------------------------------------------------------
  */
 package com.swimcore.util;
@@ -15,36 +22,32 @@ import java.net.URL;
 
 public class LuxuryMessage extends JDialog {
 
-    private static final Color BG_DARK = new Color(28, 28, 28);
+    private static final Color BG_DARK = new Color(20, 20, 20); // Negro Profundo (Elegante)
     private static final Color GOLD = new Color(212, 175, 55);
     private static final Color ERROR_RED = new Color(220, 50, 50);
     private static final Color TEXT_WHITE = new Color(230, 230, 230);
 
-    // Constructor privado
+    // Constructor Privado
     private LuxuryMessage(Window parent, String title, String message, boolean isError) {
         super(parent, ModalityType.APPLICATION_MODAL);
+        setBackground(new Color(0,0,0,0)); // Para que la ventana sea transparente
 
-        // Fondo transparente para que el redondeado se vea suave
-        setBackground(new Color(0,0,0,0));
+        Color accentColor = isError ? ERROR_RED : new Color(57, 255, 20); // ¡VERDE NEÓN!
 
-        Color accentColor = isError ? ERROR_RED : GOLD;
-
-        // PANEL PRINCIPAL (DIBUJO MANUAL PARA BORDES SUAVES)
+        // PANEL PRINCIPAL (Bordes redondeados y degradado)
         JPanel mainPanel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-                // Fondo oscuro
-                g2.setColor(BG_DARK);
-                g2.fillRoundRect(2, 2, getWidth()-4, getHeight()-4, 25, 25);
-
-                // Borde Neón/Dorado fino
+                // Fondo oscuro degradado
+                GradientPaint gp = new GradientPaint(0, 0, BG_DARK, 0, getHeight(), BG_DARK.darker());
+                g2.setPaint(gp);
+                g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 35, 35); // Bordes redondos
+                // Borde Dorado (Opciónal)
                 g2.setColor(accentColor);
-                g2.setStroke(new BasicStroke(1.5f));
-                g2.drawRoundRect(2, 2, getWidth()-4, getHeight()-4, 25, 25);
-
+                g2.setStroke(new BasicStroke(2));
+                g2.drawRoundRect(1, 1, getWidth()-3, getHeight()-3, 35, 35);
                 g2.dispose();
             }
         };
@@ -52,22 +55,18 @@ public class LuxuryMessage extends JDialog {
         mainPanel.setBorder(new EmptyBorder(20, 25, 20, 25));
         mainPanel.setLayout(new BorderLayout(20, 10));
 
-        // --- ICONO ---
+        // --- Icono (Si hay) ---
         JLabel iconLabel = new JLabel();
-
-        // LÓGICA DE ICONOS CORREGIDA:
         if (isError) {
-            // Error: Usamos Emoji Rojo (Limpio y directo)
             iconLabel.setText("❌");
             iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 50));
             iconLabel.setForeground(ERROR_RED);
         } else {
-            // Éxito: Usamos TU LOGO (logo.png)
             ImageIcon icon = loadIcon("logo.png", 60);
             if (icon != null) {
                 iconLabel.setIcon(icon);
             } else {
-                // Fallback si no encuentra el logo: Check Dorado
+                // Si no encuentra el logo
                 iconLabel.setText("✅");
                 iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 50));
                 iconLabel.setForeground(GOLD);
@@ -75,7 +74,7 @@ public class LuxuryMessage extends JDialog {
         }
         iconLabel.setVerticalAlignment(SwingConstants.TOP);
 
-        // --- CONTENIDO ---
+        // --- CONTENIDO DEL MENSAJE ---
         JPanel centerPanel = new JPanel(new BorderLayout(0, 10));
         centerPanel.setOpaque(false);
 
@@ -91,49 +90,39 @@ public class LuxuryMessage extends JDialog {
         txtMsg.setLineWrap(true);
         txtMsg.setEditable(false);
         txtMsg.setFocusable(false);
-        txtMsg.setSize(new Dimension(350, 10));
         txtMsg.setBorder(null);
-
         centerPanel.add(lblTitle, BorderLayout.NORTH);
         centerPanel.add(txtMsg, BorderLayout.CENTER);
 
-        // --- BOTÓN ---
+        // --- BOTÓN (Con SoftButton y el color "PRO") ---
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
         btnPanel.setOpaque(false);
 
         SoftButton btnOk = new SoftButton(null);
         btnOk.setText("ACEPTAR");
-        btnOk.setPreferredSize(new Dimension(110, 35));
-        btnOk.setForeground(Color.BLACK);
-        btnOk.setBackground(accentColor);
+        btnOk.setPreferredSize(new Dimension(150, 50)); // ¡BOTÓN MÁS GRANDE!
+        btnOk.setForeground(Color.BLACK); // Texto negro
+        btnOk.setBackground(accentColor);  // ¡Verde Neón!
         btnOk.setFont(new Font("Segoe UI", Font.BOLD, 13));
         btnOk.addActionListener(e -> dispose());
-
         btnPanel.add(btnOk);
 
-        // ARMADO
+        // --- ENSAMBLAJE (Orden correcto) ---
         mainPanel.add(iconLabel, BorderLayout.WEST);
         mainPanel.add(centerPanel, BorderLayout.CENTER);
         mainPanel.add(btnPanel, BorderLayout.SOUTH);
 
         setContentPane(mainPanel);
-        pack(); // Ajuste automático
-
-        int w = Math.max(400, Math.min(getWidth(), 600));
-        int h = getHeight();
-        setSize(w, h);
-
+        pack(); // Ajusta el tamaño automáticamente
         if (parent != null) setLocationRelativeTo(parent);
         else setLocationRelativeTo(null);
     }
 
-    // CARGA DE IMAGEN CORREGIDA (Busca en /images/ directamente)
+    // CARGA DE IMAGEN (Busca en /images/)
     private ImageIcon loadIcon(String name, int size) {
         try {
-            // CAMBIO CLAVE: Quitamos "icons/" para que busque en la raíz de imagenes
             URL url = getClass().getResource("/images/" + name);
             if (url != null) {
-                // Usamos java.awt.Image explícitamente para evitar conflictos
                 return new ImageIcon(new ImageIcon(url).getImage().getScaledInstance(size, size, java.awt.Image.SCALE_SMOOTH));
             }
         } catch (Exception e) {}

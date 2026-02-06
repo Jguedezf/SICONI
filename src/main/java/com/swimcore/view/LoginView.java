@@ -3,7 +3,12 @@
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
  * PROYECTO: SICONI - DAYANA GUEDEZ SWIMWEAR
  * ARCHIVO: LoginView.java
- * VERSIÓN: 2.1.0 (Fixed & Optimized)
+ * VERSIÓN: 2.7.0 (Fix de Altura Forzada)
+ * FECHA: 06 de Febrero de 2026
+ * HORA: 04:30 PM (Hora de Venezuela)
+ * DESCRIPCIÓN: Ventana de acceso principal.
+ * SOLUCIÓN: Se usa 'setPreferredSize' para obligar al campo de contraseña
+ * del escudo a tener un tamaño correcto, sin depender del Main.
  * -----------------------------------------------------------------------------
  */
 
@@ -13,13 +18,18 @@ import com.swimcore.dao.UserDAO;
 import com.swimcore.model.User;
 import com.swimcore.util.LanguageManager;
 import com.swimcore.util.SoundManager;
+import com.swimcore.view.dialogs.UserManagementDialog;
 
 import javax.swing.*;
+import javax.swing.border.CompoundBorder;
+import javax.swing.border.EmptyBorder;
+import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.net.URL;
 import java.util.Locale;
+import java.util.TimeZone;
 
 public class LoginView extends JFrame {
 
@@ -32,42 +42,42 @@ public class LoginView extends JFrame {
     // --- COMPONENTES UI ---
     private JLabel lblUser, lblPass;
     private JLabel lblSecurity;
+    private JLabel lblAdminShield;
     private JTextField txtUser;
     private JPasswordField txtPass;
     private JButton btnLogin;
 
+    private Image backgroundImage;
+
     public LoginView() {
-        // El título se carga en updateTexts()
         setSize(480, 680);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setResizable(false);
 
-        // --- CAMBIO 1: Panel con Imagen de Fondo ---
-        // Usamos una clase anónima para pintar la imagen sin romper tu layout null
+        // --- CARGA DE RECURSOS ---
+        try {
+            URL url = getClass().getResource("/images/login_bg.png");
+            if (url != null) {
+                backgroundImage = new ImageIcon(url).getImage();
+            }
+        } catch (Exception e) {
+            System.err.println("Error al cargar imagen de fondo: " + e.getMessage());
+        }
+
         JPanel panel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
-                try {
-                    // Asegúrate de tener esta imagen. Si no, usa el color de fondo.
-                    URL url = getClass().getResource("/images/login_bg.png");
-                    if (url != null) {
-                        Image img = new ImageIcon(url).getImage();
-                        g.drawImage(img, 0, 0, getWidth(), getHeight(), this);
-                    } else {
-                        g.setColor(COLOR_FONDO);
-                        g.fillRect(0, 0, getWidth(), getHeight());
-                    }
-                } catch (Exception e) {
+                if (backgroundImage != null) {
+                    g.drawImage(backgroundImage, 0, 0, getWidth(), getHeight(), this);
+                } else {
                     g.setColor(COLOR_FONDO);
                     g.fillRect(0, 0, getWidth(), getHeight());
                 }
             }
         };
-
         panel.setLayout(null);
-        // panel.setBackground(COLOR_FONDO); // Ya no es necesario, lo pinta paintComponent
         add(panel);
 
         int centerX = 240;
@@ -92,8 +102,8 @@ public class LoginView extends JFrame {
         btnVe.setBounds(centerX - flagW - (gap/2), 160, flagW, flagH);
         estilizarBotonImagen(btnVe, "/images/ve.png");
         btnVe.addActionListener(e -> {
-            LanguageManager.setLocale(new Locale("es"));
-            updateTexts(); // Actualiza los textos al cambiar idioma
+            LanguageManager.setLocale(new Locale("es", "VE"));
+            updateTexts();
         });
         panel.add(btnVe);
 
@@ -101,8 +111,8 @@ public class LoginView extends JFrame {
         btnUs.setBounds(centerX + (gap/2), 160, flagW, flagH);
         estilizarBotonImagen(btnUs, "/images/us.png");
         btnUs.addActionListener(e -> {
-            LanguageManager.setLocale(new Locale("en"));
-            updateTexts(); // Actualiza los textos al cambiar idioma
+            LanguageManager.setLocale(new Locale("en", "US"));
+            updateTexts();
         });
         panel.add(btnUs);
 
@@ -114,12 +124,18 @@ public class LoginView extends JFrame {
         lblUser.setBounds(inputX, startY, 200, 20);
         panel.add(lblUser);
 
+        // --- USUARIO ---
         txtUser = new JTextField();
         txtUser.setBounds(inputX, startY + 25, inputWidth, 45);
         txtUser.setBackground(COLOR_CAMPOS);
         txtUser.setForeground(Color.WHITE);
         txtUser.setCaretColor(COLOR_DORADO);
         txtUser.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        // Borde dorado normal
+        txtUser.setBorder(new CompoundBorder(
+                new LineBorder(COLOR_DORADO, 1),
+                new EmptyBorder(0, 10, 0, 0)
+        ));
         panel.add(txtUser);
 
         lblPass = new JLabel();
@@ -127,12 +143,17 @@ public class LoginView extends JFrame {
         lblPass.setBounds(inputX, startY + 90, 200, 20);
         panel.add(lblPass);
 
+        // --- CONTRASEÑA ---
         txtPass = new JPasswordField();
         txtPass.setBounds(inputX, startY + 115, inputWidth, 45);
         txtPass.setBackground(COLOR_CAMPOS);
         txtPass.setForeground(Color.WHITE);
         txtPass.setCaretColor(COLOR_DORADO);
         txtPass.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        txtPass.setBorder(new CompoundBorder(
+                new LineBorder(COLOR_DORADO, 1),
+                new EmptyBorder(0, 10, 0, 0)
+        ));
         txtPass.addActionListener(e -> validarYAnimar());
         panel.add(txtPass);
 
@@ -144,57 +165,59 @@ public class LoginView extends JFrame {
         ajustarImagen(lblSecurity, "/images/lock_closed.jpg", lockSize);
         panel.add(lblSecurity);
 
-// 5. BOTÓN ENTRAR (SUBIDO: AHORA SÍ)
+        // 5. BOTÓN ENTRAR
         btnLogin = new JButton() {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-                // --- COLORES 3D (Gradiente Fucsia) ---
                 Color colorTop = new Color(255, 50, 150);
                 Color colorBottom = new Color(180, 0, 100);
-
                 if (getModel().isRollover()) {
                     colorTop = colorTop.brighter();
                     colorBottom = colorBottom.brighter();
                 }
-
-                // Pintar Gradiente
                 GradientPaint gp = new GradientPaint(0, 0, colorTop, 0, getHeight(), colorBottom);
                 g2.setPaint(gp);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 15, 15);
-
-                // Borde Dorado Fino
                 g2.setColor(COLOR_DORADO);
                 g2.setStroke(new BasicStroke(1.5f));
                 g2.drawRoundRect(1, 1, getWidth()-2, getHeight()-2, 15, 15);
-
                 g2.dispose();
                 super.paintComponent(g);
             }
         };
 
         int btnWidth = 220;
-
-        // --- CÁLCULO DE POSICIÓN ---
-        // Candado termina en: startY(220) + 170 + 100 = 490 (Y real)
-        // Botón empieza en: startY + 285 = 505 (Y real)
-        // Espacio entre candado y botón = 15 píxeles (Compacto y bonito)
         btnLogin.setBounds(centerX - (btnWidth/2), startY + 285, btnWidth, 50);
-
         btnLogin.setText(LanguageManager.get("login.button"));
         btnLogin.setFont(new Font("Segoe UI", Font.BOLD, 16));
         btnLogin.setForeground(Color.WHITE);
-
         btnLogin.setFocusPainted(false);
         btnLogin.setBorderPainted(false);
         btnLogin.setContentAreaFilled(false);
         btnLogin.setCursor(new Cursor(Cursor.HAND_CURSOR));
-
         agregarEfectoClick(btnLogin);
         btnLogin.addActionListener(e -> validarYAnimar());
         panel.add(btnLogin);
+
+        // --- 6. ESCUDO DE SEGURIDAD ---
+        lblAdminShield = new JLabel("🛡️");
+        lblAdminShield.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 28));
+        lblAdminShield.setForeground(new Color(200, 160, 51, 100));
+        lblAdminShield.setBounds(centerX - 15, startY + 345, 40, 40);
+        lblAdminShield.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        lblAdminShield.setToolTipText("Seguridad y Usuarios");
+        lblAdminShield.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) { abrirGestionSeguridad(); }
+            @Override
+            public void mouseEntered(MouseEvent e) { lblAdminShield.setForeground(COLOR_DORADO); }
+            @Override
+            public void mouseExited(MouseEvent e) { lblAdminShield.setForeground(new Color(200, 160, 51, 100)); }
+        });
+        panel.add(lblAdminShield);
+
         // Footer
         JLabel firma = new JLabel("Desarrollado por Johanna Guédez © 2026");
         firma.setFont(new Font("Segoe UI", Font.PLAIN, 10));
@@ -203,8 +226,41 @@ public class LoginView extends JFrame {
         firma.setBounds(centerX - 150, 610, 300, 20);
         panel.add(firma);
 
-        // Carga inicial de textos en el idioma por defecto
         updateTexts();
+    }
+
+    // --- MÉTODO CORREGIDO ---
+    private void abrirGestionSeguridad() {
+        SoundManager.getInstance().playClick();
+
+        JPasswordField pf = new JPasswordField();
+
+        // 1. Estilo Visual (Borde Dorado)
+        pf.setBorder(new CompoundBorder(
+                new LineBorder(COLOR_DORADO, 1),
+                new EmptyBorder(5, 10, 5, 0)
+        ));
+
+        // 2. FUERZA BRUTA PARA EL TAMAÑO (Esto soluciona el problema)
+        // Le obligamos a medir 250px de ancho y 40px de alto.
+        pf.setPreferredSize(new Dimension(250, 40));
+        pf.setFont(new Font("Segoe UI", Font.BOLD, 16));
+
+        // Mostramos el diálogo
+        int accion = JOptionPane.showConfirmDialog(this, pf,
+                "Ingrese Clave Maestra de Seguridad:",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+
+        if (accion == JOptionPane.OK_OPTION) {
+            String pass = new String(pf.getPassword());
+            if ("1234".equals(pass)) {
+                new UserManagementDialog(this).setVisible(true);
+            } else if (!pass.isEmpty()) {
+                SoundManager.getInstance().playError();
+                JOptionPane.showMessageDialog(this, "Clave Incorrecta", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
     }
 
     private void updateTexts() {
@@ -219,7 +275,6 @@ public class LoginView extends JFrame {
         String u = txtUser.getText();
         String p = new String(txtPass.getPassword());
         UserDAO dao = new UserDAO();
-
         boolean accesoBD = (dao.login(u, p) != null);
         boolean accesoEmergencia = (u.equals("admin") && p.equals("1234"));
 
@@ -229,15 +284,11 @@ public class LoginView extends JFrame {
                     dao.saveUser(new User("admin", "1234", "Johanna Guedez", "ADMIN"));
                 }
             }
-
             txtUser.setEnabled(false);
             txtPass.setEnabled(false);
             btnLogin.setText(LanguageManager.get("login.success"));
             btnLogin.setBackground(new Color(46, 204, 113));
-
-            // --- CORRECCIÓN: Usamos playClick que SÍ existe ---
             SoundManager.getInstance().playClick();
-
             try {
                 URL gifUrl = getClass().getResource("/images/lock_animation.gif");
                 if (gifUrl != null) {
@@ -246,28 +297,17 @@ public class LoginView extends JFrame {
                     lblSecurity.setIcon(new ImageIcon(img));
                 }
             } catch (Exception ex) { }
-
             Timer t = new Timer(5000, e -> {
                 dispose();
-                // --- CAMBIO 2: Lógica de Pre-carga del Dashboard ---
-                // Abrimos la Bienvenida...
+                TimeZone.setDefault(TimeZone.getTimeZone("America/Caracas"));
                 new WelcomeView().setVisible(true);
-
-                // ...y en secreto cargamos el Dashboard para que esté listo al terminar la bienvenida
-                new Thread(() -> {
-                    // Esto inicializa la clase y calienta la conexión a BD
-                    try { Class.forName("com.swimcore.view.DashboardView"); } catch(Exception ex){}
-                }).start();
+                new Thread(() -> { try { Class.forName("com.swimcore.view.DashboardView"); } catch(Exception ex){} }).start();
             });
             t.setRepeats(false);
             t.start();
-
         } else {
             SoundManager.getInstance().playError();
-            JOptionPane.showMessageDialog(this,
-                    LanguageManager.get("login.error.message"),
-                    LanguageManager.get("login.error.title"),
-                    JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, LanguageManager.get("login.error.message"), LanguageManager.get("login.error.title"), JOptionPane.ERROR_MESSAGE);
             txtPass.setText("");
             txtPass.requestFocus();
         }

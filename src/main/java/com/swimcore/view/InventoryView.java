@@ -1,9 +1,8 @@
-
 /*
 INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
 ARCHIVO: InventoryView.java
-VERSIÓN: 16.0.0 (LUXURY FINAL: Full Code + Centered Fixes + ID 001)
-FECHA: Enero 2026
+VERSIÓN: 16.1.0 (LUXURY FINAL: Interactive Filter Added)
+FECHA: Febrero 2026
 */
 package com.swimcore.view;
 
@@ -30,12 +29,15 @@ public class InventoryView extends JDialog {
     private DefaultTableModel tableModel;
     private final ProductDAO productDAO = new ProductDAO();
 
+    // VARIABLE PROMOVIDA PARA CAMBIO DINÁMICO
+    private JLabel lblTitle;
+
     // Paleta de Colores Corporativa (SICONI High Contrast)
     private final Color COLOR_GOLD = new Color(212, 175, 55);
     private final Color COLOR_TEXTO = new Color(229, 228, 226);
     private final Color COLOR_VERDE_NEON = new Color(0, 255, 128);
     private final Color COLOR_ROJO_ALERTA = new Color(255, 60, 60);
-    private final Color COLOR_NARANJA_ALERTA = new Color(255, 165, 0); // Agregado para alerta media
+    private final Color COLOR_NARANJA_ALERTA = new Color(255, 165, 0);
     private final Color COLOR_FUCSIA_NEON = new Color(255, 0, 127);
     private final Color COLOR_INPUT_BG = new Color(30, 30, 30);
     private final Color COLOR_BG_DIALOG = new Color(18, 18, 18);
@@ -79,15 +81,31 @@ public class InventoryView extends JDialog {
         loadProducts("");
 
         if (showOnlyLowStock) {
-            SwingUtilities.invokeLater(() -> {
-                if (productTable.getRowCount() > 0) {
-                    productTable.setRowSelectionInterval(0, 0);
-                    productTable.scrollRectToVisible(productTable.getCellRect(0, 0, true));
-                    productTable.requestFocus();
-                }
-            });
+            activarModoAlertaVisual();
         }
     }
+
+    // --- NUEVO MÉTODO PÚBLICO PARA CONECTAR CON DASHBOARD ---
+    public void mostrarSoloBajoStock() {
+        this.filterLowStock = true;
+        activarModoAlertaVisual();
+        loadProducts(""); // Recargar tabla con el filtro activado
+    }
+
+    private void activarModoAlertaVisual() {
+        if (lblTitle != null) {
+            lblTitle.setText("CONTROL DE STOCK CRÍTICO");
+            lblTitle.setForeground(COLOR_ROJO_ALERTA);
+        }
+        SwingUtilities.invokeLater(() -> {
+            if (productTable.getRowCount() > 0) {
+                productTable.setRowSelectionInterval(0, 0);
+                productTable.scrollRectToVisible(productTable.getCellRect(0, 0, true));
+                productTable.requestFocus();
+            }
+        });
+    }
+    // --------------------------------------------------------
 
     private void initSidePanel() {
         InventorySidePanel sidePanel = new InventorySidePanel();
@@ -111,7 +129,8 @@ public class InventoryView extends JDialog {
         headerPanel.setOpaque(false);
         headerPanel.setBorder(new EmptyBorder(20, 40, 10, 40));
 
-        JLabel lblTitle = new JLabel(filterLowStock ? "⚠️ CONTROL DE STOCK CRÍTICO" : LanguageManager.get("inventory.title"));
+        // Asignamos a la variable de clase en lugar de variable local
+        lblTitle = new JLabel(filterLowStock ? "CONTROL DE STOCK CRÍTICO" : LanguageManager.get("inventory.title"));
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 28));
         lblTitle.setForeground(filterLowStock ? COLOR_ROJO_ALERTA : COLOR_GOLD);
 
@@ -240,7 +259,7 @@ public class InventoryView extends JDialog {
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
                 Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
 
-                // FONDO ZEBRA (Igual que en Historial)
+                // FONDO ZEBRA
                 if (!isSelected) {
                     c.setBackground(row % 2 == 0 ? COLOR_TABLE_BG_1 : COLOR_TABLE_BG_2);
                 }
@@ -256,7 +275,7 @@ public class InventoryView extends JDialog {
                     setHorizontalAlignment(JLabel.CENTER);
                     setForeground(COLOR_GOLD);
                     setFont(new Font("Segoe UI", Font.BOLD, 14));
-                } else if (column == 6) { // PROVEEDOR CENTRADO (LO QUE PEDISTE)
+                } else if (column == 6) { // PROVEEDOR CENTRADO
                     setHorizontalAlignment(JLabel.CENTER);
                     setForeground(COLOR_TEXTO);
                 } else { // RESTO IZQUIERDA
@@ -273,7 +292,7 @@ public class InventoryView extends JDialog {
             if (i != 4) cm.getColumn(i).setCellRenderer(centerRenderer);
         }
 
-        // RENDERER ESPECIAL PARA STOCK (Mantiene botones +/- y aplica Zebra)
+        // RENDERER ESPECIAL PARA STOCK
         cm.getColumn(4).setCellRenderer(new PersistentStockRenderer());
     }
 
@@ -300,10 +319,10 @@ public class InventoryView extends JDialog {
                     p.getId(),
                     p.getCode(),
                     p.getName(),
-                    "General", // Mantenemos tu dato fijo para que se vea
+                    "General",
                     p.getCurrentStock(),
                     cleanPrice,
-                    "S/P",     // Mantenemos tu dato fijo para que se vea
+                    "S/P",
                     p.getMinStock()
             });
         }
@@ -349,7 +368,6 @@ public class InventoryView extends JDialog {
         @Override public Component getTableCellRendererComponent(JTable t, Object v, boolean isSel, boolean hasF, int r, int c) {
             val.setText(String.valueOf(v));
             int stock = (int)v;
-            int min = (int) tableModel.getValueAt(r, 7);
 
             // Color de alerta
             if(stock <= 5) val.setForeground(COLOR_ROJO_ALERTA);
@@ -376,7 +394,6 @@ public class InventoryView extends JDialog {
             super(parent, LanguageManager.get("audit.dialog.title"), true);
             setSize(1050, 700);
             setLocationRelativeTo(parent);
-
 
             try {
                 JPanel bgPanel = new ImagePanel("/images/bg_audit.png");

@@ -1,10 +1,12 @@
 /*
  * -----------------------------------------------------------------------------
+ * INSTITUCIÓN: UNEG - SICONI
  * ARCHIVO: ClientDAO.java
- * VERSIÓN: 2.6.1 (Restored & Synced)
- * FECHA: 04 de Febrero de 2026 - 04:40 PM
+ * VERSIÓN: 2.8.0 (RECOVERY: Restored deleteClient + Receipt Support)
+ * FECHA: 05 de Febrero de 2026 - 12:20 AM (Venezuela)
  * -----------------------------------------------------------------------------
  */
+
 package com.swimcore.dao;
 
 import com.swimcore.model.Client;
@@ -32,7 +34,6 @@ public class ClientDAO {
     }
 
     public boolean saveClient(Client c) {
-        // SQL con 17 parámetros (Añadido size al final)
         String sql = "INSERT INTO clients (code, id_type, id_number, full_name, phone, email, instagram, is_vip, athlete_name, birth_date, club_name, category, measurements, address, profession, phone_alt, size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection con = Conexion.conectar(); PreparedStatement pst = con.prepareStatement(sql)) {
             pst.setString(1, c.getCode() != null ? c.getCode() : generateNextCode());
@@ -51,11 +52,10 @@ public class ClientDAO {
             pst.setString(14, c.getAddress());
             pst.setString(15, c.getProfession());
             pst.setString(16, c.getAlternatePhone());
-            pst.setString(17, c.getSize()); // <--- Mapeo de la Talla
+            pst.setString(17, c.getSize());
             pst.executeUpdate();
             return true;
         } catch (SQLException e) {
-            System.err.println("❌ Error INSERT ClientDAO: " + e.getMessage());
             return false;
         }
     }
@@ -83,7 +83,6 @@ public class ClientDAO {
             pst.executeUpdate();
             return true;
         } catch (SQLException e) {
-            System.err.println("❌ Error UPDATE ClientDAO: " + e.getMessage());
             return false;
         }
     }
@@ -97,13 +96,36 @@ public class ClientDAO {
         return list;
     }
 
+    // --- EL MÉTODO QUE FALTABA (RESTAURADO) ---
     public boolean deleteClient(String code) {
         String sql = "DELETE FROM clients WHERE code = ?";
         try (Connection con = Conexion.conectar(); PreparedStatement pst = con.prepareStatement(sql)) {
             pst.setString(1, code);
             pst.executeUpdate();
             return true;
-        } catch (SQLException e) { return false; }
+        } catch (SQLException e) {
+            return false;
+        }
+    }
+
+    public Client getClientById(int id) {
+        String sql = "SELECT * FROM clients WHERE id = ?";
+        try (Connection con = Conexion.conectar(); PreparedStatement pst = con.prepareStatement(sql)) {
+            pst.setInt(1, id);
+            ResultSet rs = pst.executeQuery();
+            if (rs.next()) return mapClient(rs);
+        } catch (SQLException e) { e.printStackTrace(); }
+        return null;
+    }
+
+    public Client getClientByCode(String code) {
+        String sql = "SELECT * FROM clients WHERE code = ?";
+        try (Connection con = Conexion.conectar(); PreparedStatement pst = con.prepareStatement(sql)) {
+            pst.setString(1, code);
+            ResultSet rs = pst.executeQuery();
+            if (rs.next()) return mapClient(rs);
+        } catch (SQLException e) { e.printStackTrace(); }
+        return null;
     }
 
     public Client getClientByIdNumber(String id) {
@@ -124,7 +146,7 @@ public class ClientDAO {
                 rs.getString("athlete_name"), rs.getString("birth_date"), rs.getString("club_name"),
                 rs.getString("category"), rs.getString("measurements"), rs.getString("address"),
                 rs.getString("profession"), rs.getString("phone_alt"),
-                rs.getString("size") // <--- Carga de Talla
+                rs.getString("size")
         );
     }
 }
