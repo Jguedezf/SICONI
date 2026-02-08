@@ -11,54 +11,63 @@
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: Enero 2026
  * VERSIÓN: 1.0.0 (Stable Release)
- *
+ * -----------------------------------------------------------------------------
  * DESCRIPCIÓN TÉCNICA:
- * Clase de la Capa de Modelo (Model Layer) que representa la entidad 'Usuario' en el sistema.
- * Actúa como un objeto de transferencia de datos (DTO) para mapear los registros de la
- * tabla 'users' de la base de datos SQLite hacia la lógica de la aplicación.
- *
- * Características de Ingeniería:
- * 1. Estructura POO: Implementa un modelo de datos limpio sin lógica de negocio pesada,
- * facilitando la persistencia y la serialización.
- * 2. Gestión de Identidad: Incluye un identificador único (ID) que corresponde a la
- * Clave Primaria (PK) en la base de datos.
- * 3. Seguridad de Acceso: Almacena las credenciales y el rol jerárquico del usuario
- * para la gestión de permisos en el sistema.
- *
- * PRINCIPIOS POO:
- * - ENCAPSULAMIENTO: Atributos privados con métodos de acceso públicos (Getters/Setters)
- * para controlar la integridad de los datos.
- * - ABSTRACCIÓN: Representa la entidad real "Usuario" mediante propiedades esenciales.
+ * Clase perteneciente a la Capa de Modelo (Model Layer). Define la estructura
+ * de datos para la entidad 'Usuario', facilitando el transporte de información
+ * entre la base de datos SQLite y la lógica de autenticación y autorización
+ * del sistema.
  * -----------------------------------------------------------------------------
  */
 
 package com.swimcore.model;
 
 /**
- * Entidad de Usuario.
- * Define las propiedades y métodos de acceso para los usuarios del sistema SICONI.
+ * [MODELO - ENTIDAD] Representación lógica del usuario del sistema.
+ * [POO - ENCAPSULAMIENTO] Implementa el acceso controlado a los atributos mediante
+ * métodos de acceso (accessors) y mutadores (mutators), protegiendo la integridad
+ * del estado del objeto.
+ * [DISEÑO] Actúa como un POJO (Plain Old Java Object) para el mapeo objeto-relacional.
  */
 public class User {
 
-    // --- ATRIBUTOS PRIVADOS (DATOS PROTEGIDOS) ---
-    private int id;             // Identificador único (Auto-incremental en BD)
-    private String username;    // Nombre de usuario para el login (Único)
-    private String password;    // Contraseña de acceso
-    private String fullName;    // Nombre completo del operador
-    private String role;        // Perfil de seguridad (Ej: ADMIN, OPERADOR)
+    // ========================================================================================
+    //                                  ATRIBUTOS (DATOS PROTEGIDOS)
+    // ========================================================================================
+
+    // Identificador único de la entidad (Mapeado a la Clave Primaria en BD).
+    private int id;
+
+    // Identificador de cuenta utilizado para el proceso de Login.
+    private String username;
+
+    // Credencial de seguridad del usuario.
+    private String password;
+
+    // Representación nominal completa del operador del sistema.
+    private String fullName;
+
+    // Clasificación jerárquica para el control de acceso (ej: ADMIN, OPERADOR).
+    private String role;
+
+    // ========================================================================================
+    //                                  CONSTRUCTORES
+    // ========================================================================================
 
     /**
-     * Constructor por defecto (Requerido para frameworks de persistencia).
+     * Constructor por defecto.
+     * Requerido para la instanciación dinámica y compatibilidad con herramientas
+     * de persistencia de datos.
      */
     public User() {}
 
     /**
-     * Constructor con parámetros.
-     * Utilizado para la creación de nuevos usuarios antes de ser persistidos.
-     * * @param username Identificador de cuenta.
-     * @param password Credencial de acceso.
-     * @param fullName Nombre real del usuario.
-     * @param role Nivel de privilegios.
+     * Constructor con parámetros para la inicialización completa del modelo.
+     * Utilizado comúnmente en la creación de nuevos usuarios antes de la persistencia inicial.
+     * * @param username Credencial identificadora de cuenta.
+     * @param password Clave de acceso.
+     * @param fullName Nombre completo del usuario.
+     * @param role Nivel de privilegios asignado.
      */
     public User(String username, String password, String fullName, String role) {
         this.username = username;
@@ -67,31 +76,32 @@ public class User {
         this.role = role;
     }
 
-    // --- MÉTODOS DE ACCESO (GETTERS Y SETTERS) ---
-    // Implementan la interfaz pública para la manipulación controlada de los atributos.
+    // ========================================================================================
+    //                                  MÉTODOS DE ACCESO (GETTERS Y SETTERS)
+    // ========================================================================================
 
-    /** @return ID único del registro. */
+    /** @return Identificador único del registro. */
     public int getId() { return id; }
-    /** @param id Nuevo ID asignado por la BD. */
+    /** @param id Nuevo identificador asignado por el motor de BD. */
     public void setId(int id) { this.id = id; }
 
-    /** @return Nombre de cuenta del usuario. */
+    /** @return El nombre de cuenta configurado. */
     public String getUsername() { return username; }
-    /** @param username Define el nombre de cuenta. */
+    /** @param username Establece el nombre identificador de cuenta. */
     public void setUsername(String username) { this.username = username; }
 
-    /** @return Contraseña almacenada. */
+    /** @return La credencial de acceso. */
     public String getPassword() { return password; }
-    /** @param password Define la nueva contraseña. */
+    /** @param password Establece la nueva contraseña de acceso. */
     public void setPassword(String password) { this.password = password; }
 
-    /** @return Nombre y apellido del usuario. */
+    /** @return La identidad nominal completa del usuario. */
     public String getFullName() { return fullName; }
-    /** @param fullName Define el nombre completo. */
+    /** @param fullName Define el nombre y apellido del usuario. */
     public void setFullName(String fullName) { this.fullName = fullName; }
 
-    /** @return El rol o nivel de permiso actual. */
+    /** @return El nivel jerárquico o perfil de seguridad. */
     public String getRole() { return role; }
-    /** @param role Define el nuevo rol del usuario. */
+    /** @param role Asigna un rol específico para la gestión de permisos. */
     public void setRole(String role) { this.role = role; }
 }

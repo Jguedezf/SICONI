@@ -3,39 +3,17 @@
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
  * CARRERA: Ingeniería en Informática
  * ASIGNATURA: Programación III / Proyecto de Software
- *
  * PROYECTO: GESTIÓN DE INVENTARIO DE UNA TIENDA (SICONI)
  * ARCHIVO: LanguageManager.java
- *
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: 05 de Febrero de 2026 - 12:20 PM
  * VERSIÓN: 1.0.1 (Hotfix / Maintenance Release)
- *
+ * -----------------------------------------------------------------------------
  * DESCRIPCIÓN TÉCNICA:
- * Clase utilitaria encargada de la gestión de Internacionalización (i18n) del sistema.
- * Centraliza la carga de recursos lingüísticos dinámicos mediante el uso de la API
- * estándar de Java para localización.
- *
- * Responsabilidades Técnicas:
- * 1. Gestión de Estado Global: Mantiene la configuración regional (Locale) activa
- * durante el ciclo de vida de la ejecución.
- * 2. Mapeo de Diccionarios: Vincula claves de texto con sus traducciones correspondientes
- * alojadas en archivos de propiedades (.properties).
- * 3. Fallback Mechanism: Implementa una gestión de errores para evitar el colapso
- * de la UI si una clave de idioma no existe.
- *
- * PRINCIPIOS POO:
- * - ABSTRACCIÓN: Oculta la complejidad de la búsqueda de archivos y carga de flujos
- * detrás de un método estático simple `get()`.
- * - ENCAPSULAMIENTO: Protege las variables `currentLocale` y `bundle` mediante
- * modificadores de acceso privados.
- * - POLIMORFISMO (Estático): Implementa sobrecarga de métodos en la función `get`
- * para manejar valores por defecto.
- *
- * PATRONES DE DISEÑO:
- * - Singleton (Variación Estática): Proporciona un único punto de acceso global
- * para la traducción de toda la interfaz.
+ * Clase de utilidad encargada de la gestión de Internacionalización (i18n) del
+ * sistema. Centraliza la carga de recursos lingüísticos dinámicos mediante el
+ * uso de la API estándar de Java para localización (ResourceBundle).
  * -----------------------------------------------------------------------------
  */
 
@@ -45,26 +23,42 @@ import java.util.Locale;
 import java.util.ResourceBundle;
 
 /**
- * Motor de Internacionalización del Sistema SICONI.
- * Permite el cambio de idioma en tiempo de ejecución (Hot-Swapping) mediante
- * el refresco de los Resource Bundles.
+ * [UTILIDAD - INTERNACIONALIZACIÓN] Motor de traducción del Sistema SICONI.
+ * [PATRÓN DE DISEÑO] Singleton Estático: Proporciona un punto de acceso único global.
+ * [REQUERIMIENTO NO FUNCIONAL] Localización: Permite la adaptabilidad del software
+ * a diferentes configuraciones regionales sin modificar el código fuente.
  */
 public class LanguageManager {
 
-    // Configuración regional activa. Por defecto: Español (ISO 639-1: "es")
+    // ========================================================================================
+    //                                  ATRIBUTOS (ENCAPSULAMIENTO)
+    // ========================================================================================
+
+    // Objeto que define la configuración regional activa (Idioma y País).
+    // Inicializado por defecto en Español (ISO 639-1: "es").
     private static Locale currentLocale = new Locale("es");
 
-    // Contenedor de recursos cargado en memoria
+    // Contenedor de recursos que almacena el par clave-valor de las traducciones en memoria.
     private static ResourceBundle bundle;
 
-    // BLOQUE ESTÁTICO: Se ejecuta una sola vez al cargar la clase en la JVM
+    // ========================================================================================
+    //                                  BLOQUES DE INICIALIZACIÓN
+    // ========================================================================================
+
+    // [BLOQUE ESTÁTICO] Garantiza que el motor de idiomas esté listo al cargar la clase
+    // en la Máquina Virtual de Java (JVM), invocando la carga inicial del bundle.
     static {
         loadBundle();
     }
 
+    // ========================================================================================
+    //                                  MÉTODOS DE CONFIGURACIÓN
+    // ========================================================================================
+
     /**
-     * Define el nuevo idioma y fuerza la recarga de los diccionarios.
-     * @param locale Nuevo objeto Locale (ej. new Locale("en"))
+     * Define una nueva configuración regional y dispara la recarga del diccionario.
+     * Permite el cambio de idioma en tiempo de ejecución (Hot-Swapping).
+     * @param locale Objeto Locale destino.
      */
     public static void setLocale(Locale locale) {
         currentLocale = locale;
@@ -72,51 +66,53 @@ public class LanguageManager {
     }
 
     /**
-     * Recupera el Locale configurado actualmente.
-     * @return Locale activo.
+     * Recupera la instancia regional que rige la sesión actual.
+     * @return Locale configurado.
      */
     public static Locale getLocale() {
         return currentLocale;
     }
 
     /**
-     * Realiza la carga física del archivo de propiedades correspondiente.
-     * El sistema buscará archivos con el patrón: messages_XX.properties
-     * (donde XX es el código del idioma).
+     * [LÓGICA INTERNA] Realiza el acceso al sistema de archivos para cargar
+     * el archivo .properties correspondiente al idioma seleccionado.
+     * Implementa un mecanismo de Fallback para garantizar la estabilidad de la interfaz.
      */
     private static void loadBundle() {
-        // ResourceBundle busca automáticamente en el classpath
-        // el nombre base "messages" combinado con el locale actual.
-        // Se añade control de errores por seguridad.
         try {
+            // El motor busca automáticamente el patrón de nombre: "messages_XX.properties"
             bundle = ResourceBundle.getBundle("messages", currentLocale);
         } catch (Exception e) {
             System.err.println("SICONI WARNING: No se pudo cargar el idioma " + currentLocale);
-            // Fallback de seguridad a Locale por defecto del sistema si falla
+            // Mecanismo de seguridad: Fallback al idioma predeterminado del sistema operativo.
             bundle = ResourceBundle.getBundle("messages", Locale.getDefault());
         }
     }
 
+    // ========================================================================================
+    //                                  RECUPERACIÓN DE DATOS (i18n API)
+    // ========================================================================================
+
     /**
-     * Obtiene la traducción asociada a una clave específica.
-     * @param key Identificador de la cadena (ej. "login.title")
-     * @return Texto traducido o mensaje de error si la clave es inválida.
+     * Recupera el texto traducido asociado a una clave única identificadora.
+     * @param key Identificador de la cadena de texto definida en el diccionario.
+     * @return La traducción correspondiente o un indicador de error si la clave no existe.
      */
     public static String get(String key) {
         try {
             return bundle.getString(key);
         } catch (Exception e) {
-            // Gestión de fallos: Retorna la clave para identificar errores en la vista.
+            // Gestión de fallos: Retorna la clave cruda para diagnóstico visual en la UI.
             return "Key not found: " + key;
         }
     }
 
     /**
-     * SOBRECARGA DE METODO: Obtiene la traducción o usa un valor de respaldo.
-     * Soluciona el error de compilación cuando la vista envía un texto por defecto.
-     *
-     * @param key Identificador de la cadena.
-     * @param defaultValue Texto a mostrar si no se encuentra la traducción o el bundle falla.
+     * [POO - POLIMORFISMO ESTÁTICO] Sobrecarga del método get.
+     * Permite especificar un valor de respaldo para manejar inconsistencias en los
+     * archivos de propiedades y evitar punteros nulos en la vista.
+     * * @param key Identificador de la cadena.
+     * @param defaultValue Texto a retornar si la clave no se encuentra o el sistema falla.
      * @return Texto traducido o valor por defecto.
      */
     public static String get(String key, String defaultValue) {

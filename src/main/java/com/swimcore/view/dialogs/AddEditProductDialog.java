@@ -48,7 +48,7 @@ public class AddEditProductDialog extends JDialog {
         // Tamaño ajustado para evitar cortes
         setSize(1150, 700);
         setLocationRelativeTo(parent);
-        setUndecorated(true);
+        setUndecorated(false);
 
         try {
             JPanel bg = new ImagePanel("/images/bg_registro.png");

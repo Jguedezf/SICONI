@@ -1,11 +1,18 @@
 /*
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
- * ARCHIVO: ReportsDAO.java
+ * PROYECTO: SICONI - Sistema de Control de Negocio e Inventario | DG SWIMWEAR
+ * AUTORA: Johanna Gabriela Guédez Flores
+ * PROFESORA: Ing. Dubraska Roca
+ * ASIGNATURA: Técnicas de Programación III
+ * * ARCHIVO: ReportsDAO.java
  * VERSIÓN: 1.2.0 (Product Profitability Logic)
- * FECHA: Enero 2026
- * DESCRIPCIÓN: Data Access Object para reportes. Se añade lógica para
- * calcular la rentabilidad neta por producto en un rango de fechas.
+ * FECHA: 06 de Febrero de 2026
+ * HORA: 07:25 PM (Hora de Venezuela)
+ * * DESCRIPCIÓN TÉCNICA:
+ * Clase especializada en la extracción de métricas de rendimiento y analítica.
+ * Implementa consultas de agregación avanzadas sobre el esquema relacional para
+ * transformar datos transaccionales en indicadores financieros clave (KPIs).
  * -----------------------------------------------------------------------------
  */
 
@@ -21,14 +28,32 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * [DAO - BUSINESS INTELLIGENCE] Controlador de datos orientado a reportes gerenciales.
+ * [PATRÓN DE DISEÑO] Data Access Object (DAO) para el aislamiento de lógica analítica.
+ * [REQUERIMIENTO FUNCIONAL] Generación de balances financieros y análisis de
+ * rentabilidad de productos en ventanas temporales dinámicas.
+ */
 public class ReportsDAO {
 
+    // ========================================================================================
+    //                                  MÓDULO DE ANALÍTICA FINANCIERA
+    // ========================================================================================
+
+    /**
+     * Calcula un resumen consolidado de la salud financiera del taller.
+     * Realiza un cálculo ponderado entre precios de venta y costos de producción (cost_price).
+     * * @param startDate Límite inferior de la ventana temporal.
+     * @param endDate Límite superior de la ventana temporal.
+     * @return Map con los indicadores: "ingresos", "costos" y "ganancias".
+     */
     public Map<String, Double> getFinancialSummary(Date startDate, Date endDate) {
         Map<String, Double> summary = new HashMap<>();
         summary.put("ingresos", 0.0);
         summary.put("costos", 0.0);
         summary.put("ganancias", 0.0);
 
+        // Consulta con funciones de agregación SUM y cláusulas JOIN triples.
         String sql = "SELECT SUM(sd.unit_price * sd.quantity) as total_ingresos, " +
                 "       SUM(p.cost_price * sd.quantity) as total_costos " +
                 "FROM sales s " +
@@ -50,7 +75,7 @@ public class ReportsDAO {
                     double costos = rs.getDouble("total_costos");
                     summary.put("ingresos", ingresos);
                     summary.put("costos", costos);
-                    summary.put("ganancias", ingresos - costos);
+                    summary.put("ganancias", ingresos - costos); // Utilidad Bruta
                 }
             }
         } catch (Exception e) {
@@ -59,6 +84,15 @@ public class ReportsDAO {
         return summary;
     }
 
+    // ========================================================================================
+    //                                  ANÁLISIS DE ROTACIÓN DE STOCK
+    // ========================================================================================
+
+    /**
+     * Identifica los productos con mayor demanda volumétrica (Top Selling).
+     * [TÉCNICO] Implementa GROUP BY para consolidar variantes y ORDER BY para el ranking.
+     * * @param limit Cantidad de registros a recuperar (N-Top).
+     */
     public List<Object[]> getTopSellingProducts(Date startDate, Date endDate, int limit) {
         List<Object[]> topProducts = new ArrayList<>();
         String sql = "SELECT p.name, SUM(sd.quantity) as total_vendido " +
@@ -92,8 +126,15 @@ public class ReportsDAO {
         return topProducts;
     }
 
+    // ========================================================================================
+    //                                  CÁLCULO DE RENTABILIDAD NETA
+    // ========================================================================================
+
     /**
-     * NUEVO METODO: Calcula la rentabilidad de cada producto vendido en un rango de fechas.
+     * [NUEVO MÉTODO] Realiza el desglose de margen de utilidad por artículo.
+     * [LÓGICA DE NEGOCIO] Cruza el ingreso por subtotal contra el costo unitario de
+     * adquisición o manufactura para determinar la rentabilidad real.
+     * * @return Lista de arreglos conteniendo: [Nombre, Unidades, Ingresos, Costo, Ganancia].
      */
     public List<Object[]> getProductProfitability(Date startDate, Date endDate) {
         List<Object[]> profitabilityData = new ArrayList<>();

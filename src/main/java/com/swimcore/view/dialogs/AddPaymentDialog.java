@@ -3,6 +3,12 @@
  * INSTITUCIÓN: UNEG - SICONI
  * ARCHIVO: AddPaymentDialog.java
  * VERSIÓN: 5.0.0 (FINAL FIX: Focus & Colors)
+ * FECHA: 06 de Febrero de 2026
+ * HORA: 10:30 PM (Hora de Venezuela)
+ * DESCRIPCIÓN TÉCNICA:
+ * Diálogo modal para el registro de transacciones financieras (Abonos).
+ * Implementa lógica de validación de montos y actualización atómica del saldo
+ * deudor de la orden de venta asociada.
  * -----------------------------------------------------------------------------
  */
 
@@ -28,38 +34,53 @@ import java.sql.Statement;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+/**
+ * [VISTA - PAGOS] Clase que gestiona el formulario de ingreso de pagos.
+ * [POO - HERENCIA] Extiende de JDialog para garantizar la modalidad (Atención exclusiva).
+ * * FUNCIONALIDAD: Procesamiento de cobros y actualización de estados financieros.
+ */
 public class AddPaymentDialog extends JDialog {
 
+    // Identificador único de la venta asociada (FK Lógica)
     private final String saleId;
+
+    // [PATRÓN DAO] Acceso a la capa de datos de pagos.
     private final PaymentDAO paymentDAO;
+
+    // Estado financiero actual de la orden (Deuda pendiente)
     private double balanceDue = 0.0;
 
-    // UI Components
+    // Componentes de la interfaz gráfica
     private JTextField txtAmount, txtReference;
     private JComboBox<String> cmbMethod;
     private JTextArea txtNotes;
     private JLabel lblBalance;
 
-    // --- PALETA LUXURY SICONI ---
+    // Constantes de diseño (Identidad Visual)
     private final Color COLOR_BG_DARK = new Color(18, 18, 18);
     private final Color COLOR_GOLD = new Color(212, 175, 55);
-    private final Color COLOR_INPUT_BG = new Color(10, 10, 10); // Casi negro
+    private final Color COLOR_INPUT_BG = new Color(10, 10, 10);
     private final Color COLOR_TEXT_WHITE = new Color(240, 240, 240);
-    private final Color COLOR_RED_ALERT = new Color(255, 0, 0); // ROJO PURO
+    private final Color COLOR_RED_ALERT = new Color(255, 0, 0);
     private final Color COLOR_GREEN_NEON = new Color(57, 255, 20);
 
+    /**
+     * Constructor de la clase. Inicializa la ventana y recupera el saldo actual.
+     * @param owner Ventana padre.
+     * @param saleId Código de la venta a abonar.
+     */
     public AddPaymentDialog(Dialog owner, String saleId) {
         super(owner, "SICONI - Registrar Pago", true);
         this.saleId = saleId;
         this.paymentDAO = new PaymentDAO();
 
-        // TAMAÑO OPTIMIZADO (Menos alto)
+        // Configuración de dimensiones optimizadas
         setSize(500, 620);
         setLocationRelativeTo(owner);
 
-
         getRootPane().setBorder(new LineBorder(COLOR_GOLD, 2));
 
+        // Fondo personalizado con manejo de excepciones
         try {
             setContentPane(new ImagePanel("/images/bg_modal_luxury.png"));
         } catch (Exception e) {
@@ -68,26 +89,34 @@ public class AddPaymentDialog extends JDialog {
 
         setLayout(new BorderLayout());
 
+        // Recuperación de datos desde la BD
         loadInitialData();
 
+        // Construcción de la UI
         add(createHeader(), BorderLayout.NORTH);
         add(createForm(), BorderLayout.CENTER);
         add(createFooter(), BorderLayout.SOUTH);
 
-        // --- TRUCO ANTI-AZUL REFORZADO ---
-        // Usamos invokeLater para asegurar que corra AL FINAL de la carga visual
+        // [CORRECCIÓN UX: ANTI-BLUE FOCUS]
+        // Se utiliza invokeLater para garantizar que el foco se establezca
+        // DESPUÉS de que Swing haya terminado de renderizar la ventana.
+        // Esto evita que el texto aparezca seleccionado (azul) automáticamente.
         this.addWindowListener(new WindowAdapter() {
             @Override
             public void windowOpened(WindowEvent e) {
                 SwingUtilities.invokeLater(() -> {
                     txtAmount.requestFocusInWindow();
-                    // Mueve el cursor al final para que NO esté sombreado
+                    // Coloca el cursor al final del texto pre-cargado
                     txtAmount.setCaretPosition(txtAmount.getText().length());
                 });
             }
         });
     }
 
+    /**
+     * [CONSULTA SQL] Recupera el saldo pendiente (balance_due_usd) directamente de la tabla de ventas.
+     * Garantiza que el usuario vea el monto exacto a pagar.
+     */
     private void loadInitialData() {
         String sql = "SELECT balance_due_usd FROM sales WHERE id = '" + this.saleId + "'";
         try (Connection conn = com.swimcore.dao.Conexion.conectar();
@@ -116,7 +145,7 @@ public class AddPaymentDialog extends JDialog {
 
         lblBalance = new JLabel(String.format("$%.2f", this.balanceDue));
         lblBalance.setFont(new Font("Segoe UI", Font.BOLD, 26));
-        lblBalance.setForeground(COLOR_RED_ALERT); // ROJO PURO
+        lblBalance.setForeground(COLOR_RED_ALERT);
 
         balancePanel.add(lblText);
         balancePanel.add(lblBalance);
@@ -139,33 +168,33 @@ public class AddPaymentDialog extends JDialog {
         gbc.gridx = 0;
         gbc.gridy = GridBagConstraints.RELATIVE;
 
-        // 1. MONTO (INPUT GRANDE Y OSCURO)
+        // Campo de Monto (Resaltado visualmente)
         formPanel.add(createLabel("MONTO A ABONAR ($):"), gbc);
         txtAmount = new JTextField();
         styleBigInput(txtAmount);
-        txtAmount.setText(String.format("%.2f", this.balanceDue));
+        txtAmount.setText(String.format("%.2f", this.balanceDue)); // Pre-carga de la deuda total
         formPanel.add(txtAmount, gbc);
 
-        // 2. MÉTODO
+        // Selector de Método de Pago
         formPanel.add(createLabel("MÉTODO DE PAGO:"), gbc);
         cmbMethod = new JComboBox<>(new String[]{"PAGO MÓVIL", "TRANSFERENCIA", "ZELLE", "EFECTIVO ($)", "EFECTIVO (Bs)", "OTRO"});
         styleComboBox(cmbMethod);
         formPanel.add(cmbMethod, gbc);
 
-        // 3. REFERENCIA
+        // Campo de Referencia
         formPanel.add(createLabel("REFERENCIA / RECIBO:"), gbc);
         txtReference = new JTextField();
         styleNormalInput(txtReference);
         formPanel.add(txtReference, gbc);
 
-        // 4. NOTAS (ALTO FORZADO)
+        // Campo de Notas (JTextArea con Scroll)
         formPanel.add(createLabel("NOTAS O DETALLES:"), gbc);
         txtNotes = new JTextArea(5, 20);
         styleTextArea(txtNotes);
 
         JScrollPane scrollNotes = new JScrollPane(txtNotes);
         scrollNotes.setBorder(new LineBorder(new Color(60,60,60)));
-        scrollNotes.setPreferredSize(new Dimension(0, 90)); // ALTO FORZADO
+        scrollNotes.setPreferredSize(new Dimension(0, 90));
         scrollNotes.setMinimumSize(new Dimension(0, 90));
 
         gbc.weighty = 1.0;
@@ -180,7 +209,7 @@ public class AddPaymentDialog extends JDialog {
         footer.setOpaque(false);
         footer.setBorder(new EmptyBorder(10, 40, 30, 40));
 
-        // Botón Cancelar (FONDO NEGRO)
+        // Botón Cancelar
         SoftButton btnCancel = new SoftButton(null);
         btnCancel.setText("CANCELAR");
         btnCancel.setFont(new Font("Segoe UI", Font.BOLD, 15));
@@ -189,10 +218,10 @@ public class AddPaymentDialog extends JDialog {
         btnCancel.setPreferredSize(new Dimension(0, 55));
         btnCancel.setContentAreaFilled(false);
         btnCancel.setOpaque(false);
-        btnCancel.setBorder(new LineBorder(new Color(150, 40, 40), 2)); // Borde Rojo
+        btnCancel.setBorder(new LineBorder(new Color(150, 40, 40), 2));
         btnCancel.addActionListener(e -> { SoundManager.getInstance().playClick(); dispose(); });
 
-        // Botón Guardar (FONDO NEGRO + TEXTO NEON)
+        // Botón Confirmar (Estilo Neón)
         SoftButton btnSave = new SoftButton(null);
         btnSave.setText("PROCESAR PAGO");
         btnSave.setFont(new Font("Segoe UI", Font.BOLD, 15));
@@ -201,7 +230,7 @@ public class AddPaymentDialog extends JDialog {
         btnSave.setPreferredSize(new Dimension(0, 55));
         btnSave.setContentAreaFilled(false);
         btnSave.setOpaque(false);
-        btnSave.setBorder(new LineBorder(COLOR_GREEN_NEON, 2)); // Borde Verde
+        btnSave.setBorder(new LineBorder(COLOR_GREEN_NEON, 2));
         btnSave.addActionListener(e -> savePayment());
 
         footer.add(btnCancel);
@@ -209,14 +238,23 @@ public class AddPaymentDialog extends JDialog {
         return footer;
     }
 
+    /**
+     * [LÓGICA TRANSACCIONAL]
+     * Valida la entrada de datos, construye el objeto Payment y solicita
+     * al DAO la persistencia y actualización del saldo de la venta.
+     */
     private void savePayment() {
         double amount;
         try {
+            // Normalización de separadores decimales
             amount = Double.parseDouble(txtAmount.getText().replace(',', '.'));
+
+            // Regla de Negocio 1: Montos positivos
             if (amount <= 0) {
                 JOptionPane.showMessageDialog(this, "El monto debe ser positivo.", "Error", JOptionPane.WARNING_MESSAGE);
                 return;
             }
+            // Regla de Negocio 2: Advertencia sobre pago excedente
             if (amount > this.balanceDue + 0.99) {
                 int confirm = JOptionPane.showConfirmDialog(this,
                         "El monto supera la deuda. ¿Registrar como saldo a favor?",
@@ -230,13 +268,15 @@ public class AddPaymentDialog extends JDialog {
 
         String method = (String) cmbMethod.getSelectedItem();
         String reference = txtReference.getText().trim();
-        if(reference.isEmpty()) reference = "S/R";
+        if(reference.isEmpty()) reference = "S/R"; // Valor por defecto "Sin Referencia"
 
         String notes = txtNotes.getText().trim();
         String currentDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
 
+        // Creación del DTO
         Payment newPayment = new Payment(this.saleId, currentDate, amount, method, reference, notes);
 
+        // Delegación al DAO (Operación Atómica)
         if (paymentDAO.savePaymentAndUpdateSale(newPayment)) {
             SoundManager.getInstance().playClick();
             JOptionPane.showMessageDialog(this, "¡PAGO REGISTRADO CON ÉXITO!", "SICONI", JOptionPane.INFORMATION_MESSAGE);
@@ -247,7 +287,7 @@ public class AddPaymentDialog extends JDialog {
         }
     }
 
-    // --- ESTILOS ---
+    // --- MÉTODOS DE ESTILIZACIÓN (LOOK & FEEL) ---
 
     private JLabel createLabel(String text) {
         JLabel label = new JLabel(text);
@@ -259,7 +299,7 @@ public class AddPaymentDialog extends JDialog {
     private void styleBigInput(JTextField tf) {
         tf.setBackground(COLOR_INPUT_BG);
         tf.setForeground(COLOR_GREEN_NEON);
-        tf.setCaretColor(Color.WHITE); // Cursor blanco visible
+        tf.setCaretColor(Color.WHITE);
         tf.setFont(new Font("Segoe UI", Font.BOLD, 36));
         tf.setHorizontalAlignment(JTextField.CENTER);
         tf.setPreferredSize(new Dimension(0, 60));

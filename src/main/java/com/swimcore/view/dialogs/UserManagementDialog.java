@@ -6,8 +6,10 @@
  * VERSIÓN: 2.6.5 (Performance Turbo Fix)
  * FECHA: 06 de Febrero de 2026
  * HORA: 03:00 PM (Hora de Venezuela)
- * DESCRIPCIÓN: Módulo de gestión de usuarios.
- * OPTIMIZACIÓN: Carga asíncrona de datos para apertura instantánea.
+ * DESCRIPCIÓN TÉCNICA:
+ * Módulo de Gestión de Usuarios (ABM). Permite la administración de credenciales
+ * y roles de acceso al sistema. Implementa carga asíncrona para optimizar
+ * el tiempo de respuesta de la interfaz gráfica.
  * -----------------------------------------------------------------------------
  */
 
@@ -30,20 +32,34 @@ import javax.swing.table.JTableHeader;
 import java.awt.*;
 import java.util.List;
 
+/**
+ * [VISTA - GESTIÓN DE USUARIOS] Clase que implementa la interfaz para el mantenimiento de usuarios.
+ * [POO - HERENCIA] Extiende de JDialog para funcionar como una ventana modal de administración.
+ * * FUNCIONALIDAD: Creación, Edición y Eliminación de usuarios del sistema (CRUD).
+ */
 public class UserManagementDialog extends JDialog {
 
+    // [PATRÓN DAO] Objeto de acceso a datos para la entidad Usuario.
     private final UserDAO userDAO = new UserDAO();
+
+    // Componentes de la tabla de visualización de datos
     private DefaultTableModel model;
     private JTable table;
 
+    // Constantes de diseño (Look & Feel)
     private final Color LUX_GOLD = new Color(212, 175, 55);
     private final Color LUX_BG_DARK = new Color(20, 20, 20);
 
+    /**
+     * Constructor de la clase. Configura la interfaz e inicia la carga de datos.
+     * @param parent Ventana padre para establecer la modalidad.
+     */
     public UserManagementDialog(Window parent) {
         super(parent, LanguageManager.get("user.title"), ModalityType.APPLICATION_MODAL);
         setSize(900, 600);
         setLocationRelativeTo(parent);
 
+        // Configuración del panel de fondo
         try {
             JPanel bg = new ImagePanel("/images/bg_audit.png");
             bg.setLayout(new BorderLayout());
@@ -59,7 +75,7 @@ public class UserManagementDialog extends JDialog {
         initTable();
         initButtons();
 
-        // OPTIMIZACIÓN: Cargar datos en segundo plano para no congelar la ventana
+        // [OPTIMIZACIÓN] Carga de datos en segundo plano (Background Thread).
         loadDataAsync();
     }
 
@@ -144,13 +160,19 @@ public class UserManagementDialog extends JDialog {
         add(p, BorderLayout.SOUTH);
     }
 
-    // --- AQUÍ ESTÁ LA MAGIA DEL TURBO ---
+    // --- LÓGICA DE CARGA ASÍNCRONA ---
+
+    /**
+     * [CONCURRENCIA]
+     * Método encargado de cargar los datos de usuarios desde la base de datos
+     * en un hilo separado para evitar congelar la interfaz gráfica.
+     */
     private void loadDataAsync() {
         model.setRowCount(0);
-        // Ejecutamos la consulta pesada en un hilo separado
+        // Ejecución de la consulta en un hilo secundario
         new Thread(() -> {
             List<User> list = userDAO.getAllUsers();
-            // Cuando termine, actualizamos la tabla visualmente
+            // Actualización de la UI en el hilo de despacho de eventos (EDT)
             SwingUtilities.invokeLater(() -> {
                 for(User u : list) {
                     model.addRow(new Object[]{u.getUsername(), u.getFullName(), u.getRole(), "********"});
@@ -159,7 +181,7 @@ public class UserManagementDialog extends JDialog {
         }).start();
     }
 
-    // Mantenemos el método original por compatibilidad interna, pero redirigiendo
+    // Mantenemos el método original por compatibilidad interna, pero redirigiendo a la versión asíncrona.
     private void loadData() {
         loadDataAsync();
     }
@@ -256,6 +278,10 @@ public class UserManagementDialog extends JDialog {
         return c;
     }
 
+    /**
+     * [CLASE INTERNA - UI] Botón personalizado con efecto 3D y degradado.
+     * [POO - POLIMORFISMO] Sobreescribe el método paintComponent para renderizado customizado.
+     */
     private class ThreeDButton extends JButton {
         private Color baseColor;
         public ThreeDButton(String text, Color color) {

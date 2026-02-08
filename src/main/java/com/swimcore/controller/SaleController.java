@@ -1,10 +1,22 @@
 /*
  * -----------------------------------------------------------------------------
+ * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
+ * CARRERA: Ingeniería en Informática
+ * ASIGNATURA: Programación III / Proyecto de Software
+ *
+ * PROYECTO: GESTIÓN DE INVENTARIO DE UNA TIENDA (SICONI)
  * ARCHIVO: SaleController.java
+ *
+ * AUTORA: Johanna Guedez - V14089807
+ * PROFESORA: Ing. Dubraska Roca
+ * FECHA: 06 de Febrero de 2026
  * VERSIÓN: 2.2.0 (Receipt Flow Fix & Snapshot Bridge)
- * CAMBIOS:
- * 1. Eliminada la llamada automática a generación de PDF en registerSale.
- * 2. Añadidos métodos de soporte para la SalesView (getSaleById, getDetailsFromSnapshot).
+ * -----------------------------------------------------------------------------
+ * DESCRIPCIÓN TÉCNICA:
+ * Clase de la Capa de Controlador. Actúa como mediador entre los componentes de
+ * la interfaz de usuario (SalesView) y la capa de acceso a datos (SaleDAO).
+ * Coordina la lógica de negocio para la generación de correlativos fiscales,
+ * el registro transaccional de ventas y el flujo de generación de comprobantes.
  * -----------------------------------------------------------------------------
  */
 
@@ -16,38 +28,64 @@ import com.swimcore.model.Client;
 import com.swimcore.model.Sale;
 import com.swimcore.model.SaleDetail;
 import com.swimcore.util.ReceiptGenerator;
-import com.swimcore.view.dialogs.ReceiptPreviewDialog; // Para el TicketItem
+import com.swimcore.view.dialogs.ReceiptPreviewDialog;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+/**
+ * [CONTROLLER] Orquestador de procesos comerciales y transaccionales.
+ * [DISEÑO] Sigue el principio de separación de responsabilidades (MVC), evitando
+ * que la vista maneje directamente la lógica de base de datos o cálculos financieros.
+ * [LOGICA] Gestiona la integridad de los números de control y factura.
+ */
 public class SaleController {
 
+    // ========================================================================================
+    //                                  ATRIBUTOS (DEPENDENCIAS)
+    // ========================================================================================
+
+    // Referencias a la capa de persistencia mediante Inyección por Constructor.
     private final SaleDAO saleDAO;
     private final ClientDAO clientDAO;
 
+    /**
+     * Constructor de la clase.
+     * Inicializa los objetos de acceso a datos necesarios para la operación del módulo.
+     */
     public SaleController() {
         this.saleDAO = new SaleDAO();
         this.clientDAO = new ClientDAO();
     }
 
-    // --- MÉTODOS DE CONSECUTIVOS (NO CAMBIAN) ---
+    // ========================================================================================
+    //                                  GESTIÓN DE CORRELATIVOS FISCALES
+    // ========================================================================================
 
+    /** @return Siguiente número correlativo de orden basado en el conteo histórico. */
     public int getNextOrderNumber() {
         return saleDAO.getTotalSaleCount() + 1;
     }
 
+    /**
+     * Implementa la lógica incremental para la numeración de facturas (FAC-XXXX).
+     * @return String con el siguiente formato de factura.
+     */
     public String getNextInvoiceNumber() {
         String lastInvoice = saleDAO.getLastInvoiceAndControlNumbers()[0];
         try {
             int num = Integer.parseInt(lastInvoice.split("-")[1]);
             return String.format("FAC-%04d", num + 1);
         } catch (Exception e) {
-            return "FAC-0001"; // Si hay error o es el primero
+            return "FAC-0001"; // Fallback para primer registro o error de formato.
         }
     }
 
+    /**
+     * Genera el número de control fiscal basado en el año en curso.
+     * Detecta el cambio de año para reiniciar el correlativo (CTRL-YYYY-XXXX).
+     */
     public String getNextControlNumber() {
         String lastControl = saleDAO.getLastInvoiceAndControlNumbers()[1];
         String year = new SimpleDateFormat("yyyy").format(new Date());
@@ -57,55 +95,57 @@ public class SaleController {
             if (year.equals(lastYear)) {
                 return String.format("CTRL-%s-%04d", year, num + 1);
             }
-        } catch (Exception e) {
-            // No hacer nada, se genera uno nuevo abajo
-        }
-        return "CTRL-" + year + "-0001"; // Si hay error, es año nuevo o es el primero
+        } catch (Exception e) { /* Manejo de excepción para inicialización */ }
+        return "CTRL-" + year + "-0001";
     }
 
-
-    public boolean registerSale(Sale sale, List<SaleDetail> details) {
-        if (sale == null || details == null || details.isEmpty()) return false;
-        boolean success = saleDAO.registerSale(sale, details);
-
-        // ⛔ SE ELIMINÓ LA LLAMADA AUTOMÁTICA DEL RECIBO AQUÍ
-
-        return success;
-    }
-
-    // --- MÉTODOS DE SOPORTE PARA RECEIPT FLOW ---
+    // ========================================================================================
+    //                                  PROCESAMIENTO TRANSACCIONAL
+    // ========================================================================================
 
     /**
-     * Recupera el objeto Sale completo por su ID (Necesario en SalesView para generar PDF).
-     * NOTA: Este método asume que SaleDAO tiene el método getSaleById(String saleId).
+     * Delega el registro de la venta al componente DAO.
+     * [CAMBIO V2.2] Se desacopló la generación automática de PDF para permitir
+     * una previsualización controlada por el usuario en la vista.
+     */
+    public boolean registerSale(Sale sale, List<SaleDetail> details) {
+        if (sale == null || details == null || details.isEmpty()) return false;
+        return saleDAO.registerSale(sale, details);
+    }
+
+    /**
+     * Recupera la entidad Sale completa desde la persistencia.
+     * @param saleId Identificador único de la transacción.
      */
     public Sale getSaleById(String saleId) {
         return saleDAO.getSaleById(saleId);
     }
 
     /**
-     * Reconstruye la lista de SaleDetail a partir del Snapshot de datos de la Vista.
+     * [SNAPSHOT BRIDGE] Reconstruye objetos de modelo SaleDetail a partir de
+     * estructuras de datos de la interfaz de usuario (TicketItem).
+     * Permite la generación de comprobantes sin realizar re-consultas innecesarias a la BD.
      */
     public List<SaleDetail> getDetailsFromSnapshot(List<ReceiptPreviewDialog.TicketItem> items, String saleId) {
         List<SaleDetail> details = new ArrayList<>();
-        // No tenemos el product_id original, pero el generador solo necesita el nombre, cantidad y precio.
         for (ReceiptPreviewDialog.TicketItem item : items) {
-            // Creamos un SaleDetail temporal (el productId se deja como "0" o similar si no es esencial)
             SaleDetail d = new SaleDetail();
             d.setSaleId(saleId);
             d.setProductName(item.name);
             d.setQuantity(item.qty);
             d.setSubtotal(item.subtotal);
             d.setUnitPrice(item.subtotal / item.qty);
-            // El product_id se deja vacío o en "0" ya que no lo tenemos del Snapshot
-            d.setProductId("0");
+            d.setProductId("0"); // Identificador dummy para datos volátiles de previsualización.
             details.add(d);
         }
         return details;
     }
 
-    // --- MÉTODOS ANALÍTICOS (NO CAMBIAN) ---
+    // ========================================================================================
+    //                                  MÉTODOS ANALÍTICOS (REPORTING)
+    // ========================================================================================
 
+    /** Calcula el gasto total acumulado de un cliente específico en USD. */
     public double getCustomerTotalSpending(String clientId) {
         return saleDAO.getAllSales().stream()
                 .filter(s -> s.getClientId().equals(clientId))
@@ -113,26 +153,13 @@ public class SaleController {
                 .sum();
     }
 
+    /** Contabiliza la recurrencia de compra (frecuencia) de un cliente. */
     public int getCustomerOrderCount(String clientId) {
-        if (clientId.isEmpty()) { // Si el ID es vacío, contamos todos
+        if (clientId.isEmpty()) {
             return saleDAO.getTotalSaleCount();
         }
         return (int) saleDAO.getAllSales().stream()
                 .filter(s -> s.getClientId().equals(clientId))
                 .count();
-    }
-
-    // NOTA: Este método privado ya no se usa, pero lo dejamos si es necesario para otros módulos.
-    private void generarReciboPDF(Sale sale, List<SaleDetail> details) {
-        try {
-            Client client = clientDAO.getAllClients().stream()
-                    .filter(c -> String.valueOf(c.getId()).equals(sale.getClientId()))
-                    .findFirst().orElse(null);
-            if(client != null) {
-                // Aquí se llama a la función anterior que abría el PDF automáticamente,
-                // pero ahora se reemplaza por la nueva lógica controlada.
-                ReceiptGenerator.generateReceipt(sale, details, client, false);
-            }
-        } catch (Exception e) { e.printStackTrace(); }
     }
 }

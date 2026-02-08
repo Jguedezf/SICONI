@@ -1,10 +1,18 @@
 /*
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
- * PROYECTO: SICONI - DAYANA GUEDEZ SWIMWEAR
- * ARCHIVO: WelcomeView.java
+ * PROYECTO: SICONI - Sistema de Control de Negocio e Inventario | DG SWIMWEAR
+ * AUTORA: Johanna Gabriela Guédez Flores
+ * PROFESORA: Ing. Dubraska Roca
+ * ASIGNATURA: Técnicas de Programación III
+ * * ARCHIVO: WelcomeView.java
  * VERSIÓN: 4.0.0 (ZERO LAG - BACKGROUND LOADING)
- * DESCRIPCIÓN: Splash Screen con pre-carga inteligente del Dashboard.
+ * FECHA: 06 de Febrero de 2026
+ * HORA: 06:30 PM (Hora de Venezuela)
+ * * DESCRIPCIÓN TÉCNICA:
+ * Pantalla de bienvenida (Splash Screen) con arquitectura de pre-carga.
+ * Implementa Hilos (Threads) para la instanciación asíncrona del Dashboard,
+ * optimizando el tiempo de respuesta percibido por el usuario.
  * -----------------------------------------------------------------------------
  */
 
@@ -20,24 +28,35 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.net.URL;
 
+/**
+ * [VISTA] Clase que gestiona la pantalla de carga inicial.
+ * [POO - HERENCIA] Extiende de JWindow para la visualización de una ventana sin bordes (Splash).
+ */
 public class WelcomeView extends JWindow {
 
-    private volatile boolean skipped = false; // 'volatile' para sincronización de hilos
+    // [CONCURRENCIA] Variable 'volatile' para garantizar la visibilidad de cambios
+    // de estado entre el hilo de la UI y el hilo de carga (Sincronización de Memoria).
+    private volatile boolean skipped = false;
+
+    // [HILO] Referencia al proceso de ejecución en segundo plano.
     private Thread transitionThread;
 
-    // TIEMPO TOTAL DE LA MÚSICA (20 Segundos)
-    // Si cortas la música después, solo cambia este número a 10000
+    // Constante de duración del audio introductorio (milisegundos)
     private final long MUSIC_DURATION = 20000;
 
+    /**
+     * Constructor de la vista. Se encarga de la configuración de UI e inicio del hilo de carga.
+     */
     public WelcomeView() {
         setSize(960, 540);
         setLocationRelativeTo(null);
 
-        // Reproducir música
+        // Reproducción de audio (Manejo de excepciones para recursos externos)
         try {
             SoundManager.getInstance().playLoginSuccess();
         } catch (Exception e) {}
 
+        // [POO - CLASE ANÓNIMA] Personalización del panel para el renderizado de la imagen de fondo.
         JPanel content = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -63,12 +82,12 @@ public class WelcomeView extends JWindow {
 
         int width = getWidth();
 
-        // 1. TÍTULO PRINCIPAL
+        // 1. TÍTULO PRINCIPAL (Componente personalizado GoldenTitle)
         GoldenTitle lblBienvenida = new GoldenTitle(LanguageManager.get("welcome.title"), 42);
         lblBienvenida.setBounds(0, 30, width, 60);
         textPanel.add(lblBienvenida);
 
-        // 2. TEXTOS INFERIORES
+        // 2. ELEMENTOS INFORMATIVOS INFERIORES
         JLabel lblDefinicion = createCleanLabel(LanguageManager.get("welcome.system"), 18, true);
         lblDefinicion.setBounds(0, 400, width, 30);
         textPanel.add(lblDefinicion);
@@ -89,6 +108,7 @@ public class WelcomeView extends JWindow {
 
         content.add(textPanel, BorderLayout.CENTER);
 
+        // Barra de progreso indeterminada (Feedback visual de actividad)
         JProgressBar progressBar = new JProgressBar();
         progressBar.setIndeterminate(true);
         progressBar.setBackground(new Color(10, 10, 10));
@@ -97,51 +117,56 @@ public class WelcomeView extends JWindow {
         progressBar.setPreferredSize(new Dimension(getWidth(), 6));
         content.add(progressBar, BorderLayout.SOUTH);
 
-        // --- AQUÍ ESTÁ LA MAGIA (HILO DE CARGA INTELIGENTE) ---
+        // --- ESTRATEGIA DE OPTIMIZACIÓN (BACKGROUND LOADING) ---
+        // Se instancia un hilo independiente para la carga pesada del Dashboard,
+        // evitando el bloqueo del hilo de despacho de eventos (EDT).
         transitionThread = new Thread(() -> {
             long startTime = System.currentTimeMillis();
             DashboardView preloadedDashboard = null;
 
             try {
-                // 1. CARGAMOS EL DASHBOARD EN SILENCIO
-                // Mientras el usuario ve la imagen, esto trabaja por detrás.
-                // Esto elimina el "hueco" negro al final.
+                // 1. INSTANCIACIÓN EN SEGUNDO PLANO
+                // Se inicializa el Dashboard mientras se visualiza la imagen de bienvenida.
+                // Esta técnica elimina la latencia visual (pantalla negra) en la transición.
                 preloadedDashboard = new DashboardView();
             } catch (Exception e) {
                 e.printStackTrace();
             }
 
-            // 2. CALCULAMOS EL TIEMPO RESTANTE
+            // 2. CÁLCULO DE TIEMPO TRANSCURRIDO
             long timeElapsed = System.currentTimeMillis() - startTime;
             long timeLeft = MUSIC_DURATION - timeElapsed;
 
-            // 3. ESPERAMOS SOLO SI SOBRA TIEMPO DE MÚSICA
+            // 3. SINCRONIZACIÓN TEMPORAL
+            // Se mantiene la espera únicamente si la carga finaliza antes que la duración del audio.
             if (timeLeft > 0) {
                 long endTime = System.currentTimeMillis() + timeLeft;
-                // Bucle de espera que revisa si diste click a "Saltar"
+                // Ciclo de espera activo con verificación de bandera de interrupción.
                 while (System.currentTimeMillis() < endTime && !skipped) {
                     try { Thread.sleep(100); } catch (InterruptedException e) {}
                 }
             }
 
-            // 4. ABRIMOS EL DASHBOARD (Que ya está listo en memoria)
+            // 4. TRANSICIÓN A LA VISTA PRINCIPAL
+            // Se procede al despliegue del objeto previamente instanciado.
             abrirDashboard(preloadedDashboard);
         });
         transitionThread.start();
 
-        // EVENTO DE SALTAR (CLICK)
+        // EVENTO DE INTERRUPCIÓN MANUAL (SKIP)
+        // Permite al usuario omitir la espera mediante interacción directa.
         addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (!skipped) {
                     skipped = true;
-                    // Al poner skipped en true, el bucle while del hilo se rompe
-                    // y pasa directo a abrirDashboard.
+                    // La modificación de esta bandera interrumpe el ciclo 'while' del hilo secundario.
                 }
             }
         });
     }
 
+    // Método auxiliar (Factory Method) para la creación estandarizada de etiquetas.
     private JLabel createCleanLabel(String text, int size, boolean bold) {
         JLabel label = new JLabel(text, SwingConstants.CENTER);
         label.setFont(new Font("Segoe UI", bold ? Font.BOLD : Font.PLAIN, size));
@@ -149,14 +174,15 @@ public class WelcomeView extends JWindow {
         return label;
     }
 
-    // Método modificado para recibir el Dashboard ya cargado
+    // Método encargado de realizar la transición visual al Dashboard.
     private void abrirDashboard(DashboardView preloadedDash) {
-        // Ejecutamos la transición visual en el hilo de Swing para evitar parpadeos
+        // [CONCURRENCIA SWING] Se asegura que la manipulación de componentes UI ocurra en el EDT.
         SwingUtilities.invokeLater(() -> {
-            dispose(); // Cerramos bienvenida
+            dispose(); // Liberación de recursos de la ventana actual.
 
-            // Si por alguna razón falló la precarga (muy raro), creamos uno nuevo.
-            // Si todo salió bien, usamos el que ya cargamos en memoria.
+            // Lógica de respaldo (Fallback):
+            // Si la precarga falló, se instancia un nuevo objeto en el momento.
+            // Si fue exitosa, se utiliza el objeto cargado en memoria.
             if (preloadedDash != null) {
                 preloadedDash.setVisible(true);
             } else {

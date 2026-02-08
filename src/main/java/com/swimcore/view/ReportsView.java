@@ -1,11 +1,20 @@
 /*
  * -----------------------------------------------------------------------------
- * INSTITUCIÓN: UNEG - SICONI
- * ARCHIVO: ReportsView.java
+ * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
+ * PROYECTO: SICONI - Sistema de Control de Negocio e Inventario | DG SWIMWEAR
+ * AUTORA: Johanna Gabriela Guédez Flores
+ * PROFESORA: Ing. Dubraska Roca
+ * ASIGNATURA: Técnicas de Programación III
+ * * ARCHIVO: ReportsView.java
  * VERSIÓN: FINAL OPTIMIZADA (Tabla Limpia + Branding SICONI)
+ * FECHA: 06 de Febrero de 2026
+ * HORA: 07:00 PM (Hora de Venezuela)
+ * * DESCRIPCIÓN TÉCNICA:
+ * Módulo de Inteligencia de Negocios (BI). Genera visualizaciones estadísticas
+ * (KPIs, Gráficas de Barras y Anillos) procesando grandes volúmenes de datos
+ * en segundo plano mediante hilos de trabajo (SwingWorker).
  * -----------------------------------------------------------------------------
  */
-
 package com.swimcore.view;
 
 import com.github.lgooddatepicker.components.DatePicker;

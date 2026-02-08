@@ -1,14 +1,14 @@
 /*
  * -----------------------------------------------------------------------------
- * INSTITUCIÓN: UNEG - SICONI
+ * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
+ * PROYECTO: SICONI - Sistema de Control de Negocio e Inventario | DG SWIMWEAR
  * ARCHIVO: AddEditClientDialog.java
- * VERSIÓN: 38.0.0 (STABLE RELEASE: Async & Feedback Fix)
- * FECHA: 04 de Febrero de 2026 - 05:45 PM
- * DESCRIPCIÓN:
- * 1. FIX GUARDADO: Usa SwingWorker y JOptionPane para garantizar que el usuario
- * vea la confirmación de éxito antes de cerrar.
- * 2. FIX BOTONES: El botón "Volver" ya no parpadea (zapatea).
- * 3. RENDIMIENTO: La carga inicial no congela el botón de "Nuevo Cliente".
+ * VERSIÓN: 38.0.1 (STABLE RELEASE: Focus & Controller Fix)
+ * FECHA: 07 de Febrero de 2026
+ * DESCRIPCIÓN TÉCNICA:
+ * Formulario maestro para la gestión de clientes (Alta y Modificación).
+ * Se corrigió la gestión de hilos en la inicialización y el conflicto de foco
+ * al cerrar la ventana modal.
  * -----------------------------------------------------------------------------
  */
 
@@ -38,14 +38,21 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Vector;
 
+/**
+ * [VISTA - CLIENTES] Clase que representa la interfaz gráfica para el registro y edición de clientes.
+ * [POO - HERENCIA] Extiende de JDialog para operar como ventana modal independiente.
+ */
 public class AddEditClientDialog extends JDialog {
 
-    // --- VARIABLES DE CLASE ---
+    // ========================================================================================
+    //                                  ATRIBUTOS Y DEPENDENCIAS
+    // ========================================================================================
+
     private ClientController controller;
     private final Client clientToEdit;
     private Client currentClient;
 
-    // --- COMPONENTES ---
+    // Componentes de la Interfaz Gráfica
     private JComboBox<String> cmbIdType, cmbClub, cmbCategory, cmbSize, cmbCountryCode;
     private JTextField txtIdNumber, txtFullName, txtProfession, txtPhone, txtPhoneAlt,
             txtEmail, txtInstagram, txtAthleteName;
@@ -55,17 +62,15 @@ public class AddEditClientDialog extends JDialog {
     private JLabel lblFlagIcon, lblSystemCode;
     private SoftButton btnSave, btnDelete, btnClear, btnCancel;
 
-    // --- CONSTANTES DE DISEÑO ---
+    // Constantes de Diseño
     private final int INPUT_HEIGHT = 38;
     private final int TEXT_AREA_H = 65;
 
-    // COLORES LUXURY
     private final Color COLOR_GOLD = new Color(212, 175, 55);
     private final Color COLOR_INPUT_BG = new Color(45, 45, 45);
     private final Color COLOR_TEXT_INPUT = new Color(255, 255, 255);
     private final Color COLOR_LABEL = new Color(230, 230, 230);
 
-    // FUENTES
     private final Font FONT_INPUT = new Font("Segoe UI", Font.BOLD, 16);
     private final Font FONT_LABEL = new Font("Segoe UI", Font.BOLD, 13);
     private final Font FONT_TITLE_BORDER = new Font("Segoe UI", Font.BOLD, 12);
@@ -77,9 +82,15 @@ public class AddEditClientDialog extends JDialog {
             {"CHI", "+56", "chi.png"}, {"ESP", "+34", "esp.png"}
     };
 
+    /**
+     * Constructor principal.
+     */
     public AddEditClientDialog(Frame owner, Client clientToEdit) {
         super(owner, "FICHA TÉCNICA - SICONI", true);
         this.clientToEdit = clientToEdit;
+
+        // [CORRECCIÓN CRÍTICA] Inicialización inmediata del controlador para evitar NullPointer
+        this.controller = new ClientController();
 
         setSize(1120, 680);
         setLocationRelativeTo(null);
@@ -96,7 +107,6 @@ public class AddEditClientDialog extends JDialog {
         add(createMainLayout(), BorderLayout.CENTER);
         add(createActionsPanel(), BorderLayout.SOUTH);
 
-        // INICIAMOS EL PROCESO EN SEGUNDO PLANO
         initBackgroundProcess();
 
         addWindowListener(new WindowAdapter() {
@@ -105,22 +115,23 @@ public class AddEditClientDialog extends JDialog {
             }
         });
 
-        setVisible(true);
+        // Configuración para cierre con ESC
+        getRootPane().registerKeyboardAction(e -> dispose(), KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), JComponent.WHEN_IN_FOCUSED_WINDOW);
     }
 
     public AddEditClientDialog(Window owner) { this((Frame)null, null); }
 
-    // --- CARGA ASÍNCRONA (OPTIMIZADA) ---
+    // ========================================================================================
+    //                                  LÓGICA ASÍNCRONA
+    // ========================================================================================
+
     private void initBackgroundProcess() {
-        // Bloqueamos el cursor visualmente para que sepa que está cargando
         setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
         new SwingWorker<Vector<String>, Void>() {
             @Override
             protected Vector<String> doInBackground() {
-                // Inicializamos el controlador AQUÍ (no en el constructor) para no pegar el botón
-                controller = new ClientController();
-
+                // Ya no instanciamos el controlador aquí, solo consultamos datos auxiliares
                 Vector<String> clubs = new Vector<>();
                 clubs.add("Sin Club / Particular");
                 try (Connection con = Conexion.conectar();
@@ -146,11 +157,14 @@ public class AddEditClientDialog extends JDialog {
                         updateFlagIcon();
                     }
                 } catch (Exception e) { e.printStackTrace(); }
-                // Liberamos el cursor
                 setCursor(Cursor.getDefaultCursor());
             }
         }.execute();
     }
+
+    // ========================================================================================
+    //                                  CONSTRUCCIÓN DE INTERFAZ
+    // ========================================================================================
 
     private JPanel createHeader() {
         JPanel p = new JPanel(new BorderLayout());
@@ -189,7 +203,6 @@ public class AddEditClientDialog extends JDialog {
         return p;
     }
 
-    // --- IDENTIDAD ---
     private JPanel createTopIdentityRow() {
         JPanel p = new JPanel(new GridBagLayout());
         p.setOpaque(false);
@@ -204,7 +217,6 @@ public class AddEditClientDialog extends JDialog {
         g.gridx = 2; g.weightx = 0.0; p.add(createLabel("PROFESIÓN / OFICIO:"), g);
 
         g.gridy = 1;
-        // Col 0: Cédula
         g.gridx = 0; g.weightx = 0.0;
         JPanel pId = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0)); pId.setOpaque(false);
 
@@ -222,12 +234,10 @@ public class AddEditClientDialog extends JDialog {
         JPanel pIdWrap = new JPanel(new BorderLayout()); pIdWrap.setOpaque(false); pIdWrap.add(pId, BorderLayout.WEST);
         p.add(pIdWrap, g);
 
-        // Col 1: Nombre
         g.gridx = 1; g.weightx = 1.0;
         txtFullName = createTextField(); txtFullName.setPreferredSize(new Dimension(10, INPUT_HEIGHT));
         p.add(txtFullName, g);
 
-        // Col 2: Profesión
         g.gridx = 2; g.weightx = 0.0;
         txtProfession = createTextField(); fixSize(txtProfession, 240, INPUT_HEIGHT);
         p.add(txtProfession, g);
@@ -235,7 +245,6 @@ public class AddEditClientDialog extends JDialog {
         return p;
     }
 
-    // --- CONTACTO (SIMPLIFICADO: SOLO UNA LÍNEA) ---
     private JPanel createContactBlock() {
         JPanel p = new JPanel(new GridBagLayout());
         p.setOpaque(false);
@@ -245,20 +254,15 @@ public class AddEditClientDialog extends JDialog {
         g.fill = GridBagConstraints.HORIZONTAL;
         g.weightx = 1.0;
         g.gridx = 0;
-        g.insets = new Insets(4, 8, 4, 8); // Margen externo
+        g.insets = new Insets(4, 8, 4, 8);
 
-        // 1. BLOQUE DE TELÉFONO (Ahora ocupa toda la fila)
         JPanel pPhoneRow = new JPanel(new BorderLayout(0, 5));
         pPhoneRow.setOpaque(false);
-
-        // Nuevo Título Combinado
         pPhoneRow.add(createLabel("TELÉFONO PRINCIPAL Y ALTERNATIVO:"), BorderLayout.NORTH);
 
-        // Grupo Input: [Bandera+Combo] + [Texto Largo]
         JPanel pInputGroup = new JPanel(new BorderLayout(8, 0));
         pInputGroup.setOpaque(false);
 
-        // --- PREFIJO ---
         JPanel pPrefix = new JPanel(new BorderLayout());
         pPrefix.setOpaque(false);
 
@@ -275,21 +279,15 @@ public class AddEditClientDialog extends JDialog {
         pPrefix.add(lblFlagIcon, BorderLayout.WEST);
         pPrefix.add(cmbCountryCode, BorderLayout.CENTER);
 
-        // --- CAMPO DE TEXTO (Expandido al 100%) ---
         txtPhone = createTextField();
-
-        // Inicializamos txtPhoneAlt oculto para que no falle al guardar
         txtPhoneAlt = new JTextField();
 
         pInputGroup.add(pPrefix, BorderLayout.WEST);
         pInputGroup.add(txtPhone, BorderLayout.CENTER);
 
         pPhoneRow.add(pInputGroup, BorderLayout.CENTER);
-
-        // Agregamos la fila única al panel principal
         p.add(pPhoneRow, g);
 
-        // --- RESTO DE CAMPOS (EMAIL, INSTAGRAM, ETC) ---
         p.add(createLabel(LanguageManager.get("clients.form.email")), g);
         txtEmail = createTextField();
         p.add(txtEmail, g);
@@ -309,7 +307,6 @@ public class AddEditClientDialog extends JDialog {
         return p;
     }
 
-    // --- PERFIL ---
     private JPanel createAthleteBlock() {
         JPanel p = new JPanel(new GridBagLayout());
         p.setOpaque(false); p.setBorder(createTitledBorder("PERFIL DEL ATLETA"));
@@ -327,7 +324,6 @@ public class AddEditClientDialog extends JDialog {
         JPanel p1 = new JPanel(new BorderLayout()); p1.setOpaque(false);
         p1.add(createLabel(LanguageManager.get("clients.form.birth")), BorderLayout.NORTH);
 
-        // CALENDARIO ESTILO LUXURY INTEGRADO
         datePickerBirth = createLuxuryDatePicker();
         p1.add(datePickerBirth, BorderLayout.CENTER);
         rowTriple.add(p1, g2);
@@ -373,9 +369,11 @@ public class AddEditClientDialog extends JDialog {
         Dimension d = new Dimension(135, 50);
 
         btnCancel = createSoftBtn("/images/icons/icon_cancel_gold.png", Color.DARK_GRAY, "VOLVER", d);
-
-        // FIX ZAPATEO: Usar dispose() directo sin lógica extra
-        btnCancel.addActionListener(e -> dispose());
+        // [CORRECCIÓN CRÍTICA] Liberación de foco global antes de cerrar
+        btnCancel.addActionListener(e -> {
+            KeyboardFocusManager.getCurrentKeyboardFocusManager().clearGlobalFocusOwner();
+            dispose();
+        });
 
         JPanel pR = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0)); pR.setOpaque(false);
         btnDelete = createSoftBtn("/images/icons/icon_delete_gold.png", new Color(140, 30, 30), "ELIMINAR", d);
@@ -393,7 +391,6 @@ public class AddEditClientDialog extends JDialog {
         return p;
     }
 
-    // --- DATEPICKER LUXURY (Integrado) ---
     private DatePicker createLuxuryDatePicker() {
         DatePickerSettings s = new DatePickerSettings();
         s.setFormatForDatesCommonEra("dd/MM/yyyy");
@@ -424,21 +421,17 @@ public class AddEditClientDialog extends JDialog {
         return dp;
     }
 
-    // --- LÓGICA DE NEGOCIO (CORREGIDA Y BLINDADA) ---
     private void saveClientAction() {
-        // 1. Validar nombre
         if (txtFullName.getText().trim().isEmpty()) {
             JOptionPane.showMessageDialog(this, "El nombre es obligatorio.", "Atención", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
-        // 2. BLOQUEAR INTERFAZ (Para que no den doble clic)
         btnSave.setText("GUARDANDO...");
         btnSave.setEnabled(false);
         btnCancel.setEnabled(false);
         setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
-        // 3. Preparar Objeto
         Client c = (currentClient != null) ? currentClient : new Client();
 
         c.setIdType((String) cmbIdType.getSelectedItem());
@@ -462,16 +455,13 @@ public class AddEditClientDialog extends JDialog {
                 c.setBirthDate(datePickerBirth.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
         } catch(Exception e){}
 
-        // 4. WORKER: Guardar en segundo plano
         Client finalC = c;
         new SwingWorker<Boolean, Void>() {
             @Override
             protected Boolean doInBackground() throws Exception {
-                // Generar código si no tiene (en el hilo seguro)
                 if (finalC.getCode() == null || finalC.getCode().isEmpty()) {
                     if (controller != null) finalC.setCode(controller.generateNextCode());
                 }
-
                 if (controller != null) {
                     if (currentClient == null) return controller.saveClient(finalC);
                     else return controller.updateClient(finalC);
@@ -483,19 +473,16 @@ public class AddEditClientDialog extends JDialog {
             protected void done() {
                 try {
                     boolean exito = get();
-
-                    // Restaurar botones
                     setCursor(Cursor.getDefaultCursor());
                     btnSave.setText("GUARDAR");
                     btnSave.setEnabled(true);
                     btnCancel.setEnabled(true);
 
                     if (exito) {
-                        // USAR JOPTIONPANE PARA GARANTIZAR VISIBILIDAD
                         JOptionPane.showMessageDialog(AddEditClientDialog.this,
                                 "¡Cliente guardado exitosamente!",
                                 "SICONI", JOptionPane.INFORMATION_MESSAGE);
-                        dispose(); // Cerrar ventana
+                        dispose();
                     } else {
                         JOptionPane.showMessageDialog(AddEditClientDialog.this,
                                 "Error al guardar. Verifique conexión.",
@@ -545,7 +532,6 @@ public class AddEditClientDialog extends JDialog {
         txtFullName.setText(client.getFullName());
         txtProfession.setText(client.getProfession());
         txtPhone.setText(client.getPhone());
-        // txtPhoneAlt.setText(client.getAlternatePhone());
         txtEmail.setText(client.getEmail());
         txtInstagram.setText(client.getInstagram());
         txtAthleteName.setText(client.getAthleteName());

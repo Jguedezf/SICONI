@@ -1,14 +1,15 @@
 /*
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
- * PROYECTO: SICONI - DAYANA GUEDEZ SWIMWEAR
- * ARCHIVO: LoginView.java
- * VERSIÓN: 2.7.0 (Fix de Altura Forzada)
- * FECHA: 06 de Febrero de 2026
- * HORA: 04:30 PM (Hora de Venezuela)
- * DESCRIPCIÓN: Ventana de acceso principal.
- * SOLUCIÓN: Se usa 'setPreferredSize' para obligar al campo de contraseña
- * del escudo a tener un tamaño correcto, sin depender del Main.
+ * PROYECTO: SICONI - Sistema de Control de Negocio e Inventario | DG SWIMWEAR
+ * AUTORA: Johanna Gabriela Guédez Flores
+ * PROFESORA: Ing. Dubraska Roca
+ * ASIGNATURA: Técnicas de Programación III
+ * * ARCHIVO: LoginView.java
+ * VERSIÓN: 2.7.1 (Footer Translation Fix)
+ * FECHA: 07 de Febrero de 2026
+ * HORA: 11:30 AM (Hora de Venezuela)
+ * * DESCRIPCIÓN: Ventana de acceso principal con soporte de internacionalización completo.
  * -----------------------------------------------------------------------------
  */
 
@@ -31,31 +32,44 @@ import java.net.URL;
 import java.util.Locale;
 import java.util.TimeZone;
 
+/**
+ * [VISTA - MVC] Clase que implementa la interfaz gráfica para el módulo de autenticación.
+ * [POO - HERENCIA] Se extiende de la clase JFrame para heredar las propiedades de una ventana.
+ * * FUNCIONALIDAD 1: Control de Acceso y Seguridad del Sistema.
+ */
 public class LoginView extends JFrame {
 
-    // --- CONSTANTES VISUALES ---
+    // [POO - ENCAPSULAMIENTO] Se definen atributos privados y finales (constantes) para el estilo visual.
     private final Color COLOR_FONDO = new Color(18, 18, 18);
     private final Color COLOR_CAMPOS = new Color(35, 35, 35);
     private final Color COLOR_TEXTO = new Color(200, 200, 200);
     private final Color COLOR_DORADO = new Color(200, 160, 51);
 
-    // --- COMPONENTES UI ---
+    // [POO - AGREGACIÓN] Componentes de la interfaz de usuario contenidos en la clase.
     private JLabel lblUser, lblPass;
     private JLabel lblSecurity;
     private JLabel lblAdminShield;
+
+    // [CORRECCIÓN] Etiqueta de pie de página movida al ámbito de clase para permitir su traducción dinámica
+    private JLabel lblFooter;
+
     private JTextField txtUser;
     private JPasswordField txtPass;
     private JButton btnLogin;
 
     private Image backgroundImage;
 
+    /**
+     * [POO - CONSTRUCTOR] Método encargado de la inicialización del objeto.
+     * Se configuran las propiedades de la ventana y se instancian los componentes gráficos.
+     */
     public LoginView() {
         setSize(480, 680);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setResizable(false);
 
-        // --- CARGA DE RECURSOS ---
+        // Gestión de Recursos: Se realiza la carga de la imagen de fondo con manejo de excepciones.
         try {
             URL url = getClass().getResource("/images/login_bg.png");
             if (url != null) {
@@ -65,6 +79,7 @@ public class LoginView extends JFrame {
             System.err.println("Error al cargar imagen de fondo: " + e.getMessage());
         }
 
+        // [POO - POLIMORFISMO] Clase anónima que sobreescribe el método paintComponent.
         JPanel panel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -82,7 +97,7 @@ public class LoginView extends JFrame {
 
         int centerX = 240;
 
-        // 1. BRANDING
+        // 1. IDENTIDAD CORPORATIVA (BRANDING)
         JLabel lblLogo = new JLabel();
         lblLogo.setBounds(centerX - 140, 30, 280, 90);
         lblLogo.setHorizontalAlignment(SwingConstants.CENTER);
@@ -96,11 +111,12 @@ public class LoginView extends JFrame {
         lblSub.setBounds(centerX - 150, 125, 300, 20);
         panel.add(lblSub);
 
-        // 2. IDIOMA
+        // 2. INTERNACIONALIZACIÓN (I18N)
         int flagW = 85, flagH = 55, gap = 20;
         JButton btnVe = new JButton();
         btnVe.setBounds(centerX - flagW - (gap/2), 160, flagW, flagH);
         estilizarBotonImagen(btnVe, "/images/ve.png");
+        // [POO] Se utilizan Expresiones Lambda para la gestión de eventos de acción.
         btnVe.addActionListener(e -> {
             LanguageManager.setLocale(new Locale("es", "VE"));
             updateTexts();
@@ -116,7 +132,7 @@ public class LoginView extends JFrame {
         });
         panel.add(btnUs);
 
-        // 3. INPUTS
+        // 3. CAMPOS DE ENTRADA DE DATOS
         int startY = 240, inputWidth = 320, inputX = centerX - (inputWidth / 2);
 
         lblUser = new JLabel();
@@ -124,14 +140,14 @@ public class LoginView extends JFrame {
         lblUser.setBounds(inputX, startY, 200, 20);
         panel.add(lblUser);
 
-        // --- USUARIO ---
+        // --- CAMPO USUARIO ---
         txtUser = new JTextField();
         txtUser.setBounds(inputX, startY + 25, inputWidth, 45);
         txtUser.setBackground(COLOR_CAMPOS);
         txtUser.setForeground(Color.WHITE);
         txtUser.setCaretColor(COLOR_DORADO);
         txtUser.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        // Borde dorado normal
+        // Se aplica un borde compuesto para estilizar el campo.
         txtUser.setBorder(new CompoundBorder(
                 new LineBorder(COLOR_DORADO, 1),
                 new EmptyBorder(0, 10, 0, 0)
@@ -143,7 +159,7 @@ public class LoginView extends JFrame {
         lblPass.setBounds(inputX, startY + 90, 200, 20);
         panel.add(lblPass);
 
-        // --- CONTRASEÑA ---
+        // --- CAMPO CONTRASEÑA ---
         txtPass = new JPasswordField();
         txtPass.setBounds(inputX, startY + 115, inputWidth, 45);
         txtPass.setBackground(COLOR_CAMPOS);
@@ -157,7 +173,7 @@ public class LoginView extends JFrame {
         txtPass.addActionListener(e -> validarYAnimar());
         panel.add(txtPass);
 
-        // 4. CANDADO
+        // 4. COMPONENTE VISUAL DE SEGURIDAD
         lblSecurity = new JLabel();
         int lockSize = 105;
         lblSecurity.setBounds(centerX - (lockSize/2), startY + 180, lockSize, lockSize);
@@ -165,10 +181,11 @@ public class LoginView extends JFrame {
         ajustarImagen(lblSecurity, "/images/lock_closed.jpg", lockSize);
         panel.add(lblSecurity);
 
-        // 5. BOTÓN ENTRAR
+        // 5. BOTÓN DE INGRESO
         btnLogin = new JButton() {
             @Override
             protected void paintComponent(Graphics g) {
+                // [POO - POLIMORFISMO] Se personaliza el renderizado del botón mediante Graphics2D.
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 Color colorTop = new Color(255, 50, 150);
@@ -201,7 +218,7 @@ public class LoginView extends JFrame {
         btnLogin.addActionListener(e -> validarYAnimar());
         panel.add(btnLogin);
 
-        // --- 6. ESCUDO DE SEGURIDAD ---
+        // 6. ACCESO ADMINISTRATIVO (ESCUDO)
         lblAdminShield = new JLabel("🛡️");
         lblAdminShield.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 28));
         lblAdminShield.setForeground(new Color(200, 160, 51, 100));
@@ -218,18 +235,21 @@ public class LoginView extends JFrame {
         });
         panel.add(lblAdminShield);
 
-        // Footer
-        JLabel firma = new JLabel("Desarrollado por Johanna Guédez © 2026");
-        firma.setFont(new Font("Segoe UI", Font.PLAIN, 10));
-        firma.setForeground(Color.GRAY);
-        firma.setHorizontalAlignment(SwingConstants.CENTER);
-        firma.setBounds(centerX - 150, 610, 300, 20);
-        panel.add(firma);
+        // Pie de página (Footer)
+        lblFooter = new JLabel(LanguageManager.get("dashboard.footer")); // Uso inicial del Gestor de Idiomas
+        lblFooter.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+        lblFooter.setForeground(Color.GRAY);
+        lblFooter.setHorizontalAlignment(SwingConstants.CENTER);
+        lblFooter.setBounds(centerX - 150, 610, 300, 20);
+        panel.add(lblFooter);
 
         updateTexts();
     }
 
-    // --- MÉTODO CORREGIDO ---
+    /**
+     * Metodo encargado de gestionar el acceso privilegiado al módulo de Usuarios.
+     * FUNCIONALIDAD 2: Gestión de Usuarios y Roles (Acceso Administrador).
+     */
     private void abrirGestionSeguridad() {
         SoundManager.getInstance().playClick();
 
@@ -241,12 +261,12 @@ public class LoginView extends JFrame {
                 new EmptyBorder(5, 10, 5, 0)
         ));
 
-        // 2. FUERZA BRUTA PARA EL TAMAÑO (Esto soluciona el problema)
-        // Le obligamos a medir 250px de ancho y 40px de alto.
+        // 2. CORRECCIÓN VISUAL: Se fuerza la dimensión del componente.
+        // Esto evita deformaciones en el JOptionPane.
         pf.setPreferredSize(new Dimension(250, 40));
         pf.setFont(new Font("Segoe UI", Font.BOLD, 16));
 
-        // Mostramos el diálogo
+        // Se despliega el cuadro de diálogo modal
         int accion = JOptionPane.showConfirmDialog(this, pf,
                 "Ingrese Clave Maestra de Seguridad:",
                 JOptionPane.OK_CANCEL_OPTION,
@@ -254,6 +274,7 @@ public class LoginView extends JFrame {
 
         if (accion == JOptionPane.OK_OPTION) {
             String pass = new String(pf.getPassword());
+            // Validación de credencial maestra
             if ("1234".equals(pass)) {
                 new UserManagementDialog(this).setVisible(true);
             } else if (!pass.isEmpty()) {
@@ -268,17 +289,33 @@ public class LoginView extends JFrame {
         lblUser.setText(LanguageManager.get("login.userLabel"));
         lblPass.setText(LanguageManager.get("login.passLabel"));
         btnLogin.setText(LanguageManager.get("login.button"));
+
+        // [CORRECCIÓN] Actualización dinámica del texto del footer
+        if (lblFooter != null) {
+            lblFooter.setText(LanguageManager.get("dashboard.footer"));
+        }
+
         repaint();
     }
 
+    /**
+     * Método principal de validación de credenciales.
+     * [PATRÓN DAO]: Se interactúa con la capa de datos para verificar la existencia del usuario.
+     * FUNCIONALIDAD 3: Autenticación segura y validación contra Base de Datos.
+     */
     private void validarYAnimar() {
         String u = txtUser.getText();
         String p = new String(txtPass.getPassword());
+
+        // Instancia del Modelo de Datos (DAO)
         UserDAO dao = new UserDAO();
+
+        // Verificación de credenciales en Base de Datos (Persistencia)
         boolean accesoBD = (dao.login(u, p) != null);
         boolean accesoEmergencia = (u.equals("admin") && p.equals("1234"));
 
         if (accesoBD || accesoEmergencia) {
+            // Garantía de integridad: Se crea usuario admin si no existe físicamente
             if (!accesoBD && accesoEmergencia) {
                 if (dao.findByUsername("admin") == null) {
                     dao.saveUser(new User("admin", "1234", "Johanna Guedez", "ADMIN"));
@@ -289,6 +326,8 @@ public class LoginView extends JFrame {
             btnLogin.setText(LanguageManager.get("login.success"));
             btnLogin.setBackground(new Color(46, 204, 113));
             SoundManager.getInstance().playClick();
+
+            // Animación de transición (Feedback visual)
             try {
                 URL gifUrl = getClass().getResource("/images/lock_animation.gif");
                 if (gifUrl != null) {
@@ -297,10 +336,12 @@ public class LoginView extends JFrame {
                     lblSecurity.setIcon(new ImageIcon(img));
                 }
             } catch (Exception ex) { }
+
             Timer t = new Timer(5000, e -> {
-                dispose();
+                dispose(); // Se liberan recursos de la ventana actual
                 TimeZone.setDefault(TimeZone.getTimeZone("America/Caracas"));
                 new WelcomeView().setVisible(true);
+                // Carga dinámica del Dashboard mediante Reflexión (Optimización)
                 new Thread(() -> { try { Class.forName("com.swimcore.view.DashboardView"); } catch(Exception ex){} }).start();
             });
             t.setRepeats(false);

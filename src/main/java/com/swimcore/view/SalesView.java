@@ -785,7 +785,7 @@ public class SalesView extends JPanel {
             super(parent);
             this.orderId = orderId;
             setModal(true);
-            setUndecorated(true);
+            setUndecorated(false);
             setSize(450, 320);
             setLocationRelativeTo(parent);
 

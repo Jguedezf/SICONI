@@ -3,30 +3,18 @@
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
  * CARRERA: Ingeniería en Informática
  * ASIGNATURA: Programación III / Proyecto de Software
- *
  * PROYECTO: GESTIÓN DE INVENTARIO DE UNA TIENDA (SICONI)
  * ARCHIVO: ImagePanel.java
- *
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: Enero 2026
  * VERSIÓN: 1.0.0 (Stable Release)
- *
+ * -----------------------------------------------------------------------------
  * DESCRIPCIÓN TÉCNICA:
- * Clase utilitaria que extiende de `javax.swing.JPanel` para proporcionar capacidades
- * de renderizado de imágenes de fondo (Background Images).
- * * Características de Ingeniería de UI:
- * 1. Escalado Dinámico: Implementa lógica de dibujo que adapta las dimensiones de la
- * imagen a las dimensiones actuales del contenedor en tiempo real.
- * 2. Gestión de Recursos: Utiliza el ClassLoader para localizar activos gráficos
- * dentro del JAR o sistema de archivos de forma independiente del entorno.
- * 3. Sobreescritura del Pipeline Gráfico: Intercepta el metodo `paintComponent`
- * para inyectar la capa de imagen antes de que se dibujen los componentes hijos.
- *
- * PRINCIPIOS POO:
- * - HERENCIA: Especializa un `JPanel` estándar para añadir una propiedad de estado (`backgroundImage`).
- * - POLIMORFISMO: Sobreescritura (Override) de métodos protegidos de la superclase `JComponent`.
- * - ENCAPSULAMIENTO: Oculta la complejidad del manejo del contexto gráfico (`Graphics`).
+ * Clase utilitaria que extiende la funcionalidad base de javax.swing.JPanel para
+ * permitir la renderización de mapas de bits como fondo de contenedor.
+ * Implementa un algoritmo de escalado dinámico que garantiza el ajuste de la
+ * imagen a la geometría del componente en tiempo real.
  * -----------------------------------------------------------------------------
  */
 
@@ -37,51 +25,71 @@ import java.awt.*;
 import java.net.URL;
 
 /**
- * Un JPanel personalizado con soporte para imágenes de fondo.
- * Diseñado para mejorar la experiencia de usuario (UX) mediante fondos decorativos.
+ * [UTILIDAD - INTERFAZ] Contenedor especializado con soporte para Background Imaging.
+ * [POO - HERENCIA] Especializa la clase JPanel para añadir un estado de imagen persistente.
+ * [REQUERIMIENTO NO FUNCIONAL] Estética y Usabilidad: Provee una base visual inmersiva
+ * para los módulos del sistema.
  */
 public class ImagePanel extends JPanel {
 
-    // Almacenamiento en memoria del recurso gráfico
+    // ========================================================================================
+    //                                  ATRIBUTOS (ENCAPSULAMIENTO)
+    // ========================================================================================
+
+    // Referencia al objeto de imagen cargado en el heap de la JVM.
     private Image backgroundImage;
 
+    // ========================================================================================
+    //                                  CONSTRUCTOR
+    // ========================================================================================
+
     /**
-     * Constructor de la clase.
-     * @param imagePath Ruta absoluta o relativa dentro del classpath (recursos).
+     * Inicializa el panel realizando la carga del recurso gráfico desde el classpath.
+     * Utiliza la API de ClassLoader para asegurar la portabilidad del activo en
+     * entornos empaquetados (JAR).
+     * * @param imagePath Ruta relativa del recurso (ej: "/images/bg.png").
      */
     public ImagePanel(String imagePath) {
         try {
-            // Localización del recurso mediante la URL del sistema de archivos o JAR
+            // Localización del activo mediante URL para compatibilidad multiplataforma.
             URL url = getClass().getResource(imagePath);
             if (url != null) {
-                // Carga del mapa de bits en el objeto Image
+                // Instanciación del icono y extracción de la instancia de imagen.
                 backgroundImage = new ImageIcon(url).getImage();
             } else {
-                // Registro de error en el flujo de diagnóstico estándar (System.err)
+                // Manejo de error en flujo de diagnóstico (Standard Error).
                 System.err.println("Imagen de fondo no encontrada: " + imagePath);
             }
         } catch (Exception e) {
+            // Captura de excepciones en tiempo de ejecución durante la carga de I/O.
             e.printStackTrace();
         }
 
-        // Configuración de Layout Manager por defecto para permitir la adición de hijos
+        // Definición de BorderLayout para permitir la composición de componentes hijos
+        // manteniendo el orden de renderizado (Fondo -> Componentes).
         setLayout(new BorderLayout());
     }
 
+    // ========================================================================================
+    //                                  MOTOR DE RENDERIZADO (SWING PIPELINE)
+    // ========================================================================================
+
     /**
-     * Método central del ciclo de renderizado de Swing.
-     * Se invoca automáticamente cuando el componente requiere actualización visual.
-     * @param g El contexto gráfico proporcionado por el motor de dibujo de Java.
+     * [POO - POLIMORFISMO] Sobreescritura del método paintComponent.
+     * Intercepta el flujo de dibujo nativo de Java para inyectar la capa de imagen.
+     * Implementa un escalado proporcional al ancho y alto del contenedor (Stretch logic).
+     * * @param g Contexto gráfico (Graphics) inyectado por el motor de dibujo.
      */
     @Override
     protected void paintComponent(Graphics g) {
-        // Ejecución obligatoria de la superclase para mantener la integridad del fondo
+        // [IMPORTANTE] Invocación a la superclase para procesar propiedades nativas
+        // (como la opacidad y el borrado del buffer previo).
         super.paintComponent(g);
 
         if (backgroundImage != null) {
-            // Algoritmo de estiramiento: Dibuja la imagen escalándola desde (0,0)
-            // hasta las coordenadas (getWidth, getHeight) del panel.
-            // Esto garantiza que la imagen cubra siempre el 100% del área visible.
+            // [API AWT] Renderizado de la imagen utilizando las dimensiones dinámicas
+            // obtenidas mediante los métodos de acceso getWidth() y getHeight().
+            // El observador (this) garantiza que la imagen se redibuje si cambia de estado.
             g.drawImage(backgroundImage, 0, 0, getWidth(), getHeight(), this);
         }
     }

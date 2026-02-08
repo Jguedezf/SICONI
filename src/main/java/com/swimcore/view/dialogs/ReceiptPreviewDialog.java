@@ -3,8 +3,13 @@
  * INSTITUCIÓN: UNEG - SICONI
  * ARCHIVO: ReceiptPreviewDialog.java
  * VERSIÓN: 6.1.0 (TicketItem Visibility Fix)
- * DESCRIPCIÓN: Recibo que recibe los datos directamente de la vista principal.
- * Se corrige visibilidad de TicketItem para acceso externo.
+ * FECHA: 06 de Febrero de 2026
+ * HORA: 09:00 PM (Hora de Venezuela)
+ * DESCRIPCIÓN TÉCNICA:
+ * Módulo de Visualización de Recibos. Genera una representación gráfica (Preview)
+ * del comprobante de venta antes de su impresión física. Implementa el patrón
+ * de "Transferencia de Estado" recibiendo los datos ya procesados, evitando
+ * consultas redundantes a la base de datos.
  * -----------------------------------------------------------------------------
  */
 
@@ -20,14 +25,28 @@ import java.awt.print.*;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Locale;
-import java.io.File; // Necesario para File
-import java.awt.Desktop; // Necesario para Desktop.getDesktop().open()
+import java.io.File;
+import java.awt.Desktop;
 
+/**
+ * [VISTA - RECIBO] Clase que gestiona la previsualización e impresión de tickets.
+ * [POO - HERENCIA] Extiende de JDialog para mostrarse como una ventana modal.
+ * * FUNCIONALIDAD: Renderizado visual de datos de venta e interfaz con la impresora.
+ */
 public class ReceiptPreviewDialog extends JDialog {
 
-    // --- CLASE INTERNA PARA TRANSPORTAR LOS DETALLES ---
+    // ========================================================================================
+    //                                  ESTRUCTURAS DE DATOS (DTO)
+    // ========================================================================================
+
+    /**
+     * [CLASE INTERNA ESTÁTICA - DTO]
+     * Objeto de Transferencia de Datos para los detalles del recibo.
+     * Permite encapsular la información de cada ítem (Nombre, Cantidad, Subtotal)
+     * para su transporte seguro entre la vista de ventas y el diálogo de impresión.
+     * [MODIFICADOR DE ACCESO] Se declara 'public' para permitir visibilidad externa.
+     */
     public static class TicketItem {
-        // !!! MODIFICACIÓN CLAVE: Hacer las variables públicas !!!
         public String name;
         public int qty;
         public double subtotal;
@@ -39,24 +58,45 @@ public class ReceiptPreviewDialog extends JDialog {
         }
     }
 
-    // --- DATOS DEL RECIBO ---
+    // ========================================================================================
+    //                                  ATRIBUTOS DE LA CLASE
+    // ========================================================================================
+
+    // Variables finales (inmutables) que almacenan el estado del recibo.
     private final String saleCode;
     private final String dateStr;
     private final String clientName;
     private final String clientPhone;
-    private final List<TicketItem> items;
+    private final List<TicketItem> items; // Lista de ítems a renderizar
     private final double total;
     private final double paid;
     private final double balance;
 
-    private JPanel ticketPanel; // El panel que se imprimirá
+    // Componente visual principal que contendrá el diseño del ticket.
+    private JPanel ticketPanel;
 
-    // --- PALETA LUXURY ---
+    // Constantes de diseño (Identidad Visual)
     private final Color COLOR_BG_DARK = new Color(18, 18, 18);
     private final Color COLOR_GOLD = new Color(212, 175, 55);
 
+    // ========================================================================================
+    //                                  CONSTRUCTOR
+    // ========================================================================================
+
     /**
-     * CONSTRUCTOR NUEVO: Recibe TODOS los datos necesarios.
+     * Constructor principal.
+     * Recibe la totalidad de los datos necesarios para generar el recibo,
+     * eliminando la necesidad de realizar consultas SQL adicionales (Optimización).
+     *
+     * @param owner Ventana propietaria (Modalidad).
+     * @param saleCode Código único de la venta.
+     * @param dateStr Fecha formateada.
+     * @param clientName Nombre del cliente.
+     * @param clientPhone Teléfono de contacto.
+     * @param items Lista de objetos TicketItem con el detalle.
+     * @param total Monto total de la transacción.
+     * @param paid Monto abonado.
+     * @param balance Saldo pendiente.
      */
     public ReceiptPreviewDialog(Window owner,
                                 String saleCode, String dateStr,
@@ -66,7 +106,7 @@ public class ReceiptPreviewDialog extends JDialog {
 
         super(owner, "Vista Previa del Recibo", ModalityType.APPLICATION_MODAL);
 
-        // Asignamos los datos recibidos
+        // Inicialización de atributos con validación básica de nulos (Fail-Safe)
         this.saleCode = saleCode;
         this.dateStr = dateStr;
         this.clientName = (clientName == null || clientName.isEmpty()) ? "MOSTRADOR" : clientName;
@@ -76,6 +116,7 @@ public class ReceiptPreviewDialog extends JDialog {
         this.paid = paid;
         this.balance = balance;
 
+        // Configuración de la ventana
         setSize(500, 700);
         setLocationRelativeTo(owner);
 
@@ -83,20 +124,21 @@ public class ReceiptPreviewDialog extends JDialog {
         getContentPane().setBackground(COLOR_BG_DARK);
         setLayout(new BorderLayout());
 
-        // 1. TÍTULO DE LA VENTANA
+        // 1. HEADER (Título Visual)
         JLabel lblTitle = new JLabel("VISTA PREVIA DEL RECIBO", SwingConstants.CENTER);
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
         lblTitle.setForeground(COLOR_GOLD);
         lblTitle.setBorder(new EmptyBorder(15, 0, 15, 0));
         add(lblTitle, BorderLayout.NORTH);
 
-        // 2. EL TICKET (VISUAL)
+        // 2. CUERPO DEL TICKET (Renderizado)
         ticketPanel = createTicketVisual();
 
         JScrollPane scroll = new JScrollPane(ticketPanel);
         scroll.setBorder(null);
         scroll.getViewport().setBackground(COLOR_BG_DARK);
 
+        // Wrapper para centrar el panel del ticket
         JPanel wrapper = new JPanel(new FlowLayout(FlowLayout.CENTER));
         wrapper.setBackground(COLOR_BG_DARK);
         wrapper.add(ticketPanel);
@@ -104,33 +146,41 @@ public class ReceiptPreviewDialog extends JDialog {
 
         add(scroll, BorderLayout.CENTER);
 
-        // 3. PINTAR DATOS (Directo de variables, CERO SQL)
+        // 3. INYECCIÓN DE DATOS (Rendering)
         renderTicketData();
 
-        // 4. BOTONES
+        // 4. FOOTER (Controles de Impresión)
         add(createFooter(), BorderLayout.SOUTH);
     }
 
+    // ========================================================================================
+    //                                  LÓGICA DE RENDERIZADO VISUAL
+    // ========================================================================================
+
     private JPanel createTicketVisual() {
         JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS)); // Layout vertical para simular rollo de papel
         panel.setBackground(Color.WHITE);
-        panel.setBorder(new EmptyBorder(20, 40, 20, 40));
+        panel.setBorder(new EmptyBorder(20, 40, 20, 40)); // Márgenes internos
         panel.setPreferredSize(new Dimension(380, 500));
         return panel;
     }
 
+    /**
+     * Construye dinámicamente el contenido del ticket agregando componentes Swing (JLabel, JPanel)
+     * al panel principal en orden secuencial.
+     */
     private void renderTicketData() {
         ticketPanel.removeAll();
 
-        // --- A. CABECERA ---
+        // --- SECCIÓN A: CABECERA CORPORATIVA ---
         addTicketText("SICONI", 24, true, Color.BLACK);
         addTicketText("TALLER DE CONFECCIÓN", 12, false, Color.DARK_GRAY);
         addTicketText("Puerto Ordaz, Venezuela", 10, false, Color.GRAY);
         addTicketText("R.I.F: V-14089807-1", 10, false, Color.GRAY);
         addSeparator();
 
-        // --- B. DATOS GENERALES ---
+        // --- SECCIÓN B: DATOS DE LA TRANSACCIÓN ---
         addTicketLeftRight("RECIBO N°:", saleCode);
         addTicketLeftRight("FECHA:", (dateStr.length() > 10 ? dateStr.substring(0, 10) : dateStr));
         addSeparator();
@@ -139,7 +189,7 @@ public class ReceiptPreviewDialog extends JDialog {
         if(!clientPhone.isEmpty()) addTicketLeftRight("TLF:", clientPhone);
         addSeparator();
 
-        // --- C. ÍTEMS (Iteramos la lista que recibimos) ---
+        // --- SECCIÓN C: DETALLE DE PRODUCTOS (Iteración de Lista) ---
         addTicketText("DETALLE DE PEDIDO", 12, true, Color.BLACK);
         addBox(5);
 
@@ -147,7 +197,7 @@ public class ReceiptPreviewDialog extends JDialog {
             addTicketText("(Sin detalles)", 10, false, Color.GRAY);
         } else {
             for (TicketItem item : items) {
-                // Formato: "1 x Pantalon ($20.00)"
+                // Formato de línea: "CANT x PRODUCTO (PRECIO)"
                 String precioFmt = String.format(Locale.US, "$%.2f", item.subtotal);
                 addTicketItem(item.qty + " x " + item.name, precioFmt);
             }
@@ -155,20 +205,23 @@ public class ReceiptPreviewDialog extends JDialog {
 
         addSeparator();
 
-        // --- D. TOTALES ---
+        // --- SECCIÓN D: RESUMEN FINANCIERO ---
         addTicketTotal("TOTAL:", total, false);
         addTicketTotal("ABONADO:", paid, false);
-        addTicketTotal("RESTA:", balance, true);
+        addTicketTotal("RESTA:", balance, true); // Resaltado en rojo si hay deuda
 
         addSeparator();
         addTicketText("¡Gracias por su preferencia!", 12, true, Color.BLACK);
         addTicketText("@siconi.confecciones", 10, false, Color.GRAY);
 
+        // Refresco de la interfaz
         ticketPanel.revalidate();
         ticketPanel.repaint();
     }
 
-    // --- HELPERS VISUALES ---
+    // ========================================================================================
+    //                                  MÉTODOS AUXILIARES DE UI (HELPERS)
+    // ========================================================================================
 
     private void addTicketText(String text, int size, boolean bold, Color color) {
         JLabel l = new JLabel(text);
@@ -220,7 +273,9 @@ public class ReceiptPreviewDialog extends JDialog {
 
     private void addBox(int height) { ticketPanel.add(Box.createVerticalStrut(height)); }
 
-    // --- FOOTER E IMPRESIÓN ---
+    // ========================================================================================
+    //                                  IMPRESIÓN FÍSICA (JAVA PRINT API)
+    // ========================================================================================
 
     private JPanel createFooter() {
         JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 20));
@@ -246,20 +301,34 @@ public class ReceiptPreviewDialog extends JDialog {
         return footer;
     }
 
+    /**
+     * [FUNCIONALIDAD: IMPRESIÓN]
+     * Inicia un trabajo de impresión utilizando la clase PrinterJob.
+     * Renderiza el contenido del 'ticketPanel' como un gráfico vectorial (Graphics2D)
+     * y lo envía al controlador de impresión del sistema operativo.
+     */
     private void printJob() {
         PrinterJob job = PrinterJob.getPrinterJob();
         job.setJobName("Recibo SICONI " + saleCode);
+
+        // Implementación de la interfaz Printable
         job.setPrintable(new Printable() {
             public int print(Graphics pg, PageFormat pf, int pageNum) {
                 if (pageNum > 0) return Printable.NO_SUCH_PAGE;
+
                 Graphics2D g2 = (Graphics2D) pg;
                 g2.translate(pf.getImageableX(), pf.getImageableY());
+
+                // Escalado automático para ajustar al ancho de la página
                 double scale = pf.getImageableWidth() / ticketPanel.getWidth();
                 if(scale < 1.0) g2.scale(scale, scale);
-                ticketPanel.printAll(g2);
+
+                ticketPanel.printAll(g2); // Renderizado del componente Swing
                 return Printable.PAGE_EXISTS;
             }
         });
+
+        // Diálogo nativo de selección de impresora
         if (job.printDialog()) { try { job.print(); dispose(); } catch (PrinterException e) {} }
     }
 }

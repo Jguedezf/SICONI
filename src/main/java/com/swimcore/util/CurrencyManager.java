@@ -3,20 +3,18 @@
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
  * CARRERA: Ingeniería en Informática
  * ASIGNATURA: Programación III / Proyecto de Software
- *
  * PROYECTO: GESTIÓN DE INVENTARIO DE UNA TIENDA (SICONI)
  * ARCHIVO: CurrencyManager.java
- *
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: Enero 2026
  * VERSIÓN: 3.0.0 (Global Currency Centralization)
- *
+ * -----------------------------------------------------------------------------
  * DESCRIPCIÓN TÉCNICA:
- * Clase utilitaria encargada de la lógica de conversión monetaria y gestión de tasas.
- * Implementación de "Modo de Moneda Global". Ahora el sistema
- * puede cambiar dinámicamente entre USD, EUR y Bs, persistiendo la elección
- * del usuario y el símbolo monetario asociado.
+ * Módulo utilitario encargado de la lógica de conversión monetaria y gestión
+ * de tasas de cambio. Implementa un sistema de persistencia basado en registros
+ * del sistema (Preferences API) para garantizar que la configuración financiera
+ * sea transversal a todos los módulos de la aplicación (Dashboard, Ventas, Inventario).
  * -----------------------------------------------------------------------------
  */
 
@@ -25,50 +23,68 @@ package com.swimcore.util;
 import java.util.prefs.Preferences;
 
 /**
- * Gestor de Divisas con Persistencia de Datos.
- * Actúa como el "Cerebro Financiero" de SICONI, permitiendo que un cambio
- * en la configuración afecte a todas las ventanas del sistema (Inventario, Ventas, Reportes).
+ * [UTILIDAD - FINANZAS] Gestor de Divisas con Persistencia de Datos.
+ * [POO - ABSTRACCIÓN] Centraliza la complejidad de los cálculos de conversión
+ * y el formateo de moneda en una API estática reutilizable.
+ * [REQUERIMIENTO NO FUNCIONAL] Persistencia: Mantiene los valores de tasa y
+ * símbolos monetarios incluso tras el reinicio de la aplicación.
  */
 public class CurrencyManager {
 
-    // --- ATRIBUTOS (Claves de Persistencia) ---
+    // ========================================================================================
+    //                                  ATRIBUTOS DE PERSISTENCIA
+    // ========================================================================================
+
+    // [API JAVA PREFERENCES] Nodo de almacenamiento para guardar configuraciones de usuario.
     private static final Preferences prefs = Preferences.userNodeForPackage(CurrencyManager.class);
 
-    // Claves para guardar en la memoria del sistema
+    // Claves identificadoras para el acceso al registro de datos.
     private static final String KEY_RATE = "exchange_rate_siconi";
     private static final String KEY_SYMBOL = "currency_symbol_siconi";
-    private static final String KEY_MODE = "currency_mode_siconi"; // 0=USD, 1=EUR, 2=VES
+    private static final String KEY_MODE = "currency_mode_siconi"; // Codificación: 0=USD, 1=EUR, 2=VES
 
-    // --- VALORES POR DEFECTO ---
+    // Valores predeterminados (Fallback) en caso de ausencia de datos previos.
     private static final double RATE_DEFAULT = 35.00;
     private static final String SYMBOL_DEFAULT = "$";
-    private static final int MODE_DEFAULT = 0; // Por defecto arranca en Dólares (0)
+    private static final int MODE_DEFAULT = 0;
 
-    // --- GETTERS (Lectura de Memoria) ---
+    // ========================================================================================
+    //                                  MÉTODOS DE ACCESO (GETTERS)
+    // ========================================================================================
 
+    /**
+     * Recupera la tasa de cambio almacenada en el sistema.
+     * @return Valor double de la tasa de conversión.
+     */
     public static double getTasa() {
         return prefs.getDouble(KEY_RATE, RATE_DEFAULT);
     }
 
+    /**
+     * Recupera el identificador visual de la moneda.
+     * @return String con el símbolo monetario (ej: "$", "Bs.").
+     */
     public static String getSymbol() {
         return prefs.get(KEY_SYMBOL, SYMBOL_DEFAULT);
     }
 
     /**
-     * Obtiene el modo de moneda actual.
-     * @return 0 para USD, 1 para EUR, 2 para Bolívares.
+     * Obtiene el modo operativo de moneda seleccionado por el usuario.
+     * @return Entero representativo (0: USD, 1: EUR, 2: Bolívares).
      */
     public static int getMode() {
         return prefs.getInt(KEY_MODE, MODE_DEFAULT);
     }
 
-    // --- SETTERS (Escritura y Configuración) ---
+    // ========================================================================================
+    //                                  MÉTODOS DE CONFIGURACIÓN (SETTERS)
+    // ========================================================================================
 
     /**
-     * Guarda la configuración global de moneda para todo el sistema.
-     * @param tasa La tasa de cambio del día.
-     * @param symbol El símbolo visual (Ej: "Bs.", "$").
-     * @param mode El modo operativo (0, 1, 2).
+     * Actualiza y persiste la configuración financiera global.
+     * @param tasa Nueva tasa de cambio.
+     * @param symbol Nuevo símbolo visual.
+     * @param mode Modo de operación seleccionado.
      */
     public static void setConfig(double tasa, String symbol, int mode) {
         prefs.putDouble(KEY_RATE, tasa);
@@ -76,31 +92,34 @@ public class CurrencyManager {
         prefs.putInt(KEY_MODE, mode);
     }
 
-    // --- LÓGICA DE NEGOCIO Y CONVERSIÓN ---
+    // ========================================================================================
+    //                                  LÓGICA DE CONVERSIÓN Y NEGOCIO
+    // ========================================================================================
 
     /**
-     * Convierte un monto base (asumido en USD) a la moneda seleccionada actualmente.
-     * Este es el metodo que usarán las tablas para saber qué mostrar.
-     * * @param amountInUSD El precio base del producto en Dólares.
-     * @return El monto convertido (o el mismo si es USD).
+     * [ALGORITMO DE CONVERSIÓN] Transforma un monto base a la moneda de visualización activa.
+     * Implementa una estructura de control switch para determinar el factor de conversión
+     * basándose en el modo recuperado de la persistencia.
+     * * @param amountInUSD El monto original en la divisa base del sistema (Dólares).
+     * @return El monto equivalente en la moneda seleccionada.
      */
     public static double convert(double amountInUSD) {
         int mode = getMode();
         double tasa = getTasa();
 
         switch (mode) {
-            case 0: return amountInUSD;        // USD -> USD (Base)
-            case 1: return amountInUSD;        // USD -> EUR (Asumimos paridad 1:1 o se ajustará a futuro)
-            case 2: return amountInUSD * tasa; // USD -> BS (Multiplicación por Tasa BCV)
+            case 0: return amountInUSD;        // Relación 1:1 (USD -> USD)
+            case 1: return amountInUSD;        // Relación 1:1 (USD -> EUR) - Configurable a futuro
+            case 2: return amountInUSD * tasa; // Multiplicación por tasa de cambio (USD -> Bs.)
             default: return amountInUSD;
         }
     }
 
     /**
-     * Formatea un precio automáticamente según la configuración global.
-     * Útil para etiquetas y reportes.
-     * * @param amountInUSD Precio base en dólares.
-     * @return Texto formateado (Ej: "Bs. 500.00" o "$ 15.00").
+     * Provee una representación textual formateada de un valor monetario.
+     * Aplica la conversión dinámica y concatena el símbolo correspondiente con precisión decimal.
+     * * @param amountInUSD Precio base para formatear.
+     * @return String formateado (ej: "Bs. 1.250,50").
      */
     public static String formatPrice(double amountInUSD) {
         double finalAmount = convert(amountInUSD);

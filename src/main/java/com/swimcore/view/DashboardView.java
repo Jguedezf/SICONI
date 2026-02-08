@@ -1,10 +1,16 @@
 /*
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
- * ARCHIVO: DashboardView.java
- * VERSIÓN: 3.3.5 (Transition Fix)
- * DESCRIPCIÓN: Optimización de transiciones entre ventanas para evitar
- * la sensación de bloqueo o "pantalla fantasma".
+ * PROYECTO: SICONI - Sistema de Control de Negocio e Inventario | DG SWIMWEAR
+ * AUTORA: Johanna Gabriela Guédez Flores
+ * PROFESORA: Ing. Dubraska Roca
+ * ASIGNATURA: Técnicas de Programación III
+ * * ARCHIVO: DashboardView.java
+ * VERSIÓN: 4.0.0 (ANTI-FREEZE: Worker Implementation)
+ * FECHA: 07 de Febrero de 2026
+ * HORA: 04:45 PM (Hora de Venezuela)
+ * * DESCRIPCIÓN: Panel de control principal (Dashboard).
+ * SE HA OPTIMIZADO LA CARGA DE VENTANAS PARA EVITAR CONGELAMIENTOS.
  * -----------------------------------------------------------------------------
  */
 
@@ -30,9 +36,17 @@ import java.net.URL;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * [VISTA - MVC] Clase principal que actúa como contenedor de la interfaz de usuario.
+ * [POO - HERENCIA] Hereda de JFrame para la gestión de la ventana principal.
+ * * FUNCIONALIDAD: Orquestador central de módulos (Ventas, Inventario, Reportes).
+ */
 public class DashboardView extends JFrame {
 
+    // [POO - COMPOSICIÓN] Se instancia el DAO para consultas de inventario en tiempo real.
     private final ProductDAO productDAO = new ProductDAO();
+
+    // [POO - ENCAPSULAMIENTO] Atributos privados para manejo de componentes y constantes visuales.
     private AlertCard alertCardStock;
     private final Color COLOR_BG = new Color(18, 18, 18);
     private final Color COLOR_CARD = new Color(30, 30, 30);
@@ -40,6 +54,10 @@ public class DashboardView extends JFrame {
     private final Color COLOR_TEXTO = new Color(240, 240, 240);
     private JLabel lblRateValue;
 
+    /**
+     * Constructor del Dashboard.
+     * Se encarga de la inicialización de componentes y la configuración del Layout.
+     */
     public DashboardView() {
         setTitle(LanguageManager.get("dashboard.title"));
         setSize(1100, 700);
@@ -53,13 +71,19 @@ public class DashboardView extends JFrame {
         mainPanel.setLayout(new BorderLayout());
         setContentPane(mainPanel);
 
+        // [POO - ABSTRACCIÓN] Se divide la construcción de la UI en métodos especializados.
         mainPanel.add(createHeader(), BorderLayout.NORTH);
         mainPanel.add(createCentralMenu(), BorderLayout.CENTER);
         mainPanel.add(createFooter(), BorderLayout.SOUTH);
 
+        // Inicio del hilo secundario para verificación de stock.
         updateStockAlert();
     }
 
+    /**
+     * Construye el encabezado superior con Branding y Alertas.
+     * Incluye el Widget de Tasa de Cambio (BCV).
+     */
     private JPanel createHeader() {
         JPanel headerPanel = new JPanel(new BorderLayout(20, 0));
         headerPanel.setOpaque(false);
@@ -81,19 +105,26 @@ public class DashboardView extends JFrame {
         leftPanel.add(lblLogo);
         leftPanel.add(Box.createVerticalStrut(10));
 
+        // [REQUERIMIENTO FUNCIONAL 2 - INVENTARIO]: Tarjeta de Alerta de Stock.
         alertCardStock = new AlertCard("⚠️", LanguageManager.get("dashboard.alert.calc"), () -> {
             SoundManager.getInstance().playClick();
-            setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR)); // Feedback visual
-            InventoryView inventoryView = new InventoryView(DashboardView.this);
-            try {
-                inventoryView.mostrarSoloBajoStock();
-            } catch (Exception ex) {}
-            inventoryView.setVisible(true);
-            setCursor(Cursor.getDefaultCursor());
+
+            // FIX: Carga asíncrona para evitar congelamiento
+            setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+            new SwingWorker<Void, Void>() {
+                @Override protected Void doInBackground() {
+                    InventoryView inventoryView = new InventoryView(DashboardView.this);
+                    try { inventoryView.mostrarSoloBajoStock(); } catch (Exception ex) {}
+                    inventoryView.setVisible(true);
+                    return null;
+                }
+                @Override protected void done() { setCursor(Cursor.getDefaultCursor()); updateStockAlert(); }
+            }.execute();
         });
 
         leftPanel.add(alertCardStock);
 
+        // [REQUERIMIENTO FUNCIONAL 3 - VENTAS]: Widget de Tasa BCV para cálculo multimoneda.
         JPanel rateWidget = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         rateWidget.setOpaque(false);
 
@@ -118,10 +149,15 @@ public class DashboardView extends JFrame {
         return headerPanel;
     }
 
+    /**
+     * [CONCURRENCIA - SWINGWORKER]
+     * Método que ejecuta la consulta de productos con bajo stock en un hilo secundario.
+     */
     private void updateStockAlert() {
         new SwingWorker<Long, Void>() {
             @Override
             protected Long doInBackground() throws Exception {
+                // [DAO] Consulta al modelo de datos
                 List<Product> allProducts = productDAO.getAllProducts();
                 return allProducts.stream().filter(Product::isLowStock).count();
             }
@@ -145,68 +181,92 @@ public class DashboardView extends JFrame {
         JPanel grid = new JPanel(new GridLayout(2, 3, 25, 25));
         grid.setOpaque(false);
 
-        // --- 1. NUEVO PEDIDO (OPTIMIZADO) ---
+        // --- MÓDULO 1: GESTIÓN DE VENTAS (POS) ---
         grid.add(createBigButton(LanguageManager.get("dashboard.btn.newOrder"), LanguageManager.get("dashboard.btn.newOrder.sub"), "/images/orders.png", "🛒", e -> {
-            // Cambio cursor para indicar proceso
-            setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
-            // Usamos invokeLater para que el botón termine su animación antes de abrir el diálogo
-            SwingUtilities.invokeLater(() -> {
-                ClientManagementDialog selector = new ClientManagementDialog(this, true);
-                selector.setVisible(true);
-                Client clienteSeleccionado = selector.getSelectedClient();
+            // 1. Selección de Cliente (Rápida)
+            ClientManagementDialog selector = new ClientManagementDialog(this, true);
+            selector.setVisible(true);
+            Client clienteSeleccionado = selector.getSelectedClient();
 
-                if (clienteSeleccionado != null) {
-                    // AQUÍ ESTÁ EL ARREGLO:
-                    // Si el cliente fue seleccionado, forzamos la carga de la ventana de ventas
-                    // asegurando que el cursor siga esperando hasta que aparezca.
+            if (clienteSeleccionado != null) {
+                // FIX CRÍTICO: Usamos SwingWorker para construir la ventana de Ventas en segundo plano
+                // Esto evita que el Dashboard se congele (el "limbo")
+                setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
-                    JDialog frameVentas = new JDialog(this, "SICONI - NUEVO PEDIDO", true);
-                    frameVentas.setUndecorated(false);
-                    frameVentas.setSize(1280, 750);
-                    frameVentas.setLocationRelativeTo(this);
+                new SwingWorker<JDialog, Void>() {
+                    @Override
+                    protected JDialog doInBackground() {
+                        // Construcción pesada ocurre aquí, sin bloquear la UI
+                        JDialog frameVentas = new JDialog(DashboardView.this, "SICONI - NUEVO PEDIDO", true);
+                        frameVentas.setUndecorated(false);
+                        frameVentas.setSize(1280, 750);
+                        frameVentas.setLocationRelativeTo(DashboardView.this);
 
-                    try {
-                        ImagePanel background = new ImagePanel("/images/bg3.png");
-                        background.setLayout(new BorderLayout());
-                        background.add(new SalesView(clienteSeleccionado), BorderLayout.CENTER);
-                        frameVentas.setContentPane(background);
-                    } catch (Exception ex) {
-                        frameVentas.add(new SalesView(clienteSeleccionado));
+                        try {
+                            ImagePanel background = new ImagePanel("/images/bgdg.png");
+                            background.setLayout(new BorderLayout());
+                            background.add(new SalesView(clienteSeleccionado), BorderLayout.CENTER);
+                            frameVentas.setContentPane(background);
+                        } catch (Exception ex) {
+                            frameVentas.add(new SalesView(clienteSeleccionado));
+                        }
+                        return frameVentas;
                     }
 
-                    frameVentas.setVisible(true);
+                    @Override
+                    protected void done() {
+                        try {
+                            // Mostrar la ventana ya construida instantáneamente
+                            get().setVisible(true);
+                            updateStockAlert();
+                        } catch(Exception ex) { ex.printStackTrace(); }
+                        finally { setCursor(Cursor.getDefaultCursor()); }
+                    }
+                }.execute();
+            }
+        }));
+
+        // --- MÓDULO 2: GESTIÓN DE INVENTARIO ---
+        grid.add(createBigButton(LanguageManager.get("dashboard.btn.inventory"), LanguageManager.get("dashboard.btn.inventory.sub"), "/images/inventory.png", "📦", e -> {
+            // FIX: Carga asíncrona del Inventario
+            setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+            new SwingWorker<Void, Void>() {
+                @Override protected Void doInBackground() {
+                    new InventoryView(DashboardView.this).setVisible(true);
+                    return null;
+                }
+                @Override protected void done() {
+                    setCursor(Cursor.getDefaultCursor());
                     updateStockAlert();
                 }
-                setCursor(Cursor.getDefaultCursor());
-            });
+            }.execute();
         }));
 
-        grid.add(createBigButton(LanguageManager.get("dashboard.btn.inventory"), LanguageManager.get("dashboard.btn.inventory.sub"), "/images/inventory.png", "📦", e -> {
-            setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-            SwingUtilities.invokeLater(() -> {
-                new InventoryView(this).setVisible(true);
-                setCursor(Cursor.getDefaultCursor());
-                updateStockAlert();
-            });
-        }));
-
+        // --- MÓDULO 3: TALLER / MANUFACTURA ---
         grid.add(createBigButton(LanguageManager.get("dashboard.btn.workshop"), LanguageManager.get("dashboard.btn.workshop.sub"), "/images/workshop.png", "✂️", e -> {
             new OrderManagementView(this).setVisible(true);
         }));
 
+        // --- MÓDULO 4: GESTIÓN DE CLIENTES / ATLETAS ---
         grid.add(createBigButton(LanguageManager.get("dashboard.btn.clients"), LanguageManager.get("dashboard.btn.clients.sub"), "/images/client.png", "👥", e -> {
             new ClientManagementDialog(this, false).setVisible(true);
         }));
 
+        // --- MÓDULO 5: REPORTES GERENCIALES ---
         grid.add(createBigButton(LanguageManager.get("dashboard.btn.reports"), LanguageManager.get("dashboard.btn.reports.sub"), "/images/reports.png", "📊", e -> {
+            // FIX: Carga asíncrona de Reportes
             setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-            SwingUtilities.invokeLater(() -> {
-                new ReportsView(this).setVisible(true);
-                setCursor(Cursor.getDefaultCursor());
-            });
+            new SwingWorker<Void, Void>() {
+                @Override protected Void doInBackground() {
+                    new ReportsView(DashboardView.this).setVisible(true);
+                    return null;
+                }
+                @Override protected void done() { setCursor(Cursor.getDefaultCursor()); }
+            }.execute();
         }));
 
+        // Botón de Salida
         JButton btnExit = createBigButton(LanguageManager.get("dashboard.btn.exit"), LanguageManager.get("dashboard.btn.exit.sub"), "/images/logout.png", "🚪", null);
         btnExit.addMouseListener(new MouseAdapter() {
             public void mouseEntered(MouseEvent e) { btnExit.putClientProperty("hoverColor", new Color(220, 20, 60)); btnExit.putClientProperty("hover", true); btnExit.repaint(); SoundManager.getInstance().playHover(); }
@@ -241,6 +301,10 @@ public class DashboardView extends JFrame {
         return null;
     }
 
+    /**
+     * Método auxiliar para la creación de botones principales del Dashboard.
+     * [POO]: Implementa personalización gráfica mediante sobreescritura del método paint.
+     */
     private JButton createBigButton(String title, String subtitle, String iconPath, String fallbackIcon, java.awt.event.ActionListener action) {
         JButton btn = new JButton();
         btn.setLayout(new BorderLayout());
@@ -290,6 +354,7 @@ public class DashboardView extends JFrame {
             public void mousePressed(MouseEvent e) { SoundManager.getInstance().playClick(); }
         });
 
+        // [POO - POLIMORFISMO] Renderizado customizado para efecto 'Glass/Card'.
         btn.setUI(new javax.swing.plaf.basic.BasicButtonUI() {
             public void paint(Graphics g, JComponent c) {
                 Graphics2D g2 = (Graphics2D) g.create();

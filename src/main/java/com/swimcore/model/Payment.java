@@ -1,43 +1,83 @@
 /*
  * -----------------------------------------------------------------------------
- * INSTITUCIÓN: UNEG - SICONI
+ * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
+ * CARRERA: Ingeniería en Informática
+ * ASIGNATURA: Programación III / Proyecto de Software
+ *
+ * PROYECTO: GESTIÓN DE INVENTARIO DE UNA TIENDA (SICONI)
  * ARCHIVO: Payment.java
- * VERSIÓN: 1.0.0 (Initial Release)
- * DESCRIPCIÓN: Modelo de datos que representa un registro de pago individual
- * asociado a un pedido del taller de confección.
+ *
+ * AUTORA: Johanna Guedez - V14089807
+ * PROFESORA: Ing. Dubraska Roca
+ * FECHA: Febrero 2026
+ * VERSIÓN: 1.0.0 (Initial Financial Model)
+ * -----------------------------------------------------------------------------
+ * DESCRIPCIÓN TÉCNICA:
+ * Clase perteneciente a la Capa de Modelo (Model Layer). Representa un registro
+ * atómico de transacción financiera vinculado a una orden de venta. Permite
+ * el seguimiento detallado de abonos parciales y liquidaciones totales,
+ * facilitando el control de cuentas por cobrar en el sistema.
  * -----------------------------------------------------------------------------
  */
 
 package com.swimcore.model;
 
 /**
- * Entidad de Pago.
- * Representa una transacción financiera (abono o pago final) vinculada a una venta.
+ * [MODELO - ENTIDAD] Representación lógica de un ingreso monetario por pedido.
+ * [POO - ENCAPSULAMIENTO] Define de forma privada los atributos de la transacción,
+ * garantizando la integridad de los datos financieros mediante métodos de acceso
+ * y construcción normalizados.
+ * [DISEÑO] Actúa como una entidad dependiente en la relación uno-a-muchos (1:N)
+ * con respecto a la cabecera de la venta (Sale).
  */
 public class Payment {
 
-    private int id;                 // ID único del pago
-    private String saleId;          // ID del pedido al que pertenece (FK)
-    private String paymentDate;     // Fecha del pago (Ej: "2026-01-15 10:30:00")
-    private double amountUSD;       // Monto del pago en USD
-    private String paymentMethod;   // Método (Ej: PAGO MÓVIL, ZELLE)
-    private String reference;       // Referencia de la transacción
-    private String notes;           // Observaciones adicionales
+    // ========================================================================================
+    //                                  ATRIBUTOS (DATOS PROTEGIDOS)
+    // ========================================================================================
+
+    // Identificador único del registro de pago (PK en base de datos).
+    private int id;
+
+    // Referencia al pedido asociado (FK hacia la tabla 'sales').
+    private String saleId;
+
+    // Estampa de tiempo de la ejecución de la transacción.
+    private String paymentDate;
+
+    // Valor nominal del ingreso expresado en divisa base (USD).
+    private double amountUSD;
+
+    // Clasificación del canal de ingreso (ej: PAGO MÓVIL, ZELLE, EFECTIVO).
+    private String paymentMethod;
+
+    // Código de validación o número de comprobante de la entidad bancaria.
+    private String reference;
+
+    // Información contextual o metadatos adicionales del pago.
+    private String notes;
+
+    // ========================================================================================
+    //                                  CONSTRUCTORES
+    // ========================================================================================
 
     /**
      * Constructor por defecto.
+     * Requerido para el mapeo objeto-relacional y la instanciación dinámica
+     * mediante la API de reflexión o JDBC.
      */
     public Payment() {
     }
 
     /**
-     * Constructor completo para crear una instancia de pago.
-     * @param saleId ID del pedido asociado.
-     * @param paymentDate Fecha y hora del pago.
-     * @param amountUSD Monto pagado.
-     * @param paymentMethod Método de pago utilizado.
-     * @param reference Número de referencia.
-     * @param notes Notas adicionales.
+     * Constructor parametrizado para la creación de nuevos registros.
+     * Permite la inicialización completa de la entidad antes de su persistencia.
+     * * @param saleId Identificador único del pedido origen.
+     * @param paymentDate Fecha y hora del proceso.
+     * @param amountUSD Monto total de la operación.
+     * @param paymentMethod Modalidad de transferencia.
+     * @param reference Nro de confirmación transaccional.
+     * @param notes Observaciones de auditoría.
      */
     public Payment(String saleId, String paymentDate, double amountUSD, String paymentMethod, String reference, String notes) {
         this.saleId = saleId;
@@ -48,61 +88,42 @@ public class Payment {
         this.notes = notes;
     }
 
-    // --- GETTERS Y SETTERS ---
+    // ========================================================================================
+    //                                  MÉTODOS DE ACCESO (GETTERS Y SETTERS)
+    // ========================================================================================
 
-    public int getId() {
-        return id;
-    }
+    /** @return Identificador primario del pago. */
+    public int getId() { return id; }
+    /** @param id Asignación manual del ID (usualmente manejado por la BD). */
+    public void setId(int id) { this.id = id; }
 
-    public void setId(int id) {
-        this.id = id;
-    }
+    /** @return El código del pedido vinculado. */
+    public String getSaleId() { return saleId; }
+    /** @param saleId Establece la relación con la venta maestra. */
+    public void setSaleId(String saleId) { this.saleId = saleId; }
 
-    public String getSaleId() {
-        return saleId;
-    }
+    /** @return La marca temporal del pago. */
+    public String getPaymentDate() { return paymentDate; }
+    /** @param paymentDate Define la fecha cronológica del registro. */
+    public void setPaymentDate(String paymentDate) { this.paymentDate = paymentDate; }
 
-    public void setSaleId(String saleId) {
-        this.saleId = saleId;
-    }
+    /** @return El volumen monetario de la transacción. */
+    public double getAmountUSD() { return amountUSD; }
+    /** @param amountUSD Define el monto percibido en dólares. */
+    public void setAmountUSD(double amountUSD) { this.amountUSD = amountUSD; }
 
-    public String getPaymentDate() {
-        return paymentDate;
-    }
+    /** @return El canal de pago utilizado. */
+    public String getPaymentMethod() { return paymentMethod; }
+    /** @param paymentMethod Clasifica la modalidad financiera. */
+    public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
 
-    public void setPaymentDate(String paymentDate) {
-        this.paymentDate = paymentDate;
-    }
+    /** @return El código de referencia bancaria. */
+    public String getReference() { return reference; }
+    /** @param reference Establece la validación externa del pago. */
+    public void setReference(String reference) { this.reference = reference; }
 
-    public double getAmountUSD() {
-        return amountUSD;
-    }
-
-    public void setAmountUSD(double amountUSD) {
-        this.amountUSD = amountUSD;
-    }
-
-    public String getPaymentMethod() {
-        return paymentMethod;
-    }
-
-    public void setPaymentMethod(String paymentMethod) {
-        this.paymentMethod = paymentMethod;
-    }
-
-    public String getReference() {
-        return reference;
-    }
-
-    public void setReference(String reference) {
-        this.reference = reference;
-    }
-
-    public String getNotes() {
-        return notes;
-    }
-
-    public void setNotes(String notes) {
-        this.notes = notes;
-    }
+    /** @return Notas complementarias. */
+    public String getNotes() { return notes; }
+    /** @param notes Agrega información descriptiva adicional. */
+    public void setNotes(String notes) { this.notes = notes; }
 }

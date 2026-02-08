@@ -13,6 +13,11 @@
  * HORA: 12:05 PM (Hora de Venezuela)
  * VERSIÓN: 2.5.0 (Admin Module Enabled)
  * -----------------------------------------------------------------------------
+ * DESCRIPCIÓN TÉCNICA:
+ * Clase de la Capa de Acceso a Datos (DAO). Centraliza todas las operaciones
+ * transaccionales sobre la entidad 'Usuario' en el motor SQLite. Implementa
+ * la lógica de persistencia CRUD y los mecanismos de autenticación del sistema.
+ * -----------------------------------------------------------------------------
  */
 
 package com.swimcore.dao;
@@ -26,15 +31,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Proveedor de servicios de datos para la entidad Usuario.
- * Gestiona el CRUD completo y la validación de acceso (Login).
+ * [DAO - PERSISTENCIA] Proveedor de servicios de datos para la entidad Usuario.
+ * [DISEÑO] Implementa la separación de intereses (SoC) al aislar el código SQL
+ * de la lógica de negocio y la interfaz de usuario.
+ * [SEGURIDAD] Utiliza consultas parametrizadas para mitigar vulnerabilidades de
+ * Inyección SQL durante los procesos de autenticación y registro.
  */
 public class UserDAO {
 
+    /**
+     * Constructor de la clase.
+     * Dispara la verificación de la infraestructura de tablas al instanciarse.
+     */
     public UserDAO() {
         createTable();
     }
 
+    /**
+     * [DDL] Garantiza la existencia de la tabla 'users' en el esquema relacional.
+     * Define restricciones de integridad como claves primarias y unicidad en nombres de cuenta.
+     */
     private void createTable() {
         String sql = "CREATE TABLE IF NOT EXISTS users (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -50,6 +66,16 @@ public class UserDAO {
         }
     }
 
+    // ========================================================================================
+    //                                  LÓGICA DE AUTENTICACIÓN
+    // ========================================================================================
+
+    /**
+     * Valida las credenciales de un usuario contra los registros persistidos.
+     * @param username Identificador de cuenta.
+     * @param password Credencial de acceso.
+     * @return Objeto User si la validación es exitosa; null en caso contrario.
+     */
     public User login(String username, String password) {
         String sql = "SELECT * FROM users WHERE username = ? AND password = ?";
         try (Connection conn = Conexion.conectar();
@@ -74,7 +100,16 @@ public class UserDAO {
         return null;
     }
 
-    // Registro de usuario (Retorna true si fue exitoso)
+    // ========================================================================================
+    //                                  OPERACIONES CRUD (CREATE, READ, UPDATE, DELETE)
+    // ========================================================================================
+
+    /**
+     * [CREATE] Persiste un nuevo objeto Usuario en la base de datos.
+     * Utiliza la instrucción 'INSERT OR IGNORE' para evitar duplicidad de nombres de usuario.
+     * @param user Instancia del modelo a registrar.
+     * @return true si se insertó el registro exitosamente.
+     */
     public boolean saveUser(User user) {
         String sql = "INSERT OR IGNORE INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)";
         try (Connection conn = Conexion.conectar();
@@ -90,6 +125,9 @@ public class UserDAO {
         }
     }
 
+    /**
+     * [READ] Localiza un usuario específico basándose en su nombre de cuenta único.
+     */
     public User findByUsername(String username) {
         String sql = "SELECT * FROM users WHERE username = ?";
         try (Connection conn = Conexion.conectar();
@@ -111,8 +149,10 @@ public class UserDAO {
         return null;
     }
 
-    // --- FUNCIONES PARA GESTIÓN ADMINISTRATIVA ---
-
+    /**
+     * [UPDATE] Actualiza las propiedades de un usuario existente en la base de datos.
+     * Utiliza el nombre de usuario (username) como criterio de búsqueda para la modificación.
+     */
     public boolean updateUser(User user) {
         String sql = "UPDATE users SET password = ?, full_name = ?, role = ? WHERE username = ?";
         try (Connection conn = Conexion.conectar();
@@ -128,8 +168,12 @@ public class UserDAO {
         }
     }
 
+    /**
+     * [DELETE] Elimina de forma física un registro de usuario.
+     * [REGLA DE NEGOCIO] Implementa una restricción de seguridad para evitar la eliminación
+     * del usuario administrador por defecto del sistema.
+     */
     public boolean deleteUser(String username) {
-        // Protección: No permitir borrar al admin principal
         if ("admin".equalsIgnoreCase(username)) return false;
 
         String sql = "DELETE FROM users WHERE username = ?";
@@ -143,6 +187,10 @@ public class UserDAO {
         }
     }
 
+    /**
+     * [READ ALL] Recupera la colección completa de usuarios registrados.
+     * @return List con objetos User mapeados desde la base de datos.
+     */
     public List<User> getAllUsers() {
         List<User> list = new ArrayList<>();
         String sql = "SELECT * FROM users ORDER BY id ASC";

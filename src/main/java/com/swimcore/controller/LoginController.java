@@ -11,28 +11,13 @@
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: Enero 2026
  * VERSIÓN: 1.0.0 (Stable Release)
- *
+ * -----------------------------------------------------------------------------
  * DESCRIPCIÓN TÉCNICA:
  * Clase perteneciente a la Capa de Controlador (Controller Layer).
- * Actúa como mediador entre la interfaz de autenticación (LoginView) y la capa
- * de persistencia (UserDAO). Su función principal es gestionar la lógica de
- * verificación de identidad y acceso al sistema.
- *
- * Características de Ingeniería:
- * 1. Desacoplamiento: Aísla la lógica de validación de la interfaz gráfica,
- * siguiendo el principio de Responsabilidad Única (SRP).
- * 2. Gestión de Flujo: Coordina la recuperación de la entidad 'User' y realiza
- * la comparación de credenciales en memoria.
- * 3. Escalabilidad: Estructura preparada para integrar procesos de encriptación
- * o hashing de contraseñas sin afectar otras capas.
- *
- * PRINCIPIOS POO:
- * - COMPOSICIÓN: Utiliza una instancia de `UserDAO` para delegar el acceso a datos.
- * - ENCAPSULAMIENTO: Centraliza la lógica de negocio del inicio de sesión.
- *
- * PATRONES DE DISEÑO:
- * - MVC (Model-View-Controller): Implementa el rol de controlador para la gestión
- * de estados de autenticación.
+ * Funge como el orquestador de seguridad encargado de validar el acceso al
+ * ecosistema SICONI. Coordina la comunicación entre la vista de entrada
+ * (LoginView) y el proveedor de datos (UserDAO) para verificar la identidad
+ * de los operadores del sistema.
  * -----------------------------------------------------------------------------
  */
 
@@ -42,35 +27,49 @@ import com.swimcore.dao.UserDAO;
 import com.swimcore.model.User;
 
 /**
- * Controlador de Seguridad.
- * Proporciona los servicios de validación de credenciales para el acceso al sistema SICONI.
+ * [CONTROLLER - SEGURIDAD] Controlador para la Gestión de Autenticación.
+ * [DISEÑO] Implementa el patrón MVC al aislar la lógica de validación de
+ * identidad de los componentes de la interfaz de usuario.
+ * [INGENIERÍA] Sigue el principio de Responsabilidad Única (SRP), delegando
+ * la recuperación de registros al objeto DAO y limitándose a la lógica de comparación.
  */
 public class LoginController {
 
-    // Dependencia inyectada de la Capa de Datos
+    // ========================================================================================
+    //                                  ATRIBUTOS (DEPENDENCIAS)
+    // ========================================================================================
+
+    // Dependencia de la Capa de Persistencia (Composición).
     private final UserDAO userDAO = new UserDAO();
 
+    // ========================================================================================
+    //                                  LÓGICA DE NEGOCIO (SECURITY)
+    // ========================================================================================
+
     /**
-     * Valida las credenciales proporcionadas por el usuario.
-     * 1. Consulta la existencia del usuario en la base de datos.
-     * 2. Compara la integridad de la contraseña suministrada.
-     *
-     * @param username Identificador de cuenta.
-     * @param password Credencial de acceso ingresada.
-     * @return true si las credenciales coinciden con el registro de persistencia.
+     * [ALGORITMO DE VALIDACIÓN] Verifica las credenciales de acceso suministradas.
+     * Realiza una búsqueda por nombre de usuario y evalúa la paridad de la contraseña
+     * en memoria para determinar el acceso a la sesión.
+     * * @param username Identificador nominal de la cuenta.
+     * @param password Credencial secreta de acceso suministrada en el formulario.
+     * @return booleano: true si el perfil existe y las credenciales son íntegras.
      */
     public boolean validateCredentials(String username, String password) {
-        // Recuperación de la entidad desde el almacén de datos
+
+        // Fase de Recuperación: Se consulta la entidad 'User' a través de la capa de persistencia.
         User user = userDAO.findByUsername(username);
 
+        // Fase de Verificación: Se evalúa la existencia del registro y la coincidencia de claves.
         if (user != null) {
-            // LÓGICA DE VALIDACIÓN:
-            // Comparamos el texto ingresado con el atributo del modelo.
-            // Nota: En versiones futuras, se recomienda implementar BCrypt o SHA aquí.
+
+            /* * TÉCNICO: Se realiza una comparación de cadenas (String Comparison).
+             * NOTA DE ESCALABILIDAD: La arquitectura permite sustituir esta lógica por
+             * funciones de Hashing (BCrypt/SHA) sin alterar la capa de Vista.
+             */
             return password.equals(user.getPassword());
         }
 
-        // Caso: El usuario no existe o las credenciales son inválidas
+        // Flujo Alterno: Fallo de autenticación por usuario inexistente o credenciales erróneas.
         return false;
     }
 }

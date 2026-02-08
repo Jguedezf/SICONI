@@ -7,6 +7,10 @@
  * AUTORA: Johanna Guedez
  * FECHA: 05 de Febrero de 2026
  * VERSIÓN: 13.0 (PLATINUM: High Header + Fuchsia Title + Clean Footer)
+ * * DESCRIPCIÓN TÉCNICA:
+ * Módulo de Auditoría Avanzada. Provee herramientas visuales para el análisis
+ * histórico del inventario, con capacidades de filtrado por rango de fechas,
+ * exportación a formatos estándar (PDF/CSV) y diseño de interfaz de alta gama.
  * -----------------------------------------------------------------------------
  */
 package com.swimcore.view.dialogs;
@@ -53,26 +57,38 @@ import java.util.Date;
 import java.util.List;
 import java.util.Vector;
 
+/**
+ * [VISTA - AUDITORÍA] Clase que implementa la interfaz de consulta histórica de inventario.
+ * [POO - HERENCIA] Extiende de JDialog para operar como ventana modal de reporte.
+ * * FUNCIONALIDAD: Filtrado, visualización y exportación de movimientos de stock.
+ */
 public class InventoryHistoryDialog extends JDialog {
 
+    // [PATRÓN DAO] Acceso a la capa de persistencia para consultas de inventario.
     private final ProductDAO productDAO = new ProductDAO();
+
+    // Componentes de la interfaz gráfica
     private DefaultTableModel model;
     private DatePicker dateFrom;
     private DatePicker dateTo;
     private JTable table;
 
-    // PALETA DE COLORES DE LUJO
+    // Paleta de Colores (Diseño Luxury)
     private final Color LUX_BG_DARK = new Color(20, 20, 20);
     private final Color LUX_GOLD = new Color(212, 175, 55);
     private final Color LUX_VERDE = new Color(0, 255, 128);
     private final Color LUX_ROJO = new Color(255, 0, 127);
     private final Color LUX_TEXT_WHITE = new Color(230, 230, 230);
 
+    /**
+     * Constructor de la clase. Inicializa componentes, filtros y carga de datos.
+     */
     public InventoryHistoryDialog(Window parent) {
         super(parent, LanguageManager.get("audit.dialog.title"), ModalityType.APPLICATION_MODAL);
         setSize(1150, 700);
         setLocationRelativeTo(parent);
 
+        // Configuración de fondo con manejo de excepciones
         try {
             JPanel bgPanel = new ImagePanel("/images/bg_audit.png");
             bgPanel.setLayout(new BorderLayout());
@@ -85,10 +101,13 @@ public class InventoryHistoryDialog extends JDialog {
             setContentPane(solidBg);
         }
 
+        // Construcción modular de la UI
         initHeader();
         initFilters();
         initTable();
         initFooter();
+
+        // Carga inicial de datos
         loadData();
     }
 
@@ -105,6 +124,7 @@ public class InventoryHistoryDialog extends JDialog {
     }
 
     private void initFilters() {
+        // Panel translúcido para controles de filtro
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 15)) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -119,6 +139,7 @@ public class InventoryHistoryDialog extends JDialog {
         container.setOpaque(false);
         container.add(panel);
 
+        // Configuración de DatePickers (Librería Externa)
         DatePickerSettings s1 = createLuxuryDarkSettings();
         DatePickerSettings s2 = createLuxuryDarkSettings();
         dateFrom = new DatePicker(s1); dateFrom.setDate(LocalDate.now().minusDays(30));
@@ -129,7 +150,7 @@ public class InventoryHistoryDialog extends JDialog {
         styleCalButton(dateFrom.getComponentToggleCalendarButton());
         styleCalButton(dateTo.getComponentToggleCalendarButton());
 
-        // Fix Negrita
+        // [EVENT LISTENER] Forzado de estilo de fuente en cambio de propiedad
         PropertyChangeListener fontEnforcer = evt -> {
             if ("date".equals(evt.getPropertyName())) {
                 SwingUtilities.invokeLater(() -> {
@@ -141,6 +162,7 @@ public class InventoryHistoryDialog extends JDialog {
         dateFrom.addPropertyChangeListener(fontEnforcer);
         dateTo.addPropertyChangeListener(fontEnforcer);
 
+        // Botones de Acción (Filtrar, Exportar CSV, Reporte PDF)
         SoftButton btnFilter = createIconOnlyButton("icon_lupa_hq.png", LUX_GOLD, "Actualizar Búsqueda");
         btnFilter.addActionListener(e -> { SoundManager.getInstance().playClick(); loadData(); });
 
@@ -162,6 +184,8 @@ public class InventoryHistoryDialog extends JDialog {
 
         add(container, BorderLayout.NORTH);
     }
+
+    // --- MÉTODOS DE CONSTRUCCIÓN DE COMPONENTES VISUALES ---
 
     private SoftButton createIconOnlyButton(String imgName, Color hoverColor, String tooltip) {
         SoftButton btn = new SoftButton(null) {
@@ -300,11 +324,14 @@ public class InventoryHistoryDialog extends JDialog {
         header.setFont(new Font("Segoe UI", Font.BOLD, 14));
         header.setPreferredSize(new Dimension(0, 45));
 
+        // Renderizado personalizado de celdas (Formato condicional)
         table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
             @Override public Component getTableCellRendererComponent(JTable table, Object value, boolean isSel, boolean hasFocus, int row, int col) {
                 Component c = super.getTableCellRendererComponent(table, value, isSel, hasFocus, row, col);
                 if (!isSel) c.setBackground(row % 2 == 0 ? LUX_BG_DARK : new Color(35, 35, 35));
                 else c.setBackground(new Color(60, 60, 60));
+
+                // Colorimetría según tipo de movimiento
                 if (col == 4) {
                     String val = value != null ? value.toString().toUpperCase() : "";
                     if (val.contains("ENTRADA")) c.setForeground(LUX_VERDE);
@@ -350,6 +377,11 @@ public class InventoryHistoryDialog extends JDialog {
         add(footer, BorderLayout.SOUTH);
     }
 
+    // --- LÓGICA DE NEGOCIO Y PERSISTENCIA ---
+
+    /**
+     * [PATRÓN DAO] Recupera el historial de movimientos de la BD según rango de fechas.
+     */
     private void loadData() {
         if (dateFrom.getDate() == null || dateTo.getDate() == null) return;
         LocalDate ldFrom = dateFrom.getDate(); LocalDate ldTo = dateTo.getDate();
@@ -383,6 +415,8 @@ public class InventoryHistoryDialog extends JDialog {
         }
     }
 
+    // --- FUNCIONALIDAD: EXPORTACIÓN DE REPORTES ---
+
     private void exportToCSV() {
         JFileChooser fc = new JFileChooser();
         fc.setDialogTitle("Exportar Reporte CSV");
@@ -408,14 +442,16 @@ public class InventoryHistoryDialog extends JDialog {
         }
     }
 
-    // --- REPORTE PDF (HEADER BIEN ARRIBA + TITULO FUCSIA + LOGO ABAJO) ---
+    /**
+     * [LIBRERÍA iText] Generación de PDF con formato estético corporativo.
+     */
     private void exportToAestheticPDF() {
         if (model.getRowCount() == 0) {
             LuxuryMessage.show(this, "VACÍO", "No hay datos para exportar.", true);
             return;
         }
         try {
-            // AJUSTE: Margen superior reducido a 10 (antes 30 o 40)
+            // Configuración de documento
             Document doc = new Document(PageSize.A4.rotate(), 30, 30, 10, 30);
             String fileName = "Reporte_SICONI_" + System.currentTimeMillis() + ".pdf";
             PdfWriter.getInstance(doc, new FileOutputStream(fileName));
@@ -424,10 +460,9 @@ public class InventoryHistoryDialog extends JDialog {
             BaseColor COLOR_GOLD = new BaseColor(212, 175, 55);
             BaseColor COLOR_HEADER_BG = BaseColor.BLACK;
             BaseColor COLOR_HEADER_TXT = new BaseColor(212, 175, 55);
-            // AJUSTE: Color Fucsia Vibrante
             BaseColor COLOR_FUCSIA = new BaseColor(255, 0, 128);
 
-            // TÍTULO EN FUCSIA
+            // Construcción del Encabezado del Reporte
             com.itextpdf.text.Font fTitle = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 24, com.itextpdf.text.Font.BOLD, COLOR_FUCSIA);
             com.itextpdf.text.Font fSub = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 10, com.itextpdf.text.Font.NORMAL, BaseColor.GRAY);
 
@@ -457,6 +492,7 @@ public class InventoryHistoryDialog extends JDialog {
             doc.add(lineT);
             doc.add(new Paragraph(" "));
 
+            // Construcción de la Tabla de Datos PDF
             PdfPTable pTable = new PdfPTable(model.getColumnCount());
             pTable.setWidthPercentage(100);
             pTable.setWidths(new float[]{0.8f, 2.5f, 1.2f, 4f, 1.5f, 1f, 4f});
@@ -487,13 +523,12 @@ public class InventoryHistoryDialog extends JDialog {
             }
             doc.add(pTable);
 
-            // --- AJUSTE: FIN DEL REPORTE ELIMINADO ---
-            // Solo ponemos el Logo abajo
+            // Inserción de Logo al pie de página
             try {
                 com.itextpdf.text.Image img = com.itextpdf.text.Image.getInstance(getClass().getResource("/images/logo.png"));
                 img.scaleToFit(150, 80);
                 img.setAlignment(Element.ALIGN_CENTER);
-                img.setSpacingBefore(30); // Espacio antes del logo firma
+                img.setSpacingBefore(30);
                 doc.add(img);
             } catch (Exception e) {}
 
@@ -506,10 +541,11 @@ public class InventoryHistoryDialog extends JDialog {
         }
     }
 
+    // Clase interna para el diálogo de confirmación de exportación
     private class LuxuryPDFDialog extends JDialog {
         public LuxuryPDFDialog(Dialog parent, String filePath) {
             super(parent, true);
-            setUndecorated(true);
+            setUndecorated(false);
             setSize(380, 210);
             setLocationRelativeTo(parent);
             setBackground(new Color(0,0,0,0));

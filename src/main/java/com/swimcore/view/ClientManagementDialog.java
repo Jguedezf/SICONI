@@ -2,12 +2,10 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: UNEG - SICONI
  * ARCHIVO: ClientManagementDialog.java
- * VERSIÓN: 8.0.0 (ANTI-FREEZE: Asynchronous Loading)
- * DESCRIPCIÓN:
- * 1. RENDIMIENTO: Toda la carga de datos (inicial y refresco) se hace en un hilo
- *    secundario (SwingWorker), eliminando el "botón hundido" y la lentitud.
- * 2. UX: Se muestra un mensaje de "Cargando..." y los botones se desactivan
- *    mientras se conecta a la base de datos.
+ * VERSIÓN: 9.0.0 (ANTI-BOUNCE: Cierre Seguro sin Rebote)
+ * FECHA: 07 de Febrero de 2026
+ * DESCRIPCIÓN: Se implementa bloqueo de doble clic para evitar el "zapateo"
+ * al cerrar la ventana o confirmar selección.
  * -----------------------------------------------------------------------------
  */
 
@@ -34,11 +32,18 @@ import java.util.stream.Collectors;
 
 public class ClientManagementDialog extends JDialog {
 
-    private ClientController controller; // Se inicializará en segundo plano
-    private List<Client> allClients = Collections.emptyList(); // Inicia como lista vacía
+    // ========================================================================================
+    //                                  ATRIBUTOS Y DEPENDENCIAS
+    // ========================================================================================
+
+    private ClientController controller;
+    private List<Client> allClients = Collections.emptyList();
     private JPanel cardsPanel;
     private Client selectedClient = null;
     private final boolean isSelectionMode;
+
+    // --- VARIABLE ANTI-REBOTE ---
+    private boolean isClosing = false;
 
     private JTextField txtSearch;
     private JLabel lblTitle;
@@ -47,6 +52,10 @@ public class ClientManagementDialog extends JDialog {
     private final Color COLOR_GOLD = new Color(212, 175, 55);
     private final Color COLOR_FUCSIA = new Color(220, 0, 115);
     private final String PLACEHOLDER_TEXT = LanguageManager.get("clients.search") + "...";
+
+    // ========================================================================================
+    //                                  CONSTRUCTORES
+    // ========================================================================================
 
     public ClientManagementDialog(Frame owner, boolean isSelectionMode) {
         super(owner, LanguageManager.get("clients.title"), true);
@@ -57,17 +66,21 @@ public class ClientManagementDialog extends JDialog {
 
         getRootPane().setBorder(BorderFactory.createLineBorder(COLOR_GOLD, 2));
 
-        JPanel backgroundPanel = new ImagePanel("/images/bg2.png");
-        backgroundPanel.setBackground(new Color(40, 40, 40));
-        backgroundPanel.setLayout(new BorderLayout());
-        setContentPane(backgroundPanel);
+        try {
+            JPanel backgroundPanel = new ImagePanel("/images/bg2.png");
+            backgroundPanel.setBackground(new Color(40, 40, 40));
+            backgroundPanel.setLayout(new BorderLayout());
+            setContentPane(backgroundPanel);
+        } catch (Exception e) {
+            getContentPane().setBackground(new Color(40, 40, 40));
+            setLayout(new BorderLayout());
+        }
 
         add(createHeader(), BorderLayout.NORTH);
         add(createMainContent(), BorderLayout.CENTER);
         add(createActionPanel(), BorderLayout.EAST);
         add(createFooter(), BorderLayout.SOUTH);
 
-        // --- INICIAMOS LA CARGA ASÍNCRONA ---
         loadAndRefreshClientsAsync();
     }
 
@@ -75,34 +88,32 @@ public class ClientManagementDialog extends JDialog {
 
     public Client getSelectedClient() { return selectedClient; }
 
-    // --- MÉTODO CLAVE: CARGA DE DATOS SIN CONGELAR LA UI ---
+    // ========================================================================================
+    //                                  LÓGICA ASÍNCRONA
+    // ========================================================================================
+
     private void loadAndRefreshClientsAsync() {
-        // 1. Desactivar botones y mostrar "Cargando..."
         setActionsEnabled(false);
         showLoadingState();
 
-        // 2. Crear el hilo de trabajo
         new SwingWorker<List<Client>, Void>() {
             @Override
             protected List<Client> doInBackground() throws Exception {
-                // Esto se ejecuta en un hilo secundario
                 if (controller == null) {
-                    controller = new ClientController(); // La primera vez, se conecta a la BD aquí
+                    controller = new ClientController();
                 }
-                return controller.getAllClients(); // La consulta pesada se hace aquí
+                return controller.getAllClients();
             }
 
             @Override
             protected void done() {
                 try {
-                    // Esto se ejecuta en el hilo principal cuando termina lo anterior
-                    allClients = get(); // Obtenemos la lista de clientes
-                    refreshClientCards(allClients); // Actualizamos las tarjetas
+                    allClients = get();
+                    refreshClientCards(allClients);
                 } catch (Exception e) {
                     e.printStackTrace();
                     showErrorState("Error al cargar datos.");
                 } finally {
-                    // 3. Reactivar los botones
                     setActionsEnabled(true);
                     updateButtonStates();
                 }
@@ -132,9 +143,12 @@ public class ClientManagementDialog extends JDialog {
 
     private void setActionsEnabled(boolean enabled) {
         btnNew.setEnabled(enabled);
-        btnBack.setEnabled(enabled);
-        // Edit y Delete dependen de la selección, se manejan en updateButtonStates
+        if(btnBack != null) btnBack.setEnabled(enabled);
     }
+
+    // ========================================================================================
+    //                                  INTERFAZ (UI)
+    // ========================================================================================
 
     private JPanel createHeader() {
         JPanel headerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
@@ -254,8 +268,9 @@ public class ClientManagementDialog extends JDialog {
 
         btnConfirm = createActionButton(LanguageManager.get("clients.btn.confirm"), "/images/icons/icon_check_gold.png");
         btnConfirm.setForeground(COLOR_FUCSIA);
+        // FIX: Uso de safeClose para evitar rebote
         btnConfirm.addActionListener(e -> {
-            if(selectedClient != null) dispose();
+            if (selectedClient != null) safeClose(true);
         });
         actionPanel.add(btnConfirm);
 
@@ -269,13 +284,24 @@ public class ClientManagementDialog extends JDialog {
         footerPanel.setBorder(new EmptyBorder(0, 0, 20, 30));
 
         btnBack = createActionButton(LanguageManager.get("clients.btn.back"), "/images/icons/icon_cancel_gold.png");
-        btnBack.addActionListener(e -> {
-            selectedClient = null;
-            dispose();
-        });
+        // FIX: Uso de safeClose para evitar rebote
+        btnBack.addActionListener(e -> safeClose(false));
 
         footerPanel.add(btnBack);
         return footerPanel;
+    }
+
+    // --- NUEVO MÉTODO PARA CIERRE SEGURO ---
+    private void safeClose(boolean isConfirming) {
+        if (isClosing) return; // Si ya se está cerrando, ignora clics adicionales
+
+        isClosing = true; // Activa el bloqueo
+
+        if (!isConfirming) {
+            selectedClient = null; // Si es volver, limpiamos selección
+        }
+
+        dispose();
     }
 
     private SoftButton createActionButton(String text, String iconPath) {
@@ -297,6 +323,10 @@ public class ClientManagementDialog extends JDialog {
         } catch (Exception e) {}
         return null;
     }
+
+    // ========================================================================================
+    //                                  CONTROL Y EVENTOS
+    // ========================================================================================
 
     private void updateButtonStates() {
         boolean clientIsSelected = (selectedClient != null);
@@ -320,18 +350,13 @@ public class ClientManagementDialog extends JDialog {
     private void onCardSelected(Client client) {
         this.selectedClient = client;
         updateButtonStates();
-        refreshClientCards(allClients); // Refresca visualmente la selección
+        refreshClientCards(allClients); // Actualiza la visualización para reflejar la selección
     }
 
-    // --- MÉTODO MODIFICADO ---
     private void openAddEditDialog(Client clientToEdit) {
-        // La ventana AddEditClientDialog ya es rápida por sí misma
         AddEditClientDialog dialog = new AddEditClientDialog((Frame) this.getOwner(), clientToEdit);
-        dialog.setVisible(true); // Se queda aquí hasta que se cierre
-
-        // Al volver, recargamos la lista de forma asíncrona para no congelar
+        dialog.setVisible(true);
         loadAndRefreshClientsAsync();
-
         selectedClient = null;
         updateButtonStates();
     }
@@ -345,7 +370,7 @@ public class ClientManagementDialog extends JDialog {
             if (controller.deleteClient(selectedClient.getCode())) {
                 LuxuryMessage.show("Éxito", LanguageManager.get("clients.msg.delete.success"), false);
                 selectedClient = null;
-                loadAndRefreshClientsAsync(); // Refresco asíncrono
+                loadAndRefreshClientsAsync();
             } else {
                 LuxuryMessage.show("Error", LanguageManager.get("clients.msg.delete.error"), true);
             }
@@ -369,7 +394,7 @@ public class ClientManagementDialog extends JDialog {
 
     private void refreshClientCards(List<Client> clients) {
         cardsPanel.removeAll();
-        if (clients.isEmpty() && controller != null) { // Evita mostrar "no hay" mientras carga
+        if (clients.isEmpty() && controller != null) {
             JLabel emptyLabel = new JLabel(LanguageManager.get("clients.msg.empty"));
             emptyLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
             emptyLabel.setForeground(Color.GRAY);
@@ -384,7 +409,8 @@ public class ClientManagementDialog extends JDialog {
                         onCardSelected(client);
                         if (e.getClickCount() == 2) {
                             if (isSelectionMode) {
-                                dispose();
+                                // FIX: Doble clic también usa cierre seguro
+                                safeClose(true);
                             } else {
                                 openAddEditDialog(client);
                             }

@@ -1,9 +1,15 @@
 /*
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
+ * PROYECTO: SICONI - Sistema de Control de Negocio e Inventario | DG SWIMWEAR
  * ARCHIVO: SupplierManagementDialog.java
  * VERSIÓN: 8.1.0 (Fix: TextArea Address + Rounded Social Buttons)
- * FECHA: Enero 2026
+ * FECHA: 06 de Febrero de 2026
+ * HORA: 08:30 PM (Hora de Venezuela)
+ * DESCRIPCIÓN TÉCNICA:
+ * Módulo de Gestión de Proveedores. Permite el registro, consulta y modificación
+ * de datos de contacto empresarial. Integra accesos directos a plataformas
+ * externas (WhatsApp, Instagram) y manejo de direcciones extendidas.
  * -----------------------------------------------------------------------------
  */
 
@@ -28,18 +34,29 @@ import java.awt.event.FocusEvent;
 import java.net.URI;
 import java.net.URL;
 
+/**
+ * [VISTA - PROVEEDORES] Clase que implementa la interfaz de administración de proveedores.
+ * [POO - HERENCIA] Extiende de JDialog para funcionar como un submódulo independiente.
+ * * FUNCIONALIDAD: CRUD de empresas proveedoras y agenda de contactos.
+ */
 public class SupplierManagementDialog extends JDialog {
 
+    // [PATRÓN DAO] Acceso a la capa de datos para la entidad Supplier.
     private final SupplierDAO supplierDAO = new SupplierDAO();
+
+    // Componentes de la tabla de listado
     private DefaultTableModel model;
     private JTable table;
 
+    // Campos del formulario de edición
     private JTextField txtCompany, txtContact, txtPhone, txtEmail, txtInstagram, txtWhatsapp;
-    // CAMBIO 1: Usamos JTextArea para la dirección
+    // [COMPONENTE UI] JTextArea para permitir direcciones físicas extensas (multilínea).
     private JTextArea txtAddress;
+
+    // Variable de estado para controlar la selección actual (ID del proveedor).
     private int selectedId = 0;
 
-    // PALETA LUXURY SICONI
+    // Constantes de diseño (Identidad Visual SICONI)
     private final Color COLOR_GOLD = new Color(212, 175, 55);
     private final Color COLOR_VERDE_NEON = new Color(0, 255, 128);
     private final Color COLOR_FUCSIA_NEON = new Color(255, 0, 127);
@@ -47,13 +64,17 @@ public class SupplierManagementDialog extends JDialog {
     private final Color COLOR_INPUT_BG = new Color(25, 25, 25);
     private final Color COLOR_BG_DIALOG = new Color(18, 18, 18);
 
+    /**
+     * Constructor de la clase. Inicializa la ventana modal y carga los datos.
+     */
     public SupplierManagementDialog(Window parent) {
         super(parent, "SICONI - PROVEEDORES", ModalityType.APPLICATION_MODAL);
-        // Altura ajustada para evitar cortes en pantallas estándar
+        // Ajuste de dimensiones para compatibilidad con resoluciones estándar (1366x768).
         setSize(1250, 680);
         setLocationRelativeTo(parent);
-        setUndecorated(true);
+        setUndecorated(false); // Ventana sin bordes del sistema operativo (Estilo personalizado).
 
+        // Configuración del panel de fondo con imagen o color sólido (Fallback).
         try {
             JPanel bgPanel = new ImagePanel("/images/bg_audit.png");
             bgPanel.setLayout(new BorderLayout());
@@ -68,12 +89,15 @@ public class SupplierManagementDialog extends JDialog {
 
         initUI();
 
+        // [EVENTO DE SELECCIÓN] Vinculación de la tabla con el formulario de edición.
         table.getSelectionModel().addListSelectionListener(e -> updateFieldsFromSelection());
+
+        // Carga inicial de datos desde la base de datos.
         loadSuppliersData();
     }
 
     private void initUI() {
-        // 1. HEADER
+        // 1. ENCABEZADO (HEADER)
         JPanel header = new JPanel(new BorderLayout());
         header.setOpaque(false);
         header.setBorder(new EmptyBorder(20, 0, 10, 0));
@@ -83,7 +107,7 @@ public class SupplierManagementDialog extends JDialog {
         header.add(title, BorderLayout.CENTER);
         add(header, BorderLayout.NORTH);
 
-        // 2. CONTENEDOR CENTRAL
+        // 2. CONTENEDOR CENTRAL (Split Layout: Tabla | Formulario)
         JPanel centerSplit = new JPanel(new GridBagLayout());
         centerSplit.setOpaque(false);
         centerSplit.setBorder(new EmptyBorder(5, 30, 20, 10));
@@ -91,18 +115,18 @@ public class SupplierManagementDialog extends JDialog {
         gbc.fill = GridBagConstraints.BOTH;
         gbc.weighty = 1.0;
 
-        // Tabla (40% ancho)
+        // Panel Izquierdo: Tabla de Listado (40% del ancho)
         gbc.gridx = 0; gbc.weightx = 0.40;
         centerSplit.add(buildTablePanel(), gbc);
 
-        // Formulario (60% ancho)
+        // Panel Derecho: Formulario de Datos (60% del ancho)
         gbc.gridx = 1; gbc.weightx = 0.60;
         gbc.insets = new Insets(0, 25, 0, 0);
         centerSplit.add(buildFormPanel(), gbc);
 
         add(centerSplit, BorderLayout.CENTER);
 
-        // 3. SIDEBAR
+        // 3. BARRA LATERAL (SIDEBAR)
         add(buildSidebar(), BorderLayout.EAST);
     }
 
@@ -125,6 +149,7 @@ public class SupplierManagementDialog extends JDialog {
     }
 
     private JComponent buildFormPanel() {
+        // Panel con efecto de cristal ahumado (Transparencia Alpha).
         JPanel glassPanel = new JPanel(new GridBagLayout()) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -150,13 +175,13 @@ public class SupplierManagementDialog extends JDialog {
         JSeparator sep = new JSeparator(); sep.setForeground(COLOR_GOLD);
         glassPanel.add(sep, gbc); gbc.gridy++;
 
-        // CAMPOS DE TEXTO NORMALES
+        // Generación dinámica de campos de texto
         txtCompany = buildField(glassPanel, "EMPRESA / RAZÓN SOCIAL", gbc, 2);
         txtContact = buildField(glassPanel, "PERSONA CONTACTO", gbc, 2);
         txtPhone = buildField(glassPanel, "TELÉFONO / MÓVIL", gbc, 2);
         txtEmail = buildField(glassPanel, "CORREO ELECTRÓNICO", gbc, 2);
 
-        // REDES SOCIALES (50/50)
+        // Integración de Redes Sociales (Botones de enlace directo)
         gbc.gridwidth = 1; gbc.weightx = 0.5;
         gbc.gridx = 0;
         txtWhatsapp = buildSocialField(glassPanel, "WHATSAPP", "https://wa.me/", gbc, "icon_link_green.png");
@@ -166,16 +191,17 @@ public class SupplierManagementDialog extends JDialog {
 
         gbc.gridy++; gbc.gridx = 0;
 
-        // CAMBIO 1: DIRECCIÓN FISCAL (JTextArea con Scroll)
-        gbc.gridwidth = 2; gbc.weightx = 1.0; gbc.fill = GridBagConstraints.BOTH; // Rellenar espacio
-        gbc.weighty = 0.2; // Dar peso vertical extra a esta fila
+        // [COMPONENTE UI] Configuración especial para la Dirección Fiscal.
+        // Se utiliza JTextArea dentro de un JScrollPane para soportar texto largo.
+        gbc.gridwidth = 2; gbc.weightx = 1.0; gbc.fill = GridBagConstraints.BOTH;
+        gbc.weighty = 0.2;
 
         JLabel lblAddr = new JLabel("DIRECCIÓN FISCAL");
         lblAddr.setFont(new Font("Segoe UI", Font.BOLD, 12));
         lblAddr.setForeground(new Color(180,180,180));
         glassPanel.add(lblAddr, gbc); gbc.gridy++;
 
-        txtAddress = new JTextArea(3, 20); // 3 filas visibles inicialmente
+        txtAddress = new JTextArea(3, 20);
         txtAddress.setFont(new Font("Segoe UI", Font.BOLD, 16));
         txtAddress.setBackground(COLOR_INPUT_BG);
         txtAddress.setForeground(Color.WHITE);
@@ -186,7 +212,7 @@ public class SupplierManagementDialog extends JDialog {
 
         JScrollPane scrollAddr = new JScrollPane(txtAddress);
         scrollAddr.setBorder(new LineBorder(new Color(80, 80, 80)));
-        // Listener para cambiar el color del borde del scrollpane al enfocar el textarea
+        // Listener para feedback visual (cambio de color de borde) al enfocar.
         txtAddress.addFocusListener(new FocusAdapter() {
             public void focusGained(FocusEvent e) { scrollAddr.setBorder(new LineBorder(COLOR_GOLD, 2)); }
             public void focusLost(FocusEvent e) { scrollAddr.setBorder(new LineBorder(new Color(80, 80, 80))); }
@@ -203,7 +229,7 @@ public class SupplierManagementDialog extends JDialog {
         sidebar.setBorder(new EmptyBorder(20, 10, 40, 30));
         sidebar.setPreferredSize(new Dimension(200, 0));
 
-        // BOTONES CON ICONOS GIGANTES (110px)
+        // Botones de acción principales (CRUD + Salir)
         sidebar.add(createBigImgButton("NUEVO", "btn_add.png", e -> resetForm()));
         sidebar.add(createBigImgButton("GUARDAR", "btn_save.png", e -> performSave()));
         sidebar.add(createBigImgButton("ELIMINAR", "btn_delete.png", e -> performDelete()));
@@ -212,10 +238,10 @@ public class SupplierManagementDialog extends JDialog {
         return sidebar;
     }
 
-    // --- Componentes Visuales ---
+    // --- MÉTODOS DE CONSTRUCCIÓN DE COMPONENTES VISUALES ---
 
-    // MÉTODO PARA ICONOS GIGANTES (110px)
     private SoftButton createBigImgButton(String text, String imageName, ActionListener al) {
+        // [POO - CLASE ANÓNIMA] Personalización del pintado del botón.
         SoftButton btn = new SoftButton(null) {
             @Override
             protected void paintComponent(Graphics g) {
@@ -234,7 +260,6 @@ public class SupplierManagementDialog extends JDialog {
         try {
             URL url = getClass().getResource("/images/icons/" + imageName);
             if (url != null) {
-                // ESCALADO GIGANTE: 110x110
                 ImageIcon icon = new ImageIcon(new ImageIcon(url).getImage().getScaledInstance(110, 110, Image.SCALE_SMOOTH));
                 lIcon.setIcon(icon);
             }
@@ -280,26 +305,23 @@ public class SupplierManagementDialog extends JDialog {
         row.setOpaque(false);
         JTextField txt = createTextField();
 
-        // CAMBIO 2: BOTÓN REDONDEADO CORRECTAMENTE (SIN ESQUINAS CUADRADAS)
+        // Botón de enlace externo con bordes redondeados manualmente.
         SoftButton go = new SoftButton(null) {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                // Pintamos el fondo redondeado manualmente
                 g2.setColor(new Color(40,40,40));
-                g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 15, 15); // Radio 15
-                // Pintamos el borde redondeado manualmente
+                g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 15, 15);
                 g2.setColor(new Color(80,80,80));
                 g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 15, 15);
                 g2.dispose();
-                // Super para pintar el icono
                 super.paintComponent(g);
             }
         };
-        go.setPreferredSize(new Dimension(50, 45)); // Altura coincide con el campo de texto
-        go.setOpaque(false); // CRUCIAL: Evita que Swing pinte el fondo cuadrado
-        go.setBorder(new EmptyBorder(5,5,5,5)); // Padding interno para el icono
+        go.setPreferredSize(new Dimension(50, 45));
+        go.setOpaque(false);
+        go.setBorder(new EmptyBorder(5,5,5,5));
 
         try {
             URL url = getClass().getResource("/images/icons/" + iconName);
@@ -309,6 +331,7 @@ public class SupplierManagementDialog extends JDialog {
             }
         } catch(Exception e){}
 
+        // Acción de apertura de enlace en el navegador predeterminado.
         go.addActionListener(e -> openLink(prefix, txt.getText()));
 
         row.add(txt, BorderLayout.CENTER);
@@ -363,6 +386,8 @@ public class SupplierManagementDialog extends JDialog {
         table.getColumnModel().getColumn(1).setPreferredWidth(400);
     }
 
+    // --- LÓGICA DE NEGOCIO ---
+
     private void loadSuppliersData() {
         model.setRowCount(0);
         supplierDAO.getAll().forEach(s -> model.addRow(new Object[]{s.getId(), s.getCompany()}));
@@ -376,7 +401,6 @@ public class SupplierManagementDialog extends JDialog {
                     .ifPresent(s -> {
                         txtCompany.setText(s.getCompany()); txtContact.setText(s.getContact());
                         txtPhone.setText(s.getPhone()); txtEmail.setText(s.getEmail());
-                        // Actualizamos el JTextArea
                         txtAddress.setText(s.getAddress());
                         txtInstagram.setText(s.getInstagram());
                         txtWhatsapp.setText(s.getWhatsapp());
@@ -386,7 +410,7 @@ public class SupplierManagementDialog extends JDialog {
 
     private void performSave() {
         if(txtCompany.getText().trim().isEmpty()) { JOptionPane.showMessageDialog(this, "Nombre de empresa obligatorio.", "Aviso", JOptionPane.WARNING_MESSAGE); return; }
-        // Obtenemos el texto del JTextArea
+        // Creación del objeto Supplier con los datos del formulario.
         Supplier s = new Supplier(selectedId, txtCompany.getText(), txtContact.getText(), txtPhone.getText(), txtEmail.getText(), txtAddress.getText(), txtInstagram.getText(), txtWhatsapp.getText());
         if(supplierDAO.save(s)) { loadSuppliersData(); resetForm(); SoundManager.getInstance().playClick(); }
     }
@@ -399,11 +423,14 @@ public class SupplierManagementDialog extends JDialog {
 
     private void resetForm() {
         selectedId = 0; txtCompany.setText(""); txtContact.setText(""); txtPhone.setText(""); txtEmail.setText("");
-        txtAddress.setText(""); // Limpiamos JTextArea
+        txtAddress.setText("");
         txtInstagram.setText(""); txtWhatsapp.setText("");
         table.clearSelection(); txtCompany.requestFocus();
     }
 
+    /**
+     * [FUNCIONALIDAD EXTERNA] Abre enlaces web en el navegador del sistema.
+     */
     private void openLink(String prefix, String value) {
         try { if(!value.trim().isEmpty()) Desktop.getDesktop().browse(new URI(prefix + value.trim().replace("@", ""))); } catch (Exception ignored) {}
     }
