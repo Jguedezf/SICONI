@@ -1,19 +1,9 @@
 /*
- * -----------------------------------------------------------------------------
- * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
- * PROYECTO: SICONI - Sistema de Control de Negocio e Inventario | DG SWIMWEAR
- * AUTORA: Johanna Gabriela Guédez Flores
- * PROFESORA: Ing. Dubraska Roca
- * ASIGNATURA: Técnicas de Programación III
- * * ARCHIVO: InventoryView.java
- * VERSIÓN: 17.0.0 (ANTI-FREEZE: Optimized Side Panel)
- * FECHA: 07 de Febrero de 2026
- * HORA: 10:00 AM
- * * DESCRIPCIÓN: Módulo de Gestión de Inventario con optimización de hilos
- * para evitar el congelamiento al pulsar botones del menú lateral.
- * -----------------------------------------------------------------------------
- */
-
+INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
+ARCHIVO: InventoryView.java
+VERSIÓN: 16.1.0 (LUXURY FINAL: Interactive Filter Added)
+FECHA: Febrero 2026
+*/
 package com.swimcore.view;
 
 import com.swimcore.dao.ProductDAO;
@@ -35,13 +25,14 @@ import java.util.List;
 import java.util.Locale;
 
 public class InventoryView extends JDialog {
-
     private JTable productTable;
     private DefaultTableModel tableModel;
     private final ProductDAO productDAO = new ProductDAO();
+
+    // VARIABLE PROMOVIDA PARA CAMBIO DINÁMICO
     private JLabel lblTitle;
 
-    // Paleta de Colores Corporativa
+    // Paleta de Colores Corporativa (SICONI High Contrast)
     private final Color COLOR_GOLD = new Color(212, 175, 55);
     private final Color COLOR_TEXTO = new Color(229, 228, 226);
     private final Color COLOR_VERDE_NEON = new Color(0, 255, 128);
@@ -51,8 +42,10 @@ public class InventoryView extends JDialog {
     private final Color COLOR_INPUT_BG = new Color(30, 30, 30);
     private final Color COLOR_BG_DIALOG = new Color(18, 18, 18);
     private final Color COLOR_LABEL = new Color(180, 180, 180);
-    private final Color COLOR_TABLE_BG_1 = new Color(20, 20, 20);
-    private final Color COLOR_TABLE_BG_2 = new Color(30, 30, 30);
+
+    // Fondos específicos para la Tabla (Efecto Zebra)
+    private final Color COLOR_TABLE_BG_1 = new Color(20, 20, 20); // Fila par
+    private final Color COLOR_TABLE_BG_2 = new Color(30, 30, 30); // Fila impar
 
     private SoftButton btnTasa;
     private JTextField txtSearch;
@@ -85,8 +78,6 @@ public class InventoryView extends JDialog {
         initCenterSection(mainPanel);
 
         add(mainPanel, BorderLayout.CENTER);
-
-        // Carga inicial optimizada
         loadProducts("");
 
         if (showOnlyLowStock) {
@@ -94,10 +85,11 @@ public class InventoryView extends JDialog {
         }
     }
 
+    // --- NUEVO MÉTODO PÚBLICO PARA CONECTAR CON DASHBOARD ---
     public void mostrarSoloBajoStock() {
         this.filterLowStock = true;
         activarModoAlertaVisual();
-        loadProducts("");
+        loadProducts(""); // Recargar tabla con el filtro activado
     }
 
     private void activarModoAlertaVisual() {
@@ -113,40 +105,22 @@ public class InventoryView extends JDialog {
             }
         });
     }
+    // --------------------------------------------------------
 
     private void initSidePanel() {
         InventorySidePanel sidePanel = new InventorySidePanel();
-
-        // --- BOTONES CON CARGA ASÍNCRONA (FIXED) ---
-
         sidePanel.addButton("/images/icons/icon_add.png", LanguageManager.get("inventory.btn.add"), e -> {
-            // Evita congelamiento al abrir el diálogo de nuevo producto
-            runAsync(() -> {
-                new AddEditProductDialog(this, null).setVisible(true);
-                loadProducts("");
-            });
+            new AddEditProductDialog(this, null).setVisible(true);
+            loadProducts("");
         });
-
         sidePanel.addButton("/images/icons/icon_edit.png", LanguageManager.get("inventory.btn.edit"), e -> editSelected());
-
         sidePanel.addButton("/images/icons/icon_delete.png", LanguageManager.get("inventory.btn.delete"), e -> deleteSelected());
-
         sidePanel.add(Box.createVerticalStrut(30));
-
         sidePanel.addButton("/images/icons/icon_stock.png", LanguageManager.get("inventory.btn.stock"), e -> abrirGestionExistencias());
-
-        sidePanel.addButton("/images/icons/icon_audit.png", LanguageManager.get("inventory.btn.audit"), e -> {
-            runAsync(() -> new InventoryHistoryDialog(this).setVisible(true));
-        });
-
-        sidePanel.addButton("/images/icons/icon_users.png", LanguageManager.get("inventory.btn.suppliers"), e -> {
-            runAsync(() -> new SupplierManagementDialog(this).setVisible(true));
-        });
-
+        sidePanel.addButton("/images/icons/icon_audit.png", LanguageManager.get("inventory.btn.audit"), e -> new InventoryHistoryDialog(this).setVisible(true));
+        sidePanel.addButton("/images/icons/icon_users.png", LanguageManager.get("inventory.btn.suppliers"), e -> new SupplierManagementDialog(this).setVisible(true));
         sidePanel.add(Box.createVerticalGlue());
-
         sidePanel.addButton("/images/icons/icon_exit.png", LanguageManager.get("inventory.btn.close"), e -> dispose());
-
         add(sidePanel, BorderLayout.WEST);
     }
 
@@ -155,6 +129,7 @@ public class InventoryView extends JDialog {
         headerPanel.setOpaque(false);
         headerPanel.setBorder(new EmptyBorder(20, 40, 10, 40));
 
+        // Asignamos a la variable de clase en lugar de variable local
         lblTitle = new JLabel(filterLowStock ? "CONTROL DE STOCK CRÍTICO" : LanguageManager.get("inventory.title"));
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 28));
         lblTitle.setForeground(filterLowStock ? COLOR_ROJO_ALERTA : COLOR_GOLD);
@@ -217,7 +192,7 @@ public class InventoryView extends JDialog {
         };
 
         productTable = new JTable(tableModel);
-        styleTable();
+        styleTable(); // APLICACIÓN DE ESTILO
 
         JScrollPane scrollPane = new JScrollPane(productTable);
         scrollPane.setBorder(new LineBorder(COLOR_GOLD, 1));
@@ -263,44 +238,52 @@ public class InventoryView extends JDialog {
 
         JTableHeader header = productTable.getTableHeader();
         header.setPreferredSize(new Dimension(0, 45));
-        header.setBackground(new Color(25, 25, 25));
-        header.setForeground(COLOR_GOLD);
+        header.setBackground(new Color(25, 25, 25)); // Casi negro
+        header.setForeground(COLOR_GOLD); // Letras doradas
         header.setFont(new Font("Segoe UI", Font.BOLD, 14));
         header.setBorder(new LineBorder(COLOR_GOLD, 1));
 
         TableColumnModel cm = productTable.getColumnModel();
-        cm.getColumn(0).setPreferredWidth(50);
-        cm.getColumn(1).setPreferredWidth(100);
-        cm.getColumn(2).setPreferredWidth(300);
-        cm.getColumn(3).setPreferredWidth(130);
-        cm.getColumn(4).setPreferredWidth(160);
-        cm.getColumn(5).setPreferredWidth(220);
-        cm.getColumn(6).setPreferredWidth(130);
-        cm.getColumn(7).setMinWidth(0); cm.getColumn(7).setMaxWidth(0);
+        cm.getColumn(0).setPreferredWidth(50); // ID
+        cm.getColumn(1).setPreferredWidth(100); // Código
+        cm.getColumn(2).setPreferredWidth(300); // Producto
+        cm.getColumn(3).setPreferredWidth(130); // Categoría
+        cm.getColumn(4).setPreferredWidth(160); // Stock
+        cm.getColumn(5).setPreferredWidth(220); // Precio
+        cm.getColumn(6).setPreferredWidth(130); // Proveedor
+        cm.getColumn(7).setMinWidth(0); cm.getColumn(7).setMaxWidth(0); // Oculto
 
+        // RENDERER PERSONALIZADO PARA TODAS LAS COLUMNAS (Menos Stock)
         DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
                 Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+
+                // FONDO ZEBRA
                 if (!isSelected) {
                     c.setBackground(row % 2 == 0 ? COLOR_TABLE_BG_1 : COLOR_TABLE_BG_2);
                 }
-                if (column == 0) {
+
+                // LÓGICA DE ALINEACIÓN Y FORMATO
+                if (column == 0) { // ID CON CEROS
                     setHorizontalAlignment(JLabel.CENTER);
-                    try { setText(String.format("%03d", Integer.parseInt(value.toString()))); } catch (Exception e) {}
+                    try {
+                        setText(String.format("%03d", Integer.parseInt(value.toString())));
+                    } catch (Exception e) {}
                     setForeground(Color.GRAY);
-                } else if (column == 5) {
+                } else if (column == 5) { // PRECIO CENTRADO Y DORADO
                     setHorizontalAlignment(JLabel.CENTER);
                     setForeground(COLOR_GOLD);
                     setFont(new Font("Segoe UI", Font.BOLD, 14));
-                } else if (column == 6) {
+                } else if (column == 6) { // PROVEEDOR CENTRADO
                     setHorizontalAlignment(JLabel.CENTER);
                     setForeground(COLOR_TEXTO);
-                } else {
+                } else { // RESTO IZQUIERDA
                     setHorizontalAlignment(JLabel.LEFT);
                     setForeground(COLOR_TEXTO);
-                    setBorder(new EmptyBorder(0, 10, 0, 0));
+                    setBorder(new EmptyBorder(0, 10, 0, 0)); // Padding
                 }
+
                 return c;
             }
         };
@@ -308,43 +291,41 @@ public class InventoryView extends JDialog {
         for (int i = 0; i < productTable.getColumnCount(); i++) {
             if (i != 4) cm.getColumn(i).setCellRenderer(centerRenderer);
         }
+
+        // RENDERER ESPECIAL PARA STOCK
         cm.getColumn(4).setCellRenderer(new PersistentStockRenderer());
     }
 
     private void loadProducts(String query) {
-        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-        new SwingWorker<List<Product>, Void>() {
-            @Override
-            protected List<Product> doInBackground() throws Exception {
-                if (filterLowStock) return productDAO.getLowStockProducts();
-                else if (query != null && !query.isEmpty()) return productDAO.searchProducts(query);
-                else return productDAO.getAllProducts();
-            }
-            @Override
-            protected void done() {
-                try {
-                    List<Product> list = get();
-                    tableModel.setRowCount(0);
-                    String symbol = CurrencyManager.getSymbol();
-                    productTable.getColumnModel().getColumn(5).setHeaderValue("PRECIO (" + symbol + ")");
-                    productTable.getTableHeader().repaint();
-                    if(btnTasa != null) btnTasa.setText(String.format(Locale.US, LanguageManager.get("inventory.rate_btn"), CurrencyManager.getTasa()));
+        tableModel.setRowCount(0);
+        String symbol = CurrencyManager.getSymbol();
+        productTable.getColumnModel().getColumn(5).setHeaderValue("PRECIO (" + symbol + ")");
+        productTable.getTableHeader().repaint();
+        if(btnTasa != null) btnTasa.setText(String.format(Locale.US, LanguageManager.get("inventory.rate_btn"), CurrencyManager.getTasa()));
 
-                    for (Product p : list) {
-                        double price = p.getSalePrice();
-                        int mode = CurrencyManager.getMode();
-                        double displayPrice = (mode == 2) ? price * CurrencyManager.getTasa() :
-                                (mode == 1) ? CurrencyManager.convert(price) : price;
-                        String cleanPrice = String.format("%,.2f", displayPrice);
-                        tableModel.addRow(new Object[]{
-                                p.getId(), p.getCode(), p.getName(), "General",
-                                p.getCurrentStock(), cleanPrice, "S/P", p.getMinStock()
-                        });
-                    }
-                } catch (Exception e) { e.printStackTrace(); }
-                finally { setCursor(Cursor.getDefaultCursor()); }
-            }
-        }.execute();
+        List<Product> list;
+        if (filterLowStock) list = productDAO.getLowStockProducts();
+        else if (query != null && !query.isEmpty()) list = productDAO.searchProducts(query);
+        else list = productDAO.getAllProducts();
+
+        for (Product p : list) {
+            double price = p.getSalePrice();
+            int mode = CurrencyManager.getMode();
+            double displayPrice = (mode == 2) ? price * CurrencyManager.getTasa() :
+                    (mode == 1) ? CurrencyManager.convert(price) : price;
+            String cleanPrice = String.format("%,.2f", displayPrice);
+
+            tableModel.addRow(new Object[]{
+                    p.getId(),
+                    p.getCode(),
+                    p.getName(),
+                    "General",
+                    p.getCurrentStock(),
+                    cleanPrice,
+                    "S/P",
+                    p.getMinStock()
+            });
+        }
     }
 
     private void updateStockQuickly(int id, int delta, int row, int newVal) {
@@ -356,50 +337,21 @@ public class InventoryView extends JDialog {
 
     private void editSelected() {
         int r = productTable.getSelectedRow();
-        if (r != -1) {
-            // Anti-Freeze al editar
-            runAsync(() -> {
-                new AddEditProductDialog(this, productDAO.getProductById((int) productTable.getValueAt(r, 0))).setVisible(true);
-                loadProducts("");
-            });
-        }
+        if (r != -1) { new AddEditProductDialog(this, productDAO.getProductById((int) productTable.getValueAt(r, 0))).setVisible(true); loadProducts(""); }
     }
 
     private void deleteSelected() {
         int r = productTable.getSelectedRow();
         if (r != -1 && JOptionPane.showConfirmDialog(this, LanguageManager.get("inventory.msg.confirm_delete")) == JOptionPane.YES_OPTION) {
-            // Anti-Freeze al eliminar
-            runAsync(() -> {
-                productDAO.delete((int) productTable.getValueAt(r, 0));
-                loadProducts("");
-            });
+            productDAO.delete((int) productTable.getValueAt(r, 0)); loadProducts("");
         }
     }
 
     private void abrirGestionExistencias() {
         int r = productTable.getSelectedRow();
         if (r == -1) { JOptionPane.showMessageDialog(this, LanguageManager.get("inventory.msg.select"), "Aviso", JOptionPane.WARNING_MESSAGE); return; }
-        // Anti-Freeze al abrir auditoría
-        runAsync(() -> {
-            new AuditStockDialog(this, (int) productTable.getValueAt(r,0), (String) productTable.getValueAt(r,2), (int) productTable.getValueAt(r,4), (int) productTable.getValueAt(r,7)).setVisible(true);
-            loadProducts("");
-        });
-    }
-
-    // --- NUEVO METODO HELPER PARA FLUIDEZ (Anti-Limbo) ---
-    private void runAsync(Runnable action) {
-        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-        new SwingWorker<Void, Void>() {
-            @Override
-            protected Void doInBackground() {
-                action.run();
-                return null;
-            }
-            @Override
-            protected void done() {
-                setCursor(Cursor.getDefaultCursor());
-            }
-        }.execute();
+        new AuditStockDialog(this, (int) productTable.getValueAt(r,0), (String) productTable.getValueAt(r,2), (int) productTable.getValueAt(r,4), (int) productTable.getValueAt(r,7)).setVisible(true);
+        loadProducts("");
     }
 
     class PersistentStockRenderer extends JPanel implements TableCellRenderer {
@@ -416,12 +368,16 @@ public class InventoryView extends JDialog {
         @Override public Component getTableCellRendererComponent(JTable t, Object v, boolean isSel, boolean hasF, int r, int c) {
             val.setText(String.valueOf(v));
             int stock = (int)v;
+
+            // Color de alerta
             if(stock <= 5) val.setForeground(COLOR_ROJO_ALERTA);
             else if(stock <= 15) val.setForeground(COLOR_NARANJA_ALERTA);
             else val.setForeground(Color.WHITE);
 
+            // Fondo Zebra para esta celda también
             if (isSel) setBackground(new Color(55, 55, 55));
             else setBackground(r % 2 == 0 ? COLOR_TABLE_BG_1 : COLOR_TABLE_BG_2);
+
             return this;
         }
     }

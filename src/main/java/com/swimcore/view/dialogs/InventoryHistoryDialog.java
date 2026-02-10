@@ -443,109 +443,125 @@ public class InventoryHistoryDialog extends JDialog {
     }
 
     /**
-     * [LIBRERÍA iText] Generación de PDF con formato estético corporativo.
+     /**
+     * [LIBRERÍA iText] Generación de PDF con formato estético corporativo (HILO SEGURO).
      */
     private void exportToAestheticPDF() {
         if (model.getRowCount() == 0) {
             LuxuryMessage.show(this, "VACÍO", "No hay datos para exportar.", true);
             return;
         }
-        try {
-            // Configuración de documento
-            Document doc = new Document(PageSize.A4.rotate(), 30, 30, 10, 30);
-            String fileName = "Reporte_SICONI_" + System.currentTimeMillis() + ".pdf";
-            PdfWriter.getInstance(doc, new FileOutputStream(fileName));
-            doc.open();
 
-            BaseColor COLOR_GOLD = new BaseColor(212, 175, 55);
-            BaseColor COLOR_HEADER_BG = BaseColor.BLACK;
-            BaseColor COLOR_HEADER_TXT = new BaseColor(212, 175, 55);
-            BaseColor COLOR_FUCSIA = new BaseColor(255, 0, 128);
+        // Usamos SwingWorker para no congelar la pantalla mientras se crea el PDF
+        new SwingWorker<String, Void>() {
+            @Override
+            protected String doInBackground() throws Exception {
+                Document doc = new Document(PageSize.A4.rotate(), 30, 30, 10, 30);
+                String fileName = "Reporte_SICONI_" + System.currentTimeMillis() + ".pdf";
+                PdfWriter.getInstance(doc, new FileOutputStream(fileName));
+                doc.open();
 
-            // Construcción del Encabezado del Reporte
-            com.itextpdf.text.Font fTitle = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 24, com.itextpdf.text.Font.BOLD, COLOR_FUCSIA);
-            com.itextpdf.text.Font fSub = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 10, com.itextpdf.text.Font.NORMAL, BaseColor.GRAY);
+                BaseColor COLOR_GOLD = new BaseColor(212, 175, 55);
+                BaseColor COLOR_HEADER_BG = BaseColor.BLACK;
+                BaseColor COLOR_HEADER_TXT = new BaseColor(212, 175, 55);
+                BaseColor COLOR_FUCSIA = new BaseColor(255, 0, 128);
 
-            Paragraph pTitle = new Paragraph("REPORTE DE INVENTARIO", fTitle);
-            pTitle.setAlignment(Element.ALIGN_CENTER);
-            doc.add(pTitle);
+                // --- HEADER ---
+                com.itextpdf.text.Font fTitle = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 24, com.itextpdf.text.Font.BOLD, COLOR_FUCSIA);
+                com.itextpdf.text.Font fSub = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 10, com.itextpdf.text.Font.NORMAL, BaseColor.GRAY);
 
-            com.itextpdf.text.Font fBrand = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 16, com.itextpdf.text.Font.BOLD, COLOR_GOLD);
-            Paragraph pBrand = new Paragraph("DAYANA GUÉDEZ SWIMWEAR", fBrand);
-            pBrand.setAlignment(Element.ALIGN_CENTER);
-            pBrand.setSpacingBefore(5);
-            doc.add(pBrand);
+                Paragraph pTitle = new Paragraph("REPORTE DE INVENTARIO", fTitle);
+                pTitle.setAlignment(Element.ALIGN_CENTER);
+                doc.add(pTitle);
 
-            String fecha = new SimpleDateFormat("dd/MM/yyyy hh:mm a").format(new Date());
-            Paragraph pDate = new Paragraph("Generado el: " + fecha, fSub);
-            pDate.setAlignment(Element.ALIGN_CENTER);
-            pDate.setSpacingBefore(2);
-            doc.add(pDate);
+                com.itextpdf.text.Font fBrand = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 16, com.itextpdf.text.Font.BOLD, COLOR_GOLD);
+                Paragraph pBrand = new Paragraph("DAYANA GUÉDEZ SWIMWEAR", fBrand);
+                pBrand.setAlignment(Element.ALIGN_CENTER);
+                pBrand.setSpacingBefore(5);
+                doc.add(pBrand);
 
-            doc.add(new Paragraph(" "));
-            PdfPTable lineT = new PdfPTable(1); lineT.setWidthPercentage(100);
-            PdfPCell lineC = new PdfPCell(new Phrase(""));
-            lineC.setBackgroundColor(COLOR_GOLD);
-            lineC.setBorder(com.itextpdf.text.Rectangle.NO_BORDER);
-            lineC.setFixedHeight(4f);
-            lineT.addCell(lineC);
-            doc.add(lineT);
-            doc.add(new Paragraph(" "));
+                String fecha = new SimpleDateFormat("dd/MM/yyyy hh:mm a").format(new Date());
+                Paragraph pDate = new Paragraph("Generado el: " + fecha, fSub);
+                pDate.setAlignment(Element.ALIGN_CENTER);
+                pDate.setSpacingBefore(2);
+                doc.add(pDate);
 
-            // Construcción de la Tabla de Datos PDF
-            PdfPTable pTable = new PdfPTable(model.getColumnCount());
-            pTable.setWidthPercentage(100);
-            pTable.setWidths(new float[]{0.8f, 2.5f, 1.2f, 4f, 1.5f, 1f, 4f});
+                doc.add(new Paragraph(" "));
 
-            for (int i = 0; i < model.getColumnCount(); i++) {
-                PdfPCell c = new PdfPCell(new Phrase(model.getColumnName(i), new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 10, com.itextpdf.text.Font.BOLD, COLOR_HEADER_TXT)));
-                c.setBackgroundColor(COLOR_HEADER_BG);
-                c.setHorizontalAlignment(Element.ALIGN_CENTER);
-                c.setPadding(8);
-                c.setBorderColor(COLOR_GOLD);
-                pTable.addCell(c);
-            }
+                // --- TABLA ---
+                PdfPTable pTable = new PdfPTable(model.getColumnCount());
+                pTable.setWidthPercentage(100);
+                try {
+                    // Ajuste de anchos para que la tabla se vea bien
+                    pTable.setWidths(new float[]{0.8f, 2.5f, 1.2f, 4f, 1.5f, 1f, 4f});
+                } catch(Exception e) { }
 
-            for(int i=0; i<model.getRowCount(); i++) {
-                for(int j=0; j<model.getColumnCount(); j++) {
-                    String val = model.getValueAt(i, j).toString();
-                    PdfPCell c = new PdfPCell(new Phrase(val, new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 9)));
-                    c.setPadding(6);
-                    c.setVerticalAlignment(Element.ALIGN_MIDDLE);
-                    c.setBackgroundColor((i % 2 == 0) ? BaseColor.WHITE : new BaseColor(245, 245, 245));
-                    if (j == 0 || j == 5) c.setHorizontalAlignment(Element.ALIGN_CENTER);
-                    if (j == 4) {
-                        if (val.contains("ENTRADA")) c.setPhrase(new Phrase(val, new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 9, com.itextpdf.text.Font.BOLD, new BaseColor(0,150,50))));
-                        if (val.contains("SALIDA")) c.setPhrase(new Phrase(val, new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 9, com.itextpdf.text.Font.BOLD, new BaseColor(200,0,0))));
-                    }
+                // Cabeceras
+                for (int i = 0; i < model.getColumnCount(); i++) {
+                    PdfPCell c = new PdfPCell(new Phrase(model.getColumnName(i), new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 10, com.itextpdf.text.Font.BOLD, COLOR_HEADER_TXT)));
+                    c.setBackgroundColor(COLOR_HEADER_BG);
+                    c.setHorizontalAlignment(Element.ALIGN_CENTER);
+                    c.setPadding(8);
+                    c.setBorderColor(COLOR_GOLD);
                     pTable.addCell(c);
                 }
+
+                // Datos
+                for(int i=0; i<model.getRowCount(); i++) {
+                    for(int j=0; j<model.getColumnCount(); j++) {
+                        Object valObj = model.getValueAt(i, j);
+                        String val = (valObj != null) ? valObj.toString() : "";
+
+                        PdfPCell c = new PdfPCell(new Phrase(val, new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 9)));
+                        c.setPadding(6);
+                        c.setVerticalAlignment(Element.ALIGN_MIDDLE);
+                        c.setBackgroundColor((i % 2 == 0) ? BaseColor.WHITE : new BaseColor(245, 245, 245));
+
+                        // Alineación y colores condicionales
+                        if (j == 0 || j == 5) c.setHorizontalAlignment(Element.ALIGN_CENTER);
+                        if (j == 4) { // Columna TIPO
+                            if (val.contains("ENTRADA")) c.setPhrase(new Phrase(val, new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 9, com.itextpdf.text.Font.BOLD, new BaseColor(0,150,50))));
+                            if (val.contains("SALIDA")) c.setPhrase(new Phrase(val, new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 9, com.itextpdf.text.Font.BOLD, new BaseColor(200,0,0))));
+                        }
+                        pTable.addCell(c);
+                    }
+                }
+                doc.add(pTable);
+
+                // --- LOGO (Carga segura) ---
+                try {
+                    URL logoUrl = getClass().getResource("/images/logo.png");
+                    if (logoUrl != null) {
+                        com.itextpdf.text.Image img = com.itextpdf.text.Image.getInstance(logoUrl);
+                        img.scaleToFit(150, 80);
+                        img.setAlignment(Element.ALIGN_CENTER);
+                        img.setSpacingBefore(30);
+                        doc.add(img);
+                    }
+                } catch (Exception e) {}
+
+                doc.close();
+                return fileName;
             }
-            doc.add(pTable);
 
-            // Inserción de Logo al pie de página
-            try {
-                com.itextpdf.text.Image img = com.itextpdf.text.Image.getInstance(getClass().getResource("/images/logo.png"));
-                img.scaleToFit(150, 80);
-                img.setAlignment(Element.ALIGN_CENTER);
-                img.setSpacingBefore(30);
-                doc.add(img);
-            } catch (Exception e) {}
-
-            doc.close();
-
-            new LuxuryPDFDialog(this, fileName).setVisible(true);
-
-        } catch (Exception e) {
-            LuxuryMessage.show(this, "ERROR PDF", e.getMessage(), true);
-        }
+            @Override
+            protected void done() {
+                try {
+                    String fileName = get();
+                    // Mostrar diálogo de éxito personalizado
+                    new LuxuryPDFDialog(InventoryHistoryDialog.this, fileName).setVisible(true);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    LuxuryMessage.show(InventoryHistoryDialog.this, "ERROR PDF", "Fallo al crear PDF.\n" + e.getMessage(), true);
+                }
+            }
+        }.execute();
     }
-
     // Clase interna para el diálogo de confirmación de exportación
     private class LuxuryPDFDialog extends JDialog {
         public LuxuryPDFDialog(Dialog parent, String filePath) {
             super(parent, true);
-            setUndecorated(false);
+            setUndecorated(true);
             setSize(380, 210);
             setLocationRelativeTo(parent);
             setBackground(new Color(0,0,0,0));

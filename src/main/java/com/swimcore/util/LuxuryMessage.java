@@ -1,16 +1,9 @@
 /*
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: Universidad Nacional Experimental de Guayana (UNEG)
- * CARRERA: Ingeniería en Informática
- * ASIGNATURA: Programación III / Proyecto de Software
  * ARCHIVO: LuxuryMessage.java
- * VERSIÓN: 6.1 (FINAL TOUCH: Verde Neón + Tamaño Botón)
- * FECHA: 05 de Febrero de 2026 - 13:15 PM (VENEZUELA)
- * * DESCRIPCIÓN TÉCNICA:
- * Implementación de una interfaz de diálogo personalizada (Custom Dialog) para
- * el sistema de notificaciones de SICONI. Sustituye el estándar JOptionPane por
- * una solución estética basada en renderizado vectorial (Graphics2D) y el
- * componente especializado SoftButton.
+ * VERSIÓN: 9.0 (FINAL FIX - NO DECORATION ERROR)
+ * DESCRIPCIÓN: Solución definitiva al error "The dialog is decorated".
  * -----------------------------------------------------------------------------
  */
 package com.swimcore.util;
@@ -19,62 +12,42 @@ import com.swimcore.view.components.SoftButton;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.geom.RoundRectangle2D;
 import java.net.URL;
 
-/**
- * [UTILIDAD - INTERFAZ] Clase encargada de la renderización de cuadros de mensaje.
- * [POO - HERENCIA] Extiende de javax.swing.JDialog para heredar capacidades modales.
- * [REQUERIMIENTO NO FUNCIONAL] Usabilidad y Estética: Provee feedback visual premium.
- */
 public class LuxuryMessage extends JDialog {
 
-    // ========================================================================================
-    //                                  ATRIBUTOS Y CONSTANTES (ENCAPSULAMIENTO)
-    // ========================================================================================
-
-    // Definición de la paleta semántica del sistema para notificaciones.
     private static final Color BG_DARK = new Color(20, 20, 20);
     private static final Color GOLD = new Color(212, 175, 55);
     private static final Color ERROR_RED = new Color(220, 50, 50);
+    private static final Color SUCCESS_GREEN = new Color(57, 255, 20);
     private static final Color TEXT_WHITE = new Color(230, 230, 230);
 
-    // ========================================================================================
-    //                                  CONSTRUCTOR (PRIVADO)
-    // ========================================================================================
-
-    /**
-     * Inicializa el diálogo configurando el motor de renderizado y la disposición de elementos.
-     * [CONSTRUCTOR PRIVADO] Se restringe la instanciación directa para forzar el uso
-     * de los métodos estáticos .show(), garantizando el ciclo de vida modal del diálogo.
-     * * @param parent Ventana propietaria del diálogo.
-     * @param title Título del encabezado del mensaje.
-     * @param message Contenido textual de la notificación.
-     * @param isError Flag que determina la colorimetría semántica (Verde Neón vs Rojo).
-     */
     private LuxuryMessage(Window parent, String title, String message, boolean isError) {
+        // CORRECCIÓN CLAVE: Pasamos el padre directamente al superconstructor
         super(parent, ModalityType.APPLICATION_MODAL);
-        setBackground(new Color(0,0,0,0)); // Transparencia a nivel de ventana para bordes redondeados.
 
-        Color accentColor = isError ? ERROR_RED : new Color(57, 255, 20); // Aplicación de Verde Neón.
+        // CORRECCIÓN CLAVE: setUndecorated DEBE ir antes de cualquier otra cosa
+        try {
+            setUndecorated(true);
+        } catch (Exception e) {
+            // Si falla (muy raro), continuamos con bordes normales
+        }
 
-        // [COMPONENTE ANÓNIMO] Panel principal con sobreescritura del método paintComponent.
+        setBackground(new Color(0,0,0,0));
+
+        Color accentColor = isError ? ERROR_RED : SUCCESS_GREEN;
+
         JPanel mainPanel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                // Activación de suavizado de bordes (Antialiasing).
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-                // Aplicación de Degradado Lineal (GradientPaint) para profundidad visual.
                 GradientPaint gp = new GradientPaint(0, 0, BG_DARK, 0, getHeight(), BG_DARK.darker());
                 g2.setPaint(gp);
-                g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 35, 35);
-
-                // Dibujado de borde perimetral según el estado de la notificación.
+                g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 25, 25);
                 g2.setColor(accentColor);
                 g2.setStroke(new BasicStroke(2));
-                g2.drawRoundRect(1, 1, getWidth()-3, getHeight()-3, 35, 35);
+                g2.drawRoundRect(1, 1, getWidth()-3, getHeight()-3, 25, 25);
                 g2.dispose();
             }
         };
@@ -82,33 +55,31 @@ public class LuxuryMessage extends JDialog {
         mainPanel.setBorder(new EmptyBorder(20, 25, 20, 25));
         mainPanel.setLayout(new BorderLayout(20, 10));
 
-        // --- SECCIÓN: ICONOGRAFÍA ---
+        // Icono
         JLabel iconLabel = new JLabel();
         if (isError) {
             iconLabel.setText("❌");
-            iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 50));
+            iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 40));
             iconLabel.setForeground(ERROR_RED);
         } else {
-            ImageIcon icon = loadIcon("logo.png", 60);
-            if (icon != null) {
-                iconLabel.setIcon(icon);
-            } else {
+            ImageIcon icon = loadIcon("logo.png", 50);
+            if (icon != null) iconLabel.setIcon(icon);
+            else {
                 iconLabel.setText("✅");
-                iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 50));
+                iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 40));
                 iconLabel.setForeground(GOLD);
             }
         }
         iconLabel.setVerticalAlignment(SwingConstants.TOP);
 
-        // --- SECCIÓN: CONTENIDO TEXTUAL ---
-        JPanel centerPanel = new JPanel(new BorderLayout(0, 10));
+        // Contenido
+        JPanel centerPanel = new JPanel(new BorderLayout(0, 8));
         centerPanel.setOpaque(false);
 
         JLabel lblTitle = new JLabel(title.toUpperCase());
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 16));
         lblTitle.setForeground(accentColor);
 
-        // Uso de JTextArea para soportar multilínea y ajuste de texto dinámico.
         JTextArea txtMsg = new JTextArea(message);
         txtMsg.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         txtMsg.setForeground(TEXT_WHITE);
@@ -118,66 +89,56 @@ public class LuxuryMessage extends JDialog {
         txtMsg.setEditable(false);
         txtMsg.setFocusable(false);
         txtMsg.setBorder(null);
+        txtMsg.setSize(new Dimension(300, 1));
+
         centerPanel.add(lblTitle, BorderLayout.NORTH);
         centerPanel.add(txtMsg, BorderLayout.CENTER);
 
-        // --- SECCIÓN: CONTROLES DE ACCIÓN ---
+        // Botón
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
         btnPanel.setOpaque(false);
 
-        // Integración con el componente personalizado SoftButton.
         SoftButton btnOk = new SoftButton(null);
         btnOk.setText("ACEPTAR");
-        btnOk.setPreferredSize(new Dimension(150, 50));
+        btnOk.setPreferredSize(new Dimension(120, 40));
         btnOk.setForeground(Color.BLACK);
         btnOk.setBackground(accentColor);
-        btnOk.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        btnOk.setFont(new Font("Segoe UI", Font.BOLD, 12));
         btnOk.addActionListener(e -> dispose());
         btnPanel.add(btnOk);
 
-        // Ensamblado final de la jerarquía visual.
         mainPanel.add(iconLabel, BorderLayout.WEST);
         mainPanel.add(centerPanel, BorderLayout.CENTER);
         mainPanel.add(btnPanel, BorderLayout.SOUTH);
 
         setContentPane(mainPanel);
-        pack(); // Cálculo automático de dimensiones basado en el contenido (PreferredSize).
-        if (parent != null) setLocationRelativeTo(parent);
-        else setLocationRelativeTo(null);
+        pack();
+        if (getWidth() < 350) setSize(350, getHeight());
+        setLocationRelativeTo(parent);
     }
 
-    /**
-     * [MÉTODO AUXILIAR] Carga y escala recursos gráficos del paquete.
-     */
     private ImageIcon loadIcon(String name, int size) {
         try {
             URL url = getClass().getResource("/images/" + name);
-            if (url != null) {
-                return new ImageIcon(new ImageIcon(url).getImage().getScaledInstance(size, size, java.awt.Image.SCALE_SMOOTH));
-            }
+            if (url != null) return new ImageIcon(new ImageIcon(url).getImage().getScaledInstance(size, size, 4));
         } catch (Exception e) {}
         return null;
     }
 
-    // =================================================================================
-    // MÉTODOS ESTÁTICOS (SOBRECARGA / POLIMORFISMO AD-HOC)
-    // =================================================================================
-
-    /** * [FACHADA ESTÁTICA] MODO 1: Requiere un componente padre para centrado relativo.
-     * Recupera el ancestro de tipo Window para garantizar la jerarquía de ventanas Swing.
-     */
-    public static void show(Component parentComponent, String title, String msg, boolean isError) {
-        Window window = SwingUtilities.getWindowAncestor(parentComponent);
-        if (window == null && parentComponent instanceof Window) {
-            window = (Window) parentComponent;
-        }
-        new LuxuryMessage(window, title, msg, isError).setVisible(true);
+    // --- MÉTODOS ESTÁTICOS ---
+    public static void show(Component parent, String title, String msg, boolean isError) {
+        SwingUtilities.invokeLater(() -> {
+            try {
+                Window win = (parent instanceof Window) ? (Window) parent : SwingUtilities.getWindowAncestor(parent);
+                new LuxuryMessage(win, title, msg, isError).setVisible(true);
+            } catch (Exception e) {
+                // Fallback seguro
+                JOptionPane.showMessageDialog(parent, msg, title, isError ? JOptionPane.ERROR_MESSAGE : JOptionPane.INFORMATION_MESSAGE);
+            }
+        });
     }
 
-    /** * [FACHADA ESTÁTICA] MODO 2: Método simplificado para invocaciones sin contexto.
-     * Garantiza la interoperabilidad con módulos de bajo nivel del sistema.
-     */
     public static void show(String title, String msg, boolean isError) {
-        new LuxuryMessage(null, title, msg, isError).setVisible(true);
+        show(null, title, msg, isError);
     }
 }

@@ -2,9 +2,9 @@
  * -----------------------------------------------------------------------------
  * INSTITUCIÓN: UNEG - SICONI
  * ARCHIVO: OrderManagementView.java
- * VERSIÓN: 14.1.1 (FIXED: Decimal Parsing Error)
- * DESCRIPCIÓN: Se corrigió el error de formato que multiplicaba los montos
- * al omitir el separador decimal durante el parseo del texto.
+ * VERSIÓN: 15.0.0 (ASYNC PRINTING + THREAD SAFE)
+ * DESCRIPCIÓN: Optimización de rendimiento. La generación del recibo y la
+ * carga de detalles ahora ocurren en segundo plano para no congelar la UI.
  * -----------------------------------------------------------------------------
  */
 
@@ -17,6 +17,7 @@ import com.swimcore.model.Client;
 import com.swimcore.model.Payment;
 import com.swimcore.util.ImagePanel;
 import com.swimcore.util.LanguageManager;
+import com.swimcore.util.LuxuryMessage;
 import com.swimcore.view.components.SoftButton;
 import com.swimcore.view.dialogs.AddPaymentDialog;
 import com.swimcore.view.dialogs.ReceiptPreviewDialog;
@@ -90,12 +91,23 @@ public class OrderManagementView extends JDialog {
         setLayout(new BorderLayout());
         ((JPanel)getContentPane()).setBorder(new LineBorder(COLOR_GOLD, 2));
 
-        clientCache = clientDAO.getAllClients();
+        // Carga de clientes en segundo plano
+        new SwingWorker<List<Client>, Void>() {
+            @Override
+            protected List<Client> doInBackground() {
+                return clientDAO.getAllClients();
+            }
+            @Override
+            protected void done() {
+                try {
+                    clientCache = get();
+                    loadOrders(); // Cargar ordenes despues de tener los clientes
+                } catch (Exception e) { e.printStackTrace(); }
+            }
+        }.execute();
 
         add(createHeader(), BorderLayout.NORTH);
         add(createMainPanel(), BorderLayout.CENTER);
-
-        loadOrders();
     }
 
     private JPanel createHeader() {
@@ -408,242 +420,201 @@ public class OrderManagementView extends JDialog {
     }
 
     private void updateDetailsPanel(String saleId) {
-        String sql = "SELECT * FROM sales WHERE id = '" + saleId + "'";
-        try (Connection conn = com.swimcore.dao.Conexion.conectar()) {
+        new SwingWorker<Void, Void>() {
+            String clientName, clientContact, status, historyText;
+            double total, paid, due;
+            List<Object[]> items = new ArrayList<>();
+            Color statusColor;
 
-            try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
-                if (rs.next()) {
-                    currentSaleDate = rs.getString("date");
+            @Override
+            protected Void doInBackground() throws Exception {
+                try (Connection conn = com.swimcore.dao.Conexion.conectar()) {
+                    // 1. Datos Principales
+                    try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery("SELECT * FROM sales WHERE id = '" + saleId + "'")) {
+                        if (rs.next()) {
+                            currentSaleDate = rs.getString("date");
+                            int clientId = rs.getInt("client_id");
+                            Client client = clientCache.stream().filter(c -> c.getId() == clientId).findFirst().orElse(null);
 
-                    int clientId = rs.getInt("client_id");
-                    Client client = clientCache.stream().filter(c -> c.getId() == clientId).findFirst().orElse(null);
-                    if (client != null) {
-                        lblClientName.setText(client.getFullName().toUpperCase());
-                        lblClientContact.setText("TLF: " + client.getPhone());
-                    } else {
-                        lblClientName.setText("CLIENTE DESCONOCIDO");
+                            clientName = (client != null) ? client.getFullName().toUpperCase() : "CLIENTE DESCONOCIDO";
+                            clientContact = (client != null) ? "TLF: " + client.getPhone() : "";
+
+                            total = rs.getDouble("total_divisa");
+                            paid = rs.getDouble("amount_paid_usd");
+                            due = rs.getDouble("balance_due_usd");
+
+                            String statusBD = rs.getString("status");
+                            if(due <= 0.01) { status = "PAGADO"; statusColor = COLOR_GREEN_NEON; }
+                            else { status = "PENDIENTE"; statusColor = COLOR_RED_ALERT; }
+                            if("ENTREGADO".equalsIgnoreCase(statusBD)) { status = "ENTREGADO"; statusColor = COLOR_GREEN_NEON; }
+                        }
                     }
 
-                    double total = rs.getDouble("total_divisa");
-                    double paid = rs.getDouble("amount_paid_usd");
-                    double due = rs.getDouble("balance_due_usd");
-
-                    lblTotalValue.setText(String.format("$%,.2f", total));
-                    lblPaidValue.setText(String.format("$%,.2f", paid));
-                    lblDueValue.setText(String.format("$%,.2f", due));
-
-                    String statusBD = rs.getString("status");
-                    String statusMostrar = "PENDIENTE";
-                    Color colorStatus = COLOR_GOLD;
-
-                    if(due <= 0.01) {
-                        statusMostrar = "PAGADO";
-                        colorStatus = COLOR_GREEN_NEON;
-                    } else {
-                        statusMostrar = "PENDIENTE";
-                        colorStatus = COLOR_RED_ALERT;
-                    }
-                    if("ENTREGADO".equalsIgnoreCase(statusBD)) {
-                        statusMostrar = "ENTREGADO";
-                        colorStatus = COLOR_GREEN_NEON;
+                    // 2. Items
+                    try (PreparedStatement pst = conn.prepareStatement("SELECT p.name, d.quantity FROM sale_details d JOIN products p ON d.product_id = p.id WHERE d.sale_id = ?")) {
+                        pst.setString(1, saleId);
+                        ResultSet rsItems = pst.executeQuery();
+                        while(rsItems.next()) {
+                            items.add(new Object[]{ rsItems.getString("name"), rsItems.getInt("quantity") });
+                        }
                     }
 
-                    lblStatus.setText("ESTADO: " + statusMostrar);
-                    lblStatus.setForeground(colorStatus);
+                    // 3. Pagos
+                    List<Payment> payments = paymentDAO.getPaymentsForSale(saleId);
+                    StringBuilder sb = new StringBuilder();
+                    if (payments.isEmpty()){ sb.append("Sin pagos."); }
+                    else {
+                        for(Payment p : payments) {
+                            String raw = p.getPaymentDate();
+                            try { String[] parts = raw.split(" ")[0].split("-"); raw = parts[2] + "/" + parts[1] + "/" + parts[0]; } catch(Exception e) {}
+                            sb.append(String.format("%s | Ref:%s | $%.2f\n", raw, p.getReference(), p.getAmountUSD()));
+                        }
+                    }
+                    historyText = sb.toString();
                 }
+                return null;
             }
 
-            productsModel.setRowCount(0);
-            String sqlItems = "SELECT p.name, d.quantity FROM sale_details d JOIN products p ON d.product_id = p.id WHERE d.sale_id = ?";
-            try (PreparedStatement pst = conn.prepareStatement(sqlItems)) {
-                pst.setString(1, saleId);
-                ResultSet rsItems = pst.executeQuery();
-                while(rsItems.next()) {
-                    productsModel.addRow(new Object[]{
-                            rsItems.getString("name"),
-                            rsItems.getInt("quantity")
-                    });
-                }
+            @Override
+            protected void done() {
+                lblClientName.setText(clientName);
+                lblClientContact.setText(clientContact);
+                lblTotalValue.setText(String.format("$%,.2f", total));
+                lblPaidValue.setText(String.format("$%,.2f", paid));
+                lblDueValue.setText(String.format("$%,.2f", due));
+                lblStatus.setText("ESTADO: " + status);
+                lblStatus.setForeground(statusColor);
+
+                productsModel.setRowCount(0);
+                for(Object[] row : items) productsModel.addRow(row);
+
+                paymentHistoryArea.setText(historyText);
+                paymentHistoryArea.setCaretPosition(0);
             }
-
-            List<Payment> payments = paymentDAO.getPaymentsForSale(saleId);
-            StringBuilder history = new StringBuilder();
-
-            if (payments.isEmpty()){
-                history.append("Sin pagos.");
-            } else {
-                for(Payment p : payments) {
-                    String rawDate = p.getPaymentDate();
-                    String fechaBonita = rawDate;
-                    try {
-                        String[] parts = rawDate.split(" ")[0].split("-");
-                        fechaBonita = parts[2] + "/" + parts[1] + "/" + parts[0];
-                    } catch(Exception e) {}
-
-                    history.append(String.format("%s | Ref:%s | $%.2f\n",
-                            fechaBonita,
-                            p.getReference(),
-                            p.getAmountUSD()));
-                }
-            }
-            paymentHistoryArea.setText(history.toString());
-            paymentHistoryArea.setCaretPosition(0);
-
-        } catch (Exception e) { e.printStackTrace(); }
+        }.execute();
     }
 
     private void loadOrders() {
-        tableModel.setRowCount(0);
-        String sql = "SELECT id, client_id, delivery_date, total_divisa, balance_due_usd, status FROM sales ORDER BY date DESC";
-        try (Connection conn = com.swimcore.dao.Conexion.conectar();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            while (rs.next()) {
-                Vector<Object> row = new Vector<>();
-                row.add(rs.getString("id"));
-                int clientId = rs.getInt("client_id");
-                String clientName = clientCache.stream().filter(c -> c.getId() == clientId)
-                        .map(Client::getFullName).findFirst().orElse("N/A");
-                row.add(clientName);
+        new SwingWorker<List<Vector<Object>>, Void>() {
+            @Override
+            protected List<Vector<Object>> doInBackground() throws Exception {
+                List<Vector<Object>> data = new ArrayList<>();
+                String sql = "SELECT id, client_id, delivery_date, total_divisa, balance_due_usd, status FROM sales ORDER BY date DESC";
+                try (Connection conn = com.swimcore.dao.Conexion.conectar(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+                    while (rs.next()) {
+                        Vector<Object> row = new Vector<>();
+                        row.add(rs.getString("id"));
+                        int clientId = rs.getInt("client_id");
+                        String clientName = (clientCache != null) ? clientCache.stream().filter(c -> c.getId() == clientId).map(Client::getFullName).findFirst().orElse("N/A") : "Cargando...";
+                        row.add(clientName);
 
-                String rawDate = rs.getString("delivery_date");
-                String fechaBonita = rawDate;
-                try {
-                    String[] parts = rawDate.split("-");
-                    fechaBonita = parts[2] + "/" + parts[1] + "/" + parts[0];
-                } catch(Exception e) {}
-                row.add(fechaBonita);
+                        String dDate = rs.getString("delivery_date");
+                        try { String[] parts = dDate.split("-"); dDate = parts[2] + "/" + parts[1] + "/" + parts[0]; } catch(Exception e) {}
+                        row.add(dDate);
 
-                row.add(rs.getDouble("total_divisa"));
-                row.add(rs.getDouble("balance_due_usd"));
+                        row.add(rs.getDouble("total_divisa"));
+                        row.add(rs.getDouble("balance_due_usd"));
 
-                String statusBD = rs.getString("status");
-                double due = rs.getDouble("balance_due_usd");
-                String shortStatus = "PENDIENTE";
-                if(due <= 0.01) shortStatus = "PAGADO";
-                if("ENTREGADO".equalsIgnoreCase(statusBD)) shortStatus = "ENTREGADO";
-                row.add(shortStatus);
-
-                tableModel.addRow(row);
+                        String st = "PENDIENTE";
+                        if(rs.getDouble("balance_due_usd") <= 0.01) st = "PAGADO";
+                        if("ENTREGADO".equalsIgnoreCase(rs.getString("status"))) st = "ENTREGADO";
+                        row.add(st);
+                        data.add(row);
+                    }
+                }
+                return data;
             }
-        } catch (Exception e) { e.printStackTrace(); }
+            @Override
+            protected void done() {
+                try {
+                    List<Vector<Object>> rows = get();
+                    tableModel.setRowCount(0);
+                    for(Vector<Object> r : rows) tableModel.addRow(r);
+                } catch(Exception e) { e.printStackTrace(); }
+            }
+        }.execute();
     }
 
     private void openAddPaymentDialog() {
         if (selectedSaleId == null) {
-            JOptionPane.showMessageDialog(this, "Seleccione un pedido.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            LuxuryMessage.show(this, "AVISO", "Seleccione un pedido.", true);
             return;
         }
 
-        JPanel glass = new JPanel() {
-            @Override
-            protected void paintComponent(Graphics g) {
-                g.setColor(new Color(0, 0, 0, 150));
-                g.fillRect(0, 0, getWidth(), getHeight());
-            }
-        };
+        // Efecto visual GlassPane
+        JPanel glass = new JPanel() { @Override protected void paintComponent(Graphics g) { g.setColor(new Color(0, 0, 0, 150)); g.fillRect(0, 0, getWidth(), getHeight()); }};
         glass.setOpaque(false);
-        this.setGlassPane(glass);
+        setGlassPane(glass);
         glass.setVisible(true);
 
-        AddPaymentDialog dialog = new AddPaymentDialog(this, selectedSaleId);
-        dialog.setVisible(true);
-
+        new AddPaymentDialog(this, selectedSaleId).setVisible(true);
         glass.setVisible(false);
 
         loadOrders();
-        for (int i = 0; i < tableModel.getRowCount(); i++) {
-            if (tableModel.getValueAt(i, 0).equals(selectedSaleId)) {
-                ordersTable.setRowSelectionInterval(i, i);
-                updateDetailsPanel(selectedSaleId);
-                break;
-            }
-        }
+        if(selectedSaleId != null) updateDetailsPanel(selectedSaleId);
     }
 
     private void openPrintReceiptDialog() {
         if (selectedSaleId == null) {
-            JOptionPane.showMessageDialog(this, "Seleccione un pedido para imprimir.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            LuxuryMessage.show(this, "AVISO", "Seleccione un pedido para imprimir.", true);
             return;
         }
 
-        JPanel glass = new JPanel() {
+        // Ejecutar en segundo plano para no congelar la UI
+        new SwingWorker<List<TicketItem>, Void>() {
             @Override
-            protected void paintComponent(Graphics g) {
-                g.setColor(new Color(0, 0, 0, 150));
-                g.fillRect(0, 0, getWidth(), getHeight());
+            protected List<TicketItem> doInBackground() throws Exception {
+                List<TicketItem> lista = new ArrayList<>();
+                String sql = "SELECT d.quantity, d.subtotal, p.name FROM sale_details d LEFT JOIN products p ON d.product_id = p.id WHERE d.sale_id = ?";
+                try (Connection conn = com.swimcore.dao.Conexion.conectar(); PreparedStatement pst = conn.prepareStatement(sql)) {
+                    pst.setString(1, selectedSaleId);
+                    ResultSet rs = pst.executeQuery();
+                    while(rs.next()){
+                        String nombre = rs.getString("name");
+                        if(nombre == null) nombre = "Artículo";
+                        lista.add(new TicketItem(nombre, rs.getInt("quantity"), rs.getDouble("subtotal")));
+                    }
+                }
+                return lista;
             }
-        };
-        glass.setOpaque(false);
-        this.setGlassPane(glass);
-        glass.setVisible(true);
 
-        String cliente = lblClientName.getText();
-        String tlf = lblClientContact.getText().replace("TLF:", "").trim();
-        String fecha = (currentSaleDate.isEmpty()) ? "Hoy" : currentSaleDate;
+            @Override
+            protected void done() {
+                try {
+                    List<TicketItem> items = get();
 
-        // RECOLECCIÓN CORREGIDA DE MONTOS
-        double total = parseMonto(lblTotalValue.getText());
-        double abonado = parseMonto(lblPaidValue.getText());
-        double resta = parseMonto(lblDueValue.getText());
+                    JPanel glass = new JPanel() { @Override protected void paintComponent(Graphics g) { g.setColor(new Color(0, 0, 0, 150)); g.fillRect(0, 0, getWidth(), getHeight()); }};
+                    glass.setOpaque(false);
+                    setGlassPane(glass);
+                    glass.setVisible(true);
 
-        List<TicketItem> listaItems = new ArrayList<>();
-        String sql = "SELECT d.quantity, d.subtotal, p.name " +
-                "FROM sale_details d LEFT JOIN products p ON d.product_id = p.id " +
-                "WHERE d.sale_id = ?";
+                    String cliente = lblClientName.getText();
+                    String tlf = lblClientContact.getText().replace("TLF:", "").trim();
+                    String fecha = (currentSaleDate.isEmpty()) ? "Hoy" : currentSaleDate;
+                    double total = parseMonto(lblTotalValue.getText());
+                    double abonado = parseMonto(lblPaidValue.getText());
+                    double resta = parseMonto(lblDueValue.getText());
 
-        try (Connection conn = com.swimcore.dao.Conexion.conectar();
-             PreparedStatement pst = conn.prepareStatement(sql)) {
-            pst.setString(1, selectedSaleId);
-            ResultSet rs = pst.executeQuery();
-            while(rs.next()){
-                String nombre = rs.getString("name");
-                if(nombre == null) nombre = "Artículo";
-                listaItems.add(new TicketItem(
-                        nombre,
-                        rs.getInt("quantity"),
-                        rs.getDouble("subtotal")
-                ));
+                    ReceiptPreviewDialog dialog = new ReceiptPreviewDialog(OrderManagementView.this, selectedSaleId, fecha, cliente, tlf, items, total, abonado, resta);
+                    dialog.setVisible(true);
+                    glass.setVisible(false);
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    LuxuryMessage.show(OrderManagementView.this, "ERROR", "No se pudieron cargar los datos del recibo.", true);
+                }
             }
-        } catch(Exception e) {
-            e.printStackTrace();
-        }
-
-        ReceiptPreviewDialog dialog = new ReceiptPreviewDialog(
-                this,
-                selectedSaleId,
-                fecha,
-                cliente,
-                tlf,
-                listaItems,
-                total, abonado, resta
-        );
-        dialog.setVisible(true);
-
-        glass.setVisible(false);
+        }.execute();
     }
 
-    // MÉTODO REPARADO: Ahora maneja comas y puntos correctamente para evitar multiplicaciones
     private double parseMonto(String text) {
         if (text == null || text.isEmpty()) return 0.0;
         try {
-            // Eliminamos el símbolo de dólar y espacios
             String clean = text.replace("$", "").trim();
-
-            // Si el formato usa punto para miles y coma para decimales (ej: 1.234,56)
-            if (clean.contains(",") && clean.contains(".")) {
-                clean = clean.replace(".", "").replace(",", ".");
-            }
-            // Si solo tiene coma (ej. 88,00), la cambiamos por punto
-            else if (clean.contains(",")) {
-                clean = clean.replace(",", ".");
-            }
-
+            if (clean.contains(",") && clean.contains(".")) clean = clean.replace(".", "").replace(",", ".");
+            else if (clean.contains(",")) clean = clean.replace(",", ".");
             return Double.parseDouble(clean);
-        } catch (Exception e) {
-            System.err.println("Error parseando monto: " + text);
-            return 0.0;
-        }
+        } catch (Exception e) { return 0.0; }
     }
 
     private void styleTable() {
@@ -675,17 +646,12 @@ public class OrderManagementView extends JDialog {
             @Override
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int col) {
                 Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, col);
-
                 if (!isSelected) {
                     c.setBackground(row % 2 == 0 ? COLOR_TABLE_BG_1 : COLOR_TABLE_BG_2);
                     c.setForeground(Color.WHITE);
                 }
-
-                if (col == 1) {
-                    setHorizontalAlignment(SwingConstants.LEFT);
-                } else {
-                    setHorizontalAlignment(SwingConstants.CENTER);
-                }
+                if (col == 1) setHorizontalAlignment(SwingConstants.LEFT);
+                else setHorizontalAlignment(SwingConstants.CENTER);
 
                 if (col == 3 || col == 4) {
                     if (value instanceof Number) setText(String.format("%,.2f", (Double) value));
@@ -701,7 +667,6 @@ public class OrderManagementView extends JDialog {
                         else setForeground(COLOR_RED_ALERT);
                     }
                 }
-
                 setBorder(new EmptyBorder(0, 10, 0, 10));
                 return c;
             }
@@ -738,10 +703,8 @@ public class OrderManagementView extends JDialog {
         btn.setText(text);
         btn.setForeground(textColor);
         btn.setFont(new Font("Segoe UI", Font.BOLD, 13));
-
         btn.setContentAreaFilled(false);
         btn.setOpaque(false);
-
         try {
             if(iconPath != null) {
                 URL url = getClass().getResource(iconPath);

@@ -131,7 +131,7 @@ public class ReportsDAO {
     // ========================================================================================
 
     /**
-     * [NUEVO MÉTODO] Realiza el desglose de margen de utilidad por artículo.
+     * [NUEVO METODO] Realiza el desglose de margen de utilidad por artículo.
      * [LÓGICA DE NEGOCIO] Cruza el ingreso por subtotal contra el costo unitario de
      * adquisición o manufactura para determinar la rentabilidad real.
      * * @return Lista de arreglos conteniendo: [Nombre, Unidades, Ingresos, Costo, Ganancia].

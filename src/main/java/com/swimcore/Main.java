@@ -10,14 +10,15 @@
  * AUTORA: Johanna Guedez - V14089807
  * PROFESORA: Ing. Dubraska Roca
  * FECHA: 06 de Febrero de 2026 - 01:15 PM
- * VERSIÓN: 2.5.0 (FINAL RUN - Security Enabled)
+ * VERSIÓN: 2.6.0 (DPI SAFE - SECURITY ENABLED)
  *
  * DESCRIPCIÓN TÉCNICA:
  * Clase ejecutora (Entry Point).
- * 1. Inicializa el Look & Feel (FlatLaf) para la estética "Luxury".
- * 2. Verifica la conexión a BD y crea tablas si no existen (Persistencia).
- * 3. Garantiza que exista al menos un usuario ADMIN (Seguridad Fail-Safe).
- * 4. Lanza la interfaz gráfica (LoginView) en el hilo de despacho de eventos.
+ * 1. Fuerza el escalado 1.0 para compatibilidad con monitores de alta densidad (DPI).
+ * 2. Inicializa el Look & Feel (FlatLaf) para la estética "Luxury".
+ * 3. Verifica la conexión a BD y crea tablas si no existen (Persistencia).
+ * 4. Garantiza que exista al menos un usuario ADMIN (Seguridad Fail-Safe).
+ * 5. Lanza la interfaz gráfica (LoginView) en el hilo de despacho de eventos.
  * -----------------------------------------------------------------------------
  */
 
@@ -46,6 +47,10 @@ public class Main {
      */
     public static void main(String[] args) {
 
+        // 0. BLINDAJE CONTRA ESCALADO DE WINDOWS (DPI SAFE)
+        // Evita que los iconos y botones se corten en monitores con zoom activo.
+        System.setProperty("sun.java2d.uiScale", "1.0");
+
         // 1. CONFIGURACIÓN VISUAL (LOOK AND FEEL)
         // Se establece la librería FlatLaf Dark para cumplir con la identidad visual "Luxury".
         try {
@@ -67,7 +72,7 @@ public class Main {
 
             // -------------------------------------------------------
             // ⚠ ZONA DE CARGA DE DATOS (Data Seeder) ⚠
-            // Descomentar SOLO si necesitas borrar todo y crear datos desde cero.
+            // Descomentar SOLO si necesitas borrar y crear datos desde cero.
             // -------------------------------------------------------
 
             // DataSeeder.reiniciarYSembrar();

@@ -8,7 +8,9 @@
  */
 
 package com.swimcore.view.dialogs;
-
+import java.awt.Window;
+import javax.swing.SwingUtilities;
+import com.swimcore.util.LuxuryMessage;
 import com.swimcore.dao.ProductDAO;
 import com.swimcore.model.Product;
 import com.swimcore.util.ImagePanel;
@@ -41,7 +43,7 @@ public class AddEditProductDialog extends JDialog {
     private final Color COLOR_INPUT_BG = new Color(30, 30, 30);
 
     public AddEditProductDialog(Window parent, Product product) {
-        super(parent, "SICONI - PRODUCT MASTER CONTROL", ModalityType.APPLICATION_MODAL);
+        super(parent, "SICONI - CONTROL MAESTRO DE PRODUCTOS", ModalityType.APPLICATION_MODAL);
         this.productToEdit = product;
         setupNomenclature();
 
@@ -309,19 +311,40 @@ public class AddEditProductDialog extends JDialog {
     private void resetForm() {
         txtName.setText(""); txtDesc.setText(""); txtCostPrice.setText("0.00"); txtSalePrice.setText("0.00"); txtStock.setText("0"); txtMinStock.setText("5"); generarCodigo();
     }
-
     private void guardar() {
         try {
-            if (txtName.getText().isEmpty()) { JOptionPane.showMessageDialog(this, "Debe ingresar el nombre."); return; }
-            Product p = (productToEdit == null) ? new Product() : productToEdit;
-            p.setCode(txtCode.getText()); p.setName(txtName.getText().trim()); p.setDescription(txtDesc.getText().trim());
-            p.setCostPrice(Double.parseDouble(txtCostPrice.getText().replace(",", "."))); p.setSalePrice(Double.parseDouble(txtSalePrice.getText().replace(",", ".")));
-            p.setCurrentStock(Integer.parseInt(txtStock.getText())); p.setMinStock(Integer.parseInt(txtMinStock.getText()));
-            p.setCategoryId(cmbCategory.getSelectedIndex() + 1);
-            if (productDAO.save(p)) { SoundManager.getInstance().playClick(); dispose(); }
-        } catch (Exception ex) { JOptionPane.showMessageDialog(this, "Error de datos."); }
-    }
+            if (txtName.getText().trim().isEmpty()) {
+                // Usamos tu LuxuryMessage para la validación
+                LuxuryMessage.show(this, "VALIDACIÓN", "Debe ingresar el nombre del producto.", true);
+                return;
+            }
 
+            Product p = (productToEdit == null) ? new Product() : productToEdit;
+            p.setCode(txtCode.getText());
+            p.setName(txtName.getText().trim());
+            p.setDescription(txtDesc.getText().trim());
+            p.setCostPrice(Double.parseDouble(txtCostPrice.getText().replace(",", ".")));
+            p.setSalePrice(Double.parseDouble(txtSalePrice.getText().replace(",", ".")));
+            p.setCurrentStock(Integer.parseInt(txtStock.getText()));
+            p.setMinStock(Integer.parseInt(txtMinStock.getText()));
+            p.setCategoryId(cmbCategory.getSelectedIndex() + 1);
+
+            if (productDAO.save(p)) {
+                SoundManager.getInstance().playClick();
+
+                // --- CORRECCIÓN DE FLUJO ---
+                // Capturamos la ventana principal antes de cerrar el formulario
+                Window parent = SwingUtilities.getWindowAncestor(this);
+                dispose();
+
+                // Mostramos el mensaje de éxito después de cerrar, usando la ventana principal como padre
+                LuxuryMessage.show(parent, "SICONI - ÉXITO", "El registro se completó correctamente.", false);
+            }
+        } catch (Exception ex) {
+            // Mensaje de error personalizado en lugar del JOptionPane
+            LuxuryMessage.show(this, "ERROR DE DATOS", "Verifique que los precios y stock sean numéricos.", true);
+        }
+    }
     private void eliminar() {
         if (JOptionPane.showConfirmDialog(this, "¿Eliminar producto?", "SICONI", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
             if (productDAO.delete(productToEdit.getId())) dispose();

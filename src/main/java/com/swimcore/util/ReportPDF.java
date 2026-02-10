@@ -39,7 +39,7 @@ public class ReportPDF {
     // ========================================================================================
 
     /**
-     * [MÉTODO ESTÁTICO] Coordina la creación del documento PDF.
+     * [METODO ESTÁTICO] Coordina la creación del documento PDF.
      * Implementa un algoritmo de construcción secuencial: Configuración -> Apertura ->
      * Inyección de Datos -> Cierre -> Visualización.
      * * @param rango Descripción del periodo de tiempo analizado.

@@ -777,17 +777,26 @@ public class SalesView extends JPanel {
 
     // --- CLASE INTERNA LIMPIA (Línea 782 en adelante) ---
 // --- NUEVA VENTANA GESTIÓN DE RECIBO (EDICIÓN LUXURY FASHION 3D) ---
-// --- NUEVA VENTANA GESTIÓN DE RECIBO (EDICIÓN FASHION 3D MATADORA V2) ---
+// --- NUEVA VENTANA GESTIÓN DE RECIBO (CORREGIDA: setUndecorated = TRUE) ---
     private class ReceiptOptionDialog extends JDialog {
         private String orderId;
 
         public ReceiptOptionDialog(Window parent, String orderId) {
             super(parent);
             this.orderId = orderId;
+
+            // --- CORRECCIÓN CRÍTICA ---
+            // Esto DEBE ser true para que funcione la transparencia y los bordes redondos.
+            // Si está en false, Java lanza el error "The dialog is decorated" y no abre.
+            setUndecorated(true);
+            // ---------------------------
+
             setModal(true);
-            setUndecorated(false);
             setSize(450, 320);
             setLocationRelativeTo(parent);
+
+            // Importante: El fondo transparente debe ir después de setUndecorated(true)
+            setBackground(new Color(0,0,0,0));
 
             JPanel mainPanel = new JPanel() {
                 @Override protected void paintComponent(Graphics g) {
@@ -816,40 +825,49 @@ public class SalesView extends JPanel {
             lblOrder.setForeground(Color.LIGHT_GRAY);
             lblOrder.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-            // --- BOTONES CON COLORES FORZADOS ---
+            // --- BOTONES ---
 
             // 1. Botón Abrir PDF (NEÓN INTENSO)
             SoftButton btnPreview = new SoftButton(null);
             btnPreview.setText("ABRIR COMPROBANTE PDF");
-            btnPreview.setBackground(new Color(57, 255, 20)); // Forzamos el Neón
-            btnPreview.setForeground(Color.BLACK); // Texto negro para contraste máximo
+            btnPreview.setBackground(new Color(57, 255, 20)); // Verde Neón
+            btnPreview.setForeground(Color.BLACK);
             btnPreview.setOpaque(true);
             btnPreview.setFont(new Font("Segoe UI", Font.BOLD, 14));
             btnPreview.setMaximumSize(new Dimension(320, 55));
             btnPreview.setAlignmentX(Component.CENTER_ALIGNMENT);
             btnPreview.addActionListener(e -> {
-                try {
-                    com.swimcore.dao.SaleDAO sDAO = new com.swimcore.dao.SaleDAO();
-                    Sale sale = sDAO.getSaleById(orderId);
-                    List<SaleDetail> details = sDAO.getDetailsBySaleId(orderId);
-                    Client client = null;
-                    if (sale.getClientId() != null) {
+                // Ejecutar en hilo separado para evitar mini-congelamientos
+                new SwingWorker<Void, Void>() {
+                    @Override protected Void doInBackground() {
                         try {
-                            int idNum = Integer.parseInt(sale.getClientId().replaceAll("[^0-9]",""));
-                            client = new com.swimcore.dao.ClientDAO().getClientById(idNum);
-                        } catch (Exception ex) {
-                            client = new com.swimcore.dao.ClientDAO().getClientByCode(sale.getClientId());
-                        }
+                            com.swimcore.dao.SaleDAO sDAO = new com.swimcore.dao.SaleDAO();
+                            Sale sale = sDAO.getSaleById(orderId);
+                            List<SaleDetail> details = sDAO.getDetailsBySaleId(orderId);
+                            Client client = null;
+                            if (sale.getClientId() != null) {
+                                try {
+                                    int idNum = Integer.parseInt(sale.getClientId().replaceAll("[^0-9]",""));
+                                    client = new com.swimcore.dao.ClientDAO().getClientById(idNum);
+                                } catch (Exception ex) {
+                                    client = new com.swimcore.dao.ClientDAO().getClientByCode(sale.getClientId());
+                                }
+                            }
+                            // Generar y Abrir (true = abrir automáticamente)
+                            com.swimcore.util.ReceiptGenerator.generateReceipt(sale, details, client, true);
+                        } catch(Exception ex) { ex.printStackTrace(); }
+                        return null;
                     }
-                    com.swimcore.util.ReceiptGenerator.generateReceipt(sale, details, client, true);
-                    this.dispose();
-                } catch(Exception ex) { ex.printStackTrace(); }
+                    @Override protected void done() {
+                        dispose(); // Cerrar ventana al terminar
+                    }
+                }.execute();
             });
 
-            // 2. Botón Ver Carpeta (GRIS METÁLICO)
+            // 2. Botón Ver Carpeta
             SoftButton btnFolder = new SoftButton(null);
             btnFolder.setText("VER EN CARPETA DE RECIBOS");
-            btnFolder.setBackground(new Color(20, 20, 20)); // Negro Profundo
+            btnFolder.setBackground(new Color(20, 20, 20));
             btnFolder.setForeground(Color.WHITE);
             btnFolder.setOpaque(true);
             btnFolder.setFont(new Font("Segoe UI", Font.BOLD, 12));
@@ -860,7 +878,7 @@ public class SalesView extends JPanel {
                 catch(Exception ex){ ex.printStackTrace(); }
             });
 
-            // 3. Botón Continuar (Elegante)
+            // 3. Botón Continuar
             JButton btnClose = new JButton("CONTINUAR");
             btnClose.setForeground(Color.GRAY);
             btnClose.setFont(new Font("Segoe UI", Font.BOLD, 12));
@@ -881,7 +899,6 @@ public class SalesView extends JPanel {
             mainPanel.add(btnClose);
 
             setContentPane(mainPanel);
-            setBackground(new Color(0,0,0,0));
         }
     }
 
